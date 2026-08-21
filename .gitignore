@@ -1,0 +1,9 @@
+node_modules/
+
+# Los archivos sueltos de prueba no se publican; los del showcase, sí.
+*.pkt
+*.pka
+*.pcap
+*.pcapng
+!showcase/*
+pruebas/

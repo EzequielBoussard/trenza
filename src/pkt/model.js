@@ -1,0 +1,181 @@
+import { t } from '../i18n.js';
+
+const DEVICE_CATEGORIES = [
+  { match: /router/i, category: 'router' },
+  { match: /switch|bridge/i, category: 'switch' },
+  { match: /access\s*point|wireless|wrt|wrs|repeater/i, category: 'wireless' },
+  { match: /server/i, category: 'server' },
+  { match: /laptop|tablet|pda|smartphone|phone/i, category: 'endpoint' },
+  { match: /\bpc\b|desktop|printer|tv|thin\s*client/i, category: 'endpoint' },
+  { match: /cloud|wan|dsl|cable\s*modem|modem/i, category: 'cloud' },
+  { match: /firewall|asa/i, category: 'security' },
+  { match: /\bmcu|\bsbc|\biot|sensor|actuator|smart/i, category: 'iot' },
+];
+
+// Los límites de palabra importan: sin ellos «TabletPC» cae en infraestructura por «table».
+const INFRASTRUCTURE = /power distribution|coaxial splitter|\b(rack|shelf|table)\b/i;
+
+function childText(parent, tagName) {
+  for (const child of parent.children) {
+    if (child.tagName === tagName) return child.textContent.trim();
+  }
+  return '';
+}
+
+function childrenNamed(parent, tagName) {
+  return Array.from(parent.children).filter((child) => child.tagName === tagName);
+}
+
+function classify(typeText, modelText) {
+  const subject = `${typeText} ${modelText}`;
+  if (INFRASTRUCTURE.test(subject)) return 'infrastructure';
+  for (const rule of DEVICE_CATEGORIES) {
+    if (rule.match.test(subject)) return rule.category;
+  }
+  return 'other';
+}
+
+// Las interfaces con nombre sólo aparecen en la configuración; el árbol de puertos
+// guarda direcciones pero no la nomenclatura que usa el equipo.
+function interfacesFromConfig(configLines) {
+  const interfaces = [];
+  let current = null;
+
+  for (const raw of configLines) {
+    const line = raw.trim();
+    const opened = line.match(/^interface\s+(\S+)/i);
+    if (opened) {
+      current = { name: opened[1], addresses: [], description: '', enabled: true, source: 'config' };
+      interfaces.push(current);
+      continue;
+    }
+    if (!current) continue;
+    if (line === '!' || /^(line|router|ip route)\b/i.test(line)) {
+      current = null;
+      continue;
+    }
+
+    const ipv4 = line.match(/^ip address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)/i);
+    if (ipv4) current.addresses.push({ family: 'IPv4', address: ipv4[1], mask: ipv4[2] });
+
+    const ipv6 = line.match(/^ipv6 address\s+(\S+)/i);
+    if (ipv6) current.addresses.push({ family: 'IPv6', address: ipv6[1], mask: '' });
+
+    const description = line.match(/^description\s+(.+)/i);
+    if (description) current.description = description[1];
+
+    if (/^shutdown$/i.test(line)) current.enabled = false;
+  }
+
+  return interfaces.filter((entry) => entry.addresses.length > 0 || entry.description);
+}
+
+function interfacesFromPorts(engine) {
+  const interfaces = [];
+  for (const port of engine.getElementsByTagName('PORT')) {
+    const ip = childText(port, 'IP');
+    const mac = childText(port, 'MACADDRESS');
+    if (!ip && !mac) continue;
+    interfaces.push({
+      name: '',
+      addresses: ip ? [{ family: 'IPv4', address: ip, mask: childText(port, 'SUBNET') }] : [],
+      mac,
+      gateway: childText(port, 'PORT_GATEWAY'),
+      description: '',
+      enabled: true,
+      source: 'ports',
+    });
+  }
+  return interfaces;
+}
+
+function readDevice(deviceNode) {
+  const engine = childrenNamed(deviceNode, 'ENGINE')[0];
+  if (!engine) return null;
+
+  const id = childText(engine, 'SAVE_REF_ID');
+  if (!id) return null;
+
+  const typeNode = childrenNamed(engine, 'TYPE')[0];
+  const typeText = typeNode ? typeNode.textContent.trim() : '';
+  const modelText = typeNode ? typeNode.getAttribute('model') || '' : '';
+  const category = classify(typeText, modelText);
+
+  const configNode = childrenNamed(engine, 'RUNNINGCONFIG')[0];
+  const configLines = configNode
+    ? childrenNamed(configNode, 'LINE').map((line) => line.textContent.replace(/\r/g, ''))
+    : [];
+
+  const namedInterfaces = interfacesFromConfig(configLines);
+  const workspace = childrenNamed(deviceNode, 'WORKSPACE')[0];
+  const logical = workspace ? childrenNamed(workspace, 'LOGICAL')[0] : null;
+
+  return {
+    id,
+    name: childText(engine, 'NAME') || childText(engine, 'SYS_NAME') || t('device.unnamed'),
+    type: typeText,
+    model: modelText,
+    category,
+    x: logical ? Number(childText(logical, 'X')) || 0 : 0,
+    y: logical ? Number(childText(logical, 'Y')) || 0 : 0,
+    interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
+    runningConfig: configLines,
+    links: [],
+  };
+}
+
+function readLink(linkNode) {
+  const cable = childrenNamed(linkNode, 'CABLE')[0];
+  if (!cable) return null;
+
+  const ports = childrenNamed(cable, 'PORT');
+  return {
+    from: childText(cable, 'FROM'),
+    to: childText(cable, 'TO'),
+    fromPort: ports[0] ? ports[0].textContent.trim() : '',
+    toPort: ports[1] ? ports[1].textContent.trim() : '',
+    media: childText(linkNode, 'TYPE'),
+    wiring: childText(cable, 'TYPE'),
+    length: Number(childText(cable, 'LENGTH')) || 0,
+    functional: childText(cable, 'FUNCTIONAL') !== 'false',
+  };
+}
+
+/**
+ * Traduce el XML interno de Packet Tracer al modelo que consume la interfaz:
+ * dispositivos con posición y direcciones, y los enlaces que los unen.
+ */
+export function buildNetworkModel(xmlText) {
+  const document = new DOMParser().parseFromString(xmlText, 'application/xml');
+  if (document.querySelector('parsererror')) {
+    throw new Error(t('error.xml'));
+  }
+
+  const root = document.documentElement;
+  const network = root.getElementsByTagName('NETWORK')[0];
+  if (!network) throw new Error(t('error.noTopology'));
+
+  const devicesNode = childrenNamed(network, 'DEVICES')[0];
+  const linksNode = childrenNamed(network, 'LINKS')[0];
+
+  const devices = devicesNode
+    ? childrenNamed(devicesNode, 'DEVICE').map(readDevice).filter(Boolean)
+    : [];
+  const links = linksNode ? childrenNamed(linksNode, 'LINK').map(readLink).filter(Boolean) : [];
+
+  const byId = new Map(devices.map((device) => [device.id, device]));
+  const connected = links.filter((link) => byId.has(link.from) && byId.has(link.to));
+
+  for (const link of connected) {
+    byId.get(link.from).links.push({ port: link.fromPort, peerId: link.to, peerPort: link.toPort });
+    byId.get(link.to).links.push({ port: link.toPort, peerId: link.from, peerPort: link.fromPort });
+  }
+
+  return {
+    version: childText(root, 'VERSION') || t('panel.unknownVersion'),
+    description: childText(network, 'DESCRIPTION'),
+    devices,
+    links: connected,
+    orphanLinks: links.length - connected.length,
+  };
+}

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trenza · network topology and capture viewer</title>
+<meta name="description" content="Open .pkt and .pcap files in your browser. The file never leaves your machine.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23151A22'/%3E%3Cpath d='M8 10c5 0 5 12 10 12M8 22c5 0 5-12 10-12' stroke='%23E4763C' stroke-width='2.5' fill='none'/%3E%3Cpath d='M22 10v12' stroke='%233D8BD6' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead__brand">
+    <span class="masthead__mark" aria-hidden="true">
+      <svg viewBox="0 0 32 24" focusable="false">
+        <path d="M2 6c6 0 6 12 12 12s6-12 12-12" />
+        <path d="M2 18c6 0 6-12 12-12s6 12 12 12" />
+      </svg>
+    </span>
+    <span class="masthead__name">Trenza</span>
+    <span class="masthead__kind">.pkt · .pcap</span>
+  </div>
+
+  <div class="masthead__file">
+    <span class="masthead__file-name" data-file-name></span>
+  </div>
+
+  <div class="masthead__actions">
+    <input type="file" accept=".pkt,.pka,.pcap,.pcapng,.cap" hidden data-file-input>
+    <button type="button" class="button" data-open data-i18n="action.open">Open file</button>
+    <button type="button" class="button" data-export disabled data-i18n="action.export">Export diagram</button>
+    <button type="button" class="button button--quiet" data-reset data-i18n="action.close">Close</button>
+    <select class="language" data-language data-i18n-label="action.language">
+      <option value="en">English</option>
+      <option value="es">Español</option>
+    </select>
+  </div>
+</header>
+
+<p class="statusbar" data-status role="status"></p>
+
+<dialog class="dialog" data-export-dialog aria-labelledby="export-title">
+  <form class="dialog__form" data-export-form>
+    <h2 class="dialog__title" id="export-title" data-i18n="export.title">Export the diagram</h2>
+    <p class="dialog__lead" data-i18n="export.lead"></p>
+
+    <label class="field">
+      <span class="field__label" data-i18n="export.name">File name</span>
+      <input class="field__input" type="text" name="name" required maxlength="80" autocomplete="off">
+    </label>
+
+    <fieldset class="field">
+      <legend class="field__label" data-i18n="export.format">Format</legend>
+      <div class="choice">
+        <label class="choice__option"><input type="radio" name="format" value="png" checked><span>PNG</span></label>
+        <label class="choice__option"><input type="radio" name="format" value="jpg"><span>JPG</span></label>
+        <label class="choice__option"><input type="radio" name="format" value="pdf"><span>PDF</span></label>
+      </div>
+    </fieldset>
+
+    <label class="field">
+      <span class="field__label" data-i18n="export.resolution">Resolution</span>
+      <select class="field__input" name="resolution">
+        <option value="hd" data-size="1280 × 720">1280 × 720</option>
+        <option value="fullhd" data-size="1920 × 1080" selected>1920 × 1080</option>
+        <option value="qhd" data-size="2560 × 1440">2560 × 1440</option>
+        <option value="uhd" data-size="3840 × 2160">3840 × 2160</option>
+        <option value="fit" data-i18n="export.fit">Fit to the diagram</option>
+      </select>
+    </label>
+
+    <label class="checkbox" data-transparent-field>
+      <input type="checkbox" name="transparent">
+      <span data-i18n="export.transparent">Transparent background</span>
+    </label>
+
+    <p class="dialog__note" data-export-note></p>
+
+    <footer class="dialog__actions">
+      <button type="button" class="button button--quiet" data-export-cancel data-i18n="action.cancel">Cancel</button>
+      <button type="submit" class="button button--primary" data-i18n="export.submit">Export</button>
+    </footer>
+  </form>
+</dialog>
+
+<main class="workspace">
+
+  <section class="intro" data-dropzone tabindex="0" role="button" data-i18n-label="intro.open">
+    <div class="intro__inner">
+      <p class="intro__eyebrow" data-i18n="intro.eyebrow"></p>
+      <h1 class="intro__title" data-i18n="intro.title"></h1>
+      <p class="intro__lead" data-i18n-html="intro.lead"></p>
+      <p class="intro__hint" data-i18n="intro.hint"></p>
+      <ul class="intro__notes">
+        <li data-i18n="intro.note.local"></li>
+        <li data-i18n="intro.note.readonly"></li>
+      </ul>
+    </div>
+  </section>
+
+  <aside class="rail" data-rail></aside>
+  <section class="stage" data-stage></section>
+  <aside class="panel" data-panel></aside>
+
+</main>
+
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>
