@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'trenza.language';
 const DEFAULT_LANGUAGE = 'en';
 
-export const LANGUAGES = {
+const LANGUAGES = {
   en: { label: 'English', locale: 'en' },
   es: { label: 'Español', locale: 'es-UY' },
 };
@@ -16,27 +16,44 @@ const DICTIONARIES = {
     'action.close': 'Close',
     'action.cancel': 'Cancel',
     'action.language': 'Language',
+    'action.theme': 'Switch theme',
+    'theme.dark': 'Dark',
+    'theme.light': 'Light',
 
     'intro.eyebrow': 'Local viewer',
     'intro.title': 'See the network without installing anything',
     'intro.lead': 'Drop a {pkt} or {pka} file to see the topology, the interfaces and the configuration of every device. Drop a {pcap} or {pcapng} to walk through the packets layer by layer.',
-    'intro.hint': 'Drag it here, or click to pick one',
-    'intro.note.local': 'The file is processed in your browser. It is never uploaded to a server.',
-    'intro.note.readonly': 'Read only: nothing you open gets modified.',
-    'intro.open': 'Open a file',
+    'intro.choose': 'Choose a file',
+    'intro.example': 'See an example',
+    'intro.hint': 'You can also drag the file anywhere on this page.',
+    'intro.drop': 'Drop the file to open it',
+
+    'about.title': 'What is this for',
+    'about.pktTerm': 'A .pkt file is a network built in Cisco Packet Tracer',
+    'about.pktBody': 'It is what students hand in for a networking course: devices, cabling and the configuration of each one. Opening it normally means installing Packet Tracer and signing in to a Cisco account. Here you drop it and see it.',
+    'about.pcapTerm': 'A .pcap file is recorded network traffic',
+    'about.pcapBody': 'Wireshark, tcpdump and the simulation mode of Packet Tracer all produce them. Each entry is one packet, with its addresses, its protocol and its bytes.',
+    'about.privacyTerm': 'Nothing is uploaded',
+    'about.privacyBody': 'The decoding runs in your browser. The file never leaves your machine, and there is no server holding a copy.',
+    'about.limitsTerm': 'It only reads',
+    'about.limitsBody': 'You cannot edit, simulate or run anything: for that you still need Packet Tracer. What you can do is look, search, and take it with you: the diagram as an image, the capture as CSV or pcap.',
+    'about.madeBy': 'Built by',
 
     'status.idle': 'No file open.',
     'status.reading': 'Reading the file…',
-    'status.network': '{devices} and {links} · {variant} format',
+    'status.network': '{devices} and {links}',
     'status.capture': '{packets} · {container} format',
     'status.exporting': 'Drawing the whole diagram…',
     'status.exported': '{file} · {width}×{height} px · {size} kB',
-    'status.exportedTrimmed': '{file} · {width}×{height} px · {size} kB · {hidden} left out for want of room',
+    'status.exportedVector': '{file} · vector · {size} kB',
+    'status.exportedPaper': '{file} · {paper} · {size} kB',
+    'status.exportedPlain': '{file} · {size} kB',
+    'status.exportedTrimmed': '{file} · {width}×{height} px · {size} kB · {hidden} touching for want of room',
     'status.exportFailed': 'Export failed: {reason}',
     'status.linkFailed': 'The file in the link could not be opened: {reason}',
 
-    'variant.modern': 'modern',
-    'variant.legacy': 'legacy',
+    'variant.modern': 'Packet Tracer 6.2 or later',
+    'variant.legacy': 'Before Packet Tracer 6.2',
 
     'unit.devices#one': '{count} device',
     'unit.devices#other': '{count} devices',
@@ -66,8 +83,10 @@ const DICTIONARIES = {
     'panel.connections': 'Connections',
     'panel.file': 'File',
     'panel.version': 'Packet Tracer version',
+    'panel.variant': 'Saved as',
     'panel.unknownVersion': 'unknown',
     'panel.downloadFile': 'Download the original file',
+    'panel.gateway': 'Gateway',
     'panel.devices': 'Devices',
     'panel.inventory': 'Inventory',
     'panel.description': 'Description',
@@ -126,19 +145,34 @@ const DICTIONARIES = {
     'export.name': 'File name',
     'export.format': 'Format',
     'export.resolution': 'Resolution',
+    'export.language': 'Language',
+    'export.preview': 'Preview',
+    'export.previewTrimmed': '{hidden} touching for want of room',
+    'export.theme': 'Theme',
+    'export.paper': 'Paper size',
     'export.transparent': 'Transparent background',
     'export.submit': 'Export',
-    'export.pdfNote': 'The PDF holds the diagram as a lossless image, on one printable page.',
+    'export.pdfNote': 'The PDF holds the diagram as a lossless image, on one page.',
+    'export.svgNote': 'The SVG is vector: it scales to any size without losing sharpness, and its text stays selectable.',
+    'export.scope': 'Packets',
+    'export.scopeAll': 'The whole capture ({count})',
+    'export.scopeSelection': 'Only the selection ({count})',
+    'export.csvNote': 'CSV opens in any spreadsheet: one row per packet, with its addresses, protocol and description.',
+    'export.pcapNote': 'A classic pcap, the format every tool reads, Wireshark included. It carries the original bytes of each packet.',
+    'panel.selection': 'Selection',
+    'csv.timestamp': 'Timestamp',
+    'rail.multiselect': 'Shift extends the selection, Ctrl or Cmd adds or removes one.',
+    'status.exportedData': '{file} · {packets} · {size} kB',
     'export.fit': 'Fit to the diagram',
-    'export.doesNotFit': 'leaves labels out',
     'export.caption': '{devices} · {links}',
 
     'error.noDevices': 'There are no devices to export',
     'error.tooLarge': 'The requested image is too large. Try a smaller resolution.',
     'error.canvas': 'The browser could not produce the image',
     'error.unknownFormat': 'Unknown format: {format}',
-    'error.decrypt': 'The file could not be decrypted. {details}',
+    'error.decrypt': 'This is not a Packet Tracer .pkt or .pka file, or it is damaged.',
     'error.truncated': 'Truncated compressed block',
+    'error.inflate': 'The compressed block is not readable',
     'error.size': 'Unexpected uncompressed size: {actual}, expected {expected}',
     'error.eaxShort': 'EAX message too short to hold the tag',
     'error.eaxTag': 'The EAX tag does not match: the file is corrupt or uses another key',
@@ -204,27 +238,44 @@ const DICTIONARIES = {
     'action.close': 'Cerrar',
     'action.cancel': 'Cancelar',
     'action.language': 'Idioma',
+    'action.theme': 'Cambiar de tema',
+    'theme.dark': 'Oscuro',
+    'theme.light': 'Claro',
 
     'intro.eyebrow': 'Visor local',
     'intro.title': 'Mirá la red sin instalar nada',
     'intro.lead': 'Soltá un archivo {pkt} o {pka} para ver la topología, las interfaces y la configuración de cada equipo. Soltá un {pcap} o {pcapng} para recorrer los paquetes capa por capa.',
-    'intro.hint': 'Arrastralo acá o hacé clic para elegirlo',
-    'intro.note.local': 'El archivo se procesa en tu navegador. No se sube a ningún servidor.',
-    'intro.note.readonly': 'Es sólo lectura: nada de lo que abras se modifica.',
-    'intro.open': 'Abrir un archivo',
+    'intro.choose': 'Elegir un archivo',
+    'intro.example': 'Ver un ejemplo',
+    'intro.hint': 'También podés arrastrar el archivo a cualquier parte de esta página.',
+    'intro.drop': 'Soltá el archivo para abrirlo',
+
+    'about.title': 'Para qué sirve',
+    'about.pktTerm': 'Un archivo .pkt es una red armada en Cisco Packet Tracer',
+    'about.pktBody': 'Es lo que se entrega en un curso de redes: los equipos, el cableado y la configuración de cada uno. Abrirlo normalmente exige instalar Packet Tracer y entrar con una cuenta de Cisco. Acá lo soltás y lo ves.',
+    'about.pcapTerm': 'Un archivo .pcap es tráfico de red grabado',
+    'about.pcapBody': 'Lo producen Wireshark, tcpdump y el modo simulación del propio Packet Tracer. Cada entrada es un paquete, con sus direcciones, su protocolo y sus bytes.',
+    'about.privacyTerm': 'No se sube nada',
+    'about.privacyBody': 'El descifrado corre en tu navegador. El archivo nunca sale de tu equipo y no hay servidor que se quede con una copia.',
+    'about.limitsTerm': 'Sólo lee',
+    'about.limitsBody': 'No podés editar, simular ni ejecutar: para eso sigue haciendo falta Packet Tracer. Lo que sí podés es mirar, buscar y llevártelo: el diagrama como imagen, la captura como CSV o pcap.',
+    'about.madeBy': 'Hecho por',
 
     'status.idle': 'Ningún archivo abierto.',
     'status.reading': 'Procesando el archivo…',
-    'status.network': '{devices} y {links} · formato {variant}',
+    'status.network': '{devices} y {links}',
     'status.capture': '{packets} · formato {container}',
     'status.exporting': 'Dibujando el diagrama completo…',
     'status.exported': '{file} · {width}×{height} px · {size} kB',
-    'status.exportedTrimmed': '{file} · {width}×{height} px · {size} kB · {hidden} sin lugar para dibujarse',
+    'status.exportedVector': '{file} · vectorial · {size} kB',
+    'status.exportedPaper': '{file} · {paper} · {size} kB',
+    'status.exportedPlain': '{file} · {size} kB',
+    'status.exportedTrimmed': '{file} · {width}×{height} px · {size} kB · {hidden} rozándose por falta de lugar',
     'status.exportFailed': 'No se pudo exportar: {reason}',
     'status.linkFailed': 'No se pudo abrir el archivo del enlace: {reason}',
 
-    'variant.modern': 'moderno',
-    'variant.legacy': 'heredado',
+    'variant.modern': 'Packet Tracer 6.2 o posterior',
+    'variant.legacy': 'Anterior a Packet Tracer 6.2',
 
     'unit.devices#one': '{count} dispositivo',
     'unit.devices#other': '{count} dispositivos',
@@ -254,8 +305,10 @@ const DICTIONARIES = {
     'panel.connections': 'Conexiones',
     'panel.file': 'Archivo',
     'panel.version': 'Versión de Packet Tracer',
+    'panel.variant': 'Guardado como',
     'panel.unknownVersion': 'desconocida',
     'panel.downloadFile': 'Descargar el archivo original',
+    'panel.gateway': 'Puerta de enlace',
     'panel.devices': 'Dispositivos',
     'panel.inventory': 'Inventario',
     'panel.description': 'Descripción',
@@ -314,19 +367,34 @@ const DICTIONARIES = {
     'export.name': 'Nombre del archivo',
     'export.format': 'Formato',
     'export.resolution': 'Resolución',
+    'export.language': 'Idioma',
+    'export.preview': 'Vista previa',
+    'export.previewTrimmed': '{hidden} rozándose por falta de lugar',
+    'export.theme': 'Tema',
+    'export.paper': 'Tamaño de hoja',
     'export.transparent': 'Fondo transparente',
     'export.submit': 'Exportar',
-    'export.pdfNote': 'El PDF lleva el diagrama como imagen sin pérdida, en una hoja imprimible.',
+    'export.pdfNote': 'El PDF lleva el diagrama como imagen sin pérdida, en una sola hoja.',
+    'export.svgNote': 'El SVG es vectorial: se agranda a cualquier tamaño sin perder nitidez y su texto se puede seleccionar.',
+    'export.scope': 'Paquetes',
+    'export.scopeAll': 'La captura entera ({count})',
+    'export.scopeSelection': 'Sólo la selección ({count})',
+    'export.csvNote': 'El CSV se abre en cualquier planilla: una fila por paquete, con sus direcciones, su protocolo y su descripción.',
+    'export.pcapNote': 'Un pcap clásico, el formato que lee toda herramienta, Wireshark incluido. Lleva los bytes originales de cada paquete.',
+    'panel.selection': 'Selección',
+    'csv.timestamp': 'Marca de tiempo',
+    'rail.multiselect': 'Mayúsculas extiende la selección, Control o Comando suma o quita uno.',
+    'status.exportedData': '{file} · {packets} · {size} kB',
     'export.fit': 'Ajustar al diagrama',
-    'export.doesNotFit': 'deja etiquetas afuera',
     'export.caption': '{devices} · {links}',
 
     'error.noDevices': 'No hay dispositivos para exportar',
     'error.tooLarge': 'La imagen pedida es demasiado grande. Probá con una escala menor.',
     'error.canvas': 'El navegador no pudo generar la imagen',
     'error.unknownFormat': 'Formato desconocido: {format}',
-    'error.decrypt': 'No se pudo descifrar el archivo. {details}',
+    'error.decrypt': 'Este archivo no es un .pkt ni un .pka de Packet Tracer, o está dañado.',
     'error.truncated': 'Bloque comprimido truncado',
+    'error.inflate': 'El bloque comprimido no se puede leer',
     'error.size': 'Tamaño descomprimido inesperado: {actual}, se esperaban {expected}',
     'error.eaxShort': 'Mensaje EAX demasiado corto para contener el tag',
     'error.eaxTag': 'El tag EAX no coincide: el archivo está corrupto o usa otra clave',
@@ -414,6 +482,23 @@ export function setLanguage(language) {
 }
 
 /**
+ * Corre `write` como si el idioma elegido fuera otro, y deja el de la página como estaba.
+ * Es lo que permite exportar en español mirando el visor en inglés. Sólo envuelve trabajo
+ * sincrónico: si cediera el turno, el resto de la página se dibujaría en el idioma prestado.
+ */
+export function withLanguage(language, write) {
+  if (!DICTIONARIES[language] || language === current) return write();
+
+  const previous = current;
+  current = language;
+  try {
+    return write();
+  } finally {
+    current = previous;
+  }
+}
+
+/**
  * Traduce una clave. Si se pasa `count`, primero se busca la variante de plural que
  * corresponde al idioma, para no terminar escribiendo «1 paquetes».
  */
@@ -456,5 +541,7 @@ export function translateDocument(root = document) {
     node.setAttribute('aria-label', t(node.dataset.i18nLabel));
   }
   document.documentElement.lang = current;
+  delete document.documentElement.dataset.translating;
   document.title = t('app.title');
+  document.querySelector('meta[name="description"]').content = t('app.description');
 }

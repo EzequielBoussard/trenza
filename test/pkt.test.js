@@ -32,10 +32,10 @@ test('lee un archivo con el formato heredado', async () => {
 
 test('rechaza un archivo que no es de Packet Tracer', async () => {
   const noise = new Uint8Array(512).map((_, index) => (index * 37) % 256);
-  await assert.rejects(decodePacketTracerFile(noise), /could not be decrypted/);
+  await assert.rejects(decodePacketTracerFile(noise), /not a Packet Tracer/);
 });
 
 test('detecta un archivo truncado', async () => {
   const truncated = buildLegacyFile('<PACKETTRACER5/>').subarray(0, 3);
-  await assert.rejects(decodePacketTracerFile(truncated), /could not be decrypted/);
+  await assert.rejects(decodePacketTracerFile(truncated), /not a Packet Tracer/);
 });

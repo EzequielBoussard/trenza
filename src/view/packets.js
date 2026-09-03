@@ -10,9 +10,35 @@ function createElement(tag, className, textContent) {
   return node;
 }
 
+/** Parte el texto por el término buscado y marca los tramos que coinciden. */
+function highlighted(text, needle) {
+  const value = String(text ?? '');
+  if (!needle) return document.createTextNode(value);
+
+  const fragment = document.createDocumentFragment();
+  const lower = value.toLowerCase();
+  let cursor = 0;
+
+  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, cursor)) {
+    fragment.append(value.slice(cursor, at));
+    const mark = document.createElement('mark');
+    mark.textContent = value.slice(at, at + needle.length);
+    fragment.append(mark);
+    cursor = at + needle.length;
+  }
+
+  fragment.append(value.slice(cursor));
+  return fragment;
+}
+
+function cell(className, text, needle) {
+  const node = createElement('td', className);
+  node.append(highlighted(text, needle));
+  return node;
+}
+
 function formatTime(seconds, origin) {
-  if (!seconds) return '—';
-  return (seconds - origin).toFixed(6);
+  return Number.isFinite(seconds) ? (seconds - origin).toFixed(6) : '—';
 }
 
 export class PacketTableView {
@@ -22,6 +48,51 @@ export class PacketTableView {
     this.packets = [];
     this.filter = '';
     this.rendered = 0;
+    this.selected = new Set();
+    this.anchor = null;
+  }
+
+  /** Los paquetes elegidos, en el orden en que están en la captura. */
+  getSelection() {
+    return this.packets.filter((packet) => this.selected.has(packet.index));
+  }
+
+  /**
+   * Selección al estilo de una planilla: un clic elige uno, con Mayúsculas se toma
+   * el tramo desde el último elegido y con Control o Comando se suma o se quita uno.
+   */
+  choose(packet, event) {
+    const position = this.visible.indexOf(packet);
+
+    if (event.shiftKey && this.anchor !== null) {
+      const from = Math.min(this.anchor, position);
+      const to = Math.max(this.anchor, position);
+      this.selected = new Set(this.visible.slice(from, to + 1).map((entry) => entry.index));
+    } else if (event.ctrlKey || event.metaKey) {
+      if (this.selected.has(packet.index)) this.selected.delete(packet.index);
+      else this.selected.add(packet.index);
+      this.anchor = position;
+    } else {
+      this.selected = new Set([packet.index]);
+      this.anchor = position;
+    }
+
+    this.paintSelection();
+    this.onSelect(this.getSelection(), packet);
+  }
+
+  /** Restablece una selección guardada, por ejemplo tras cambiar de idioma. */
+  select(indices) {
+    this.selected = new Set(indices);
+    this.anchor = null;
+    this.paintSelection();
+  }
+
+  paintSelection() {
+    if (!this.body) return;
+    for (const row of this.body.children) {
+      row.classList.toggle('is-selected', this.selected.has(Number(row.dataset.index)));
+    }
   }
 
   load(packets) {
@@ -39,6 +110,8 @@ export class PacketTableView {
             .includes(this.filter))
       : this.packets;
     this.rendered = 0;
+    this.selected = new Set();
+    this.anchor = null;
     this.draw();
   }
 
@@ -79,20 +152,22 @@ export class PacketTableView {
     for (const packet of slice) {
       const row = createElement('tr', 'packet-row');
       row.dataset.index = String(packet.index);
+      row.classList.toggle('is-selected', this.selected.has(packet.index));
       row.append(
         createElement('td', 'table__mono', String(packet.index)),
         createElement('td', 'table__mono', formatTime(packet.timestamp, this.origin)),
-        createElement('td', 'table__mono', packet.source || '—'),
-        createElement('td', 'table__mono', packet.destination || '—'),
-        createElement('td', null, packet.protocol),
+        cell('table__mono', packet.source || '—', this.filter),
+        cell('table__mono', packet.destination || '—', this.filter),
+        cell(null, packet.protocol, this.filter),
         createElement('td', 'table__mono', String(packet.originalLength)),
-        createElement('td', 'table__detail', packet.summary),
+        cell('table__detail', packet.summary, this.filter),
       );
-      row.addEventListener('click', () => {
-        for (const selected of this.body.querySelectorAll('.is-selected')) selected.classList.remove('is-selected');
-        row.classList.add('is-selected');
-        this.onSelect(packet);
+      // Mayúsculas al hacer clic selecciona texto por defecto; con un rango de filas
+      // en juego, eso deja media tabla resaltada por debajo de la selección real.
+      row.addEventListener('mousedown', (event) => {
+        if (event.shiftKey) event.preventDefault();
       });
+      row.addEventListener('click', (event) => this.choose(packet, event));
       fragment.append(row);
     }
 
@@ -128,13 +203,13 @@ export function renderPacketInspector(container, packet) {
   container.append(dump);
 }
 
-export function renderCaptureSummary(container, capture, packets) {
+export function renderCaptureSummary(container, capture, packets, { title } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
   header.append(
     createElement('p', 'panel-head__eyebrow', t('panel.summary')),
-    createElement('h2', 'panel-head__title', t('panel.capture')),
+    createElement('h2', 'panel-head__title', title ?? t('panel.capture')),
   );
   container.append(header);
 

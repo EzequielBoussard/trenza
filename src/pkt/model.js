@@ -45,7 +45,7 @@ function interfacesFromConfig(configLines) {
     const line = raw.trim();
     const opened = line.match(/^interface\s+(\S+)/i);
     if (opened) {
-      current = { name: opened[1], addresses: [], description: '', enabled: true, source: 'config' };
+      current = { name: opened[1], addresses: [], description: '', enabled: true };
       interfaces.push(current);
       continue;
     }
@@ -56,10 +56,10 @@ function interfacesFromConfig(configLines) {
     }
 
     const ipv4 = line.match(/^ip address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)/i);
-    if (ipv4) current.addresses.push({ family: 'IPv4', address: ipv4[1], mask: ipv4[2] });
+    if (ipv4) current.addresses.push({ address: ipv4[1], mask: ipv4[2] });
 
     const ipv6 = line.match(/^ipv6 address\s+(\S+)/i);
-    if (ipv6) current.addresses.push({ family: 'IPv6', address: ipv6[1], mask: '' });
+    if (ipv6) current.addresses.push({ address: ipv6[1], mask: '' });
 
     const description = line.match(/^description\s+(.+)/i);
     if (description) current.description = description[1];
@@ -78,12 +78,11 @@ function interfacesFromPorts(engine) {
     if (!ip && !mac) continue;
     interfaces.push({
       name: '',
-      addresses: ip ? [{ family: 'IPv4', address: ip, mask: childText(port, 'SUBNET') }] : [],
+      addresses: ip ? [{ address: ip, mask: childText(port, 'SUBNET') }] : [],
       mac,
       gateway: childText(port, 'PORT_GATEWAY'),
       description: '',
       enabled: true,
-      source: 'ports',
     });
   }
   return interfaces;
@@ -136,7 +135,6 @@ function readLink(linkNode) {
     toPort: ports[1] ? ports[1].textContent.trim() : '',
     media: childText(linkNode, 'TYPE'),
     wiring: childText(cable, 'TYPE'),
-    length: Number(childText(cable, 'LENGTH')) || 0,
     functional: childText(cable, 'FUNCTIONAL') !== 'false',
   };
 }
@@ -176,6 +174,5 @@ export function buildNetworkModel(xmlText) {
     description: childText(network, 'DESCRIPTION'),
     devices,
     links: connected,
-    orphanLinks: links.length - connected.length,
   };
 }

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Trenza">
+  <title>Trenza</title>
+  <rect width="512" height="512" rx="112" fill="#151a22"/>
+  <g fill="none" stroke-width="52" stroke-linecap="round">
+    <path d="M136 168c60 0 60 176 120 176s60-176 120-176" stroke="#e4763c"/>
+    <path d="M136 344c60 0 60-176 120-176s60 176 120 176" stroke="#3d8bd6"/>
+  </g>
+</svg>

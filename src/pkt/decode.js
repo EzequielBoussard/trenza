@@ -6,7 +6,13 @@ const FILE_NONCE = new Uint8Array(16).fill(16);
 
 async function inflate(data) {
   const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  try {
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    // El navegador informa el fallo de zlib como un error de red; sin esto, un
+    // archivo que no es de Packet Tracer termina diciendo «Failed to fetch».
+    throw new Error(t('error.inflate'));
+  }
 }
 
 // Packet Tracer antepone el tamaño descomprimido en cuatro bytes big-endian.
@@ -73,5 +79,7 @@ export async function decodePacketTracerFile(bytes) {
     }
   }
 
-  throw new Error(t('error.decrypt', { details: failures.join(' | ') }));
+  // El detalle de cada variante sirve para diagnosticar, no para leerlo en pantalla.
+  console.warn('Trenza:', failures.join(' | '));
+  throw new Error(t('error.decrypt'));
 }

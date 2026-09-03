@@ -29,8 +29,11 @@ function interfaceTable(interfaces) {
     const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '—', mask: '—' }];
     for (const address of addresses) {
       const row = createElement('tr');
+      const name = createElement('td', 'table__mono', entry.name || entry.mac || '—');
+      if (entry.description) name.title = entry.description;
+
       row.append(
-        createElement('td', 'table__mono', entry.name || entry.mac || '—'),
+        name,
         createElement('td', 'table__mono', address.address),
         createElement('td', 'table__mono', address.mask || '—'),
         createElement('td', null, t(entry.enabled ? 'table.up' : 'table.down')),
@@ -75,13 +78,15 @@ export function renderDeviceInspector(container, device, devicesById) {
   );
   container.append(header);
 
-  container.append(
-    section(t('panel.identity'), definitionList([
-      [t('panel.type'), device.type || '—'],
-      [t('panel.model'), device.model || '—'],
-      [t('panel.links'), String(device.links.length)],
-    ])),
-  );
+  const gateway = device.interfaces.map((entry) => entry.gateway).find(Boolean);
+  const identity = [
+    [t('panel.type'), device.type || '—'],
+    [t('panel.model'), device.model || '—'],
+    [t('panel.links'), String(device.links.length)],
+  ];
+  if (gateway) identity.push([t('panel.gateway'), gateway]);
+
+  container.append(section(t('panel.identity'), definitionList(identity)));
 
   if (device.interfaces.length > 0) {
     container.append(section(t('panel.interfaces'), interfaceTable(device.interfaces)));
@@ -98,7 +103,7 @@ export function renderDeviceInspector(container, device, devicesById) {
   }
 }
 
-export function renderNetworkSummary(container, model, { fileName, onDownload } = {}) {
+export function renderNetworkSummary(container, model, { fileName, variant, onDownload } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -114,12 +119,15 @@ export function renderNetworkSummary(container, model, { fileName, onDownload } 
     counts.set(label, (counts.get(label) || 0) + 1);
   }
 
-  const file = document.createElement('div');
-  file.append(definitionList([
+  const facts = [
     [t('panel.version'), model.version],
     [t('panel.devices'), String(model.devices.length)],
     [t('panel.links'), String(model.links.length)],
-  ]));
+  ];
+  if (variant) facts.splice(1, 0, [t('panel.variant'), t(`variant.${variant}`)]);
+
+  const file = document.createElement('div');
+  file.append(definitionList(facts));
 
   if (onDownload) {
     const button = createElement('button', 'button button--wide', t('panel.downloadFile'));

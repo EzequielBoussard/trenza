@@ -38,6 +38,25 @@ test('el encuadre cubre la red entera y conserva la proporción', () => {
   assert.ok(Math.abs((b.x - a.x) / (b.y - a.y) - 2) < 1e-6, 'la proporción original no se conservó');
 });
 
+test('el bloque de etiqueta se corre entero y nunca se deja de dibujar', () => {
+  // Dos dispositivos casi encimados: el segundo no puede usar el renglón del primero.
+  const devices = [
+    { id: 'a', name: 'Switch', interfaces: [{ addresses: [{ address: '192.168.1.1' }] }] },
+    { id: 'b', name: 'PC', interfaces: [{ addresses: [{ address: '192.168.1.2' }] }] },
+  ];
+  const positions = new Map([['a', { x: 100, y: 100 }], ['b', { x: 110, y: 108 }]]);
+  const measure = { nameWidth: (text) => text.length * 8, addressWidth: (text) => text.length * 7 };
+
+  const plan = planLabels(devices, positions, measure);
+
+  // Un solo desplazamiento por dispositivo: el nombre y la dirección no se separan nunca.
+  for (const device of devices) {
+    const spot = plan.get(device.id);
+    assert.equal(typeof spot.offset, 'number', `${device.id} se quedó sin lugar`);
+  }
+  assert.notEqual(plan.get('a').offset, plan.get('b').offset, 'los dos bloques quedaron en el mismo renglón');
+});
+
 test('el color del enlace sale del cableado y, si falta, del medio', () => {
   assert.equal(threadFor({ wiring: 'eCrossOver', media: 'eCopper' }), 'green');
   assert.equal(threadFor({ wiring: '', media: 'eFiber' }), 'blue');

@@ -5,11 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trenza · network topology and capture viewer</title>
 <meta name="description" content="Open .pkt and .pcap files in your browser. The file never leaves your machine.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23151A22'/%3E%3Cpath d='M8 10c5 0 5 12 10 12M8 22c5 0 5-12 10-12' stroke='%23E4763C' stroke-width='2.5' fill='none'/%3E%3Cpath d='M22 10v12' stroke='%233D8BD6' stroke-width='2.5'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1218">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Trenza">
+<meta property="og:title" content="Trenza · network topology and capture viewer">
+<meta property="og:description" content="Open .pkt and .pcap files in your browser. The file never leaves your machine.">
+<meta property="og:image" content="/web-app-manifest-512x512.png">
+<meta name="twitter:card" content="summary">
+
+<link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="./styles.css">
+<script>try{var d=document.documentElement,t=localStorage.getItem('trenza.theme'),l=localStorage.getItem('trenza.language');if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);}catch(e){}</script>
 </head>
 <body>
 
@@ -22,18 +37,39 @@
       </svg>
     </span>
     <span class="masthead__name">Trenza</span>
-    <span class="masthead__kind">.pkt · .pcap</span>
+    <span class="masthead__kind">
+      <span class="masthead__format" data-format="network">.pkt</span>
+      <span class="masthead__divider" aria-hidden="true"></span>
+      <span class="masthead__format" data-format="capture">.pcap</span>
+    </span>
   </div>
 
-  <div class="masthead__file">
-    <span class="masthead__file-name" data-file-name></span>
-  </div>
+  <p class="masthead__file" data-file-name></p>
 
   <div class="masthead__actions">
     <input type="file" accept=".pkt,.pka,.pcap,.pcapng,.cap" hidden data-file-input>
     <button type="button" class="button" data-open data-i18n="action.open">Open file</button>
-    <button type="button" class="button" data-export disabled data-i18n="action.export">Export diagram</button>
+    <button type="button" class="button" data-export data-i18n="action.export">Export diagram</button>
     <button type="button" class="button button--quiet" data-reset data-i18n="action.close">Close</button>
+    <button type="button" class="icon-button" data-theme-toggle data-i18n-label="action.theme">
+      <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <mask id="theme-icon-bite">
+          <rect width="24" height="24" fill="#fff"/>
+          <circle class="theme-icon__bite" r="8" fill="#000"/>
+        </mask>
+        <circle class="theme-icon__core" cx="12" cy="12" mask="url(#theme-icon-bite)"/>
+        <g class="theme-icon__rays">
+          <line x1="12" y1="1.5" x2="12" y2="4"/>
+          <line x1="12" y1="20" x2="12" y2="22.5"/>
+          <line x1="1.5" y1="12" x2="4" y2="12"/>
+          <line x1="20" y1="12" x2="22.5" y2="12"/>
+          <line x1="4.6" y1="4.6" x2="6.4" y2="6.4"/>
+          <line x1="17.6" y1="17.6" x2="19.4" y2="19.4"/>
+          <line x1="4.6" y1="19.4" x2="6.4" y2="17.6"/>
+          <line x1="17.6" y1="6.4" x2="19.4" y2="4.6"/>
+        </g>
+      </svg>
+    </button>
     <select class="language" data-language data-i18n-label="action.language">
       <option value="en">English</option>
       <option value="es">Español</option>
@@ -48,35 +84,70 @@
     <h2 class="dialog__title" id="export-title" data-i18n="export.title">Export the diagram</h2>
     <p class="dialog__lead" data-i18n="export.lead"></p>
 
-    <label class="field">
-      <span class="field__label" data-i18n="export.name">File name</span>
-      <input class="field__input" type="text" name="name" required maxlength="80" autocomplete="off">
-    </label>
+    <div class="dialog__body">
+      <div class="dialog__fields">
+        <label class="field">
+          <span class="field__label" data-i18n="export.name">File name</span>
+          <input class="field__input" type="text" name="name" required maxlength="80" autocomplete="off">
+        </label>
 
-    <fieldset class="field">
-      <legend class="field__label" data-i18n="export.format">Format</legend>
-      <div class="choice">
-        <label class="choice__option"><input type="radio" name="format" value="png" checked><span>PNG</span></label>
-        <label class="choice__option"><input type="radio" name="format" value="jpg"><span>JPG</span></label>
-        <label class="choice__option"><input type="radio" name="format" value="pdf"><span>PDF</span></label>
+        <fieldset class="field">
+          <legend class="field__label" data-i18n="export.format">Format</legend>
+          <div class="choice">
+            <label class="choice__option" data-for="network"><input type="radio" name="format" value="png" checked><span>PNG</span></label>
+            <label class="choice__option" data-for="network"><input type="radio" name="format" value="jpg"><span>JPG</span></label>
+            <label class="choice__option" data-for="network"><input type="radio" name="format" value="svg"><span>SVG</span></label>
+            <label class="choice__option" data-for="network"><input type="radio" name="format" value="pdf"><span>PDF</span></label>
+            <label class="choice__option" data-for="capture"><input type="radio" name="format" value="csv"><span>CSV</span></label>
+            <label class="choice__option" data-for="capture"><input type="radio" name="format" value="pcap"><span>PCAP</span></label>
+          </div>
+        </fieldset>
+
+        <label class="field" data-size-field>
+          <span class="field__label" data-size-label>Resolution</span>
+          <select class="field__input" name="size"></select>
+        </label>
+
+        <label class="field" data-language-field>
+          <span class="field__label" data-i18n="export.language">Language</span>
+          <select class="field__input" name="language">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+        </label>
+
+        <label class="field" data-theme-field>
+          <span class="field__label" data-i18n="export.theme">Theme</span>
+          <select class="field__input" name="theme">
+            <option value="dark" data-i18n="theme.dark">Dark</option>
+            <option value="light" data-i18n="theme.light">Light</option>
+          </select>
+        </label>
+
+        <label class="field" data-scope-field>
+          <span class="field__label" data-i18n="export.scope">Packets</span>
+          <select class="field__input" name="scope">
+            <option value="all"></option>
+            <option value="selection"></option>
+          </select>
+        </label>
+
+        <label class="checkbox" data-transparent-field>
+          <input type="checkbox" name="transparent">
+          <span data-i18n="export.transparent">Transparent background</span>
+        </label>
       </div>
-    </fieldset>
 
-    <label class="field">
-      <span class="field__label" data-i18n="export.resolution">Resolution</span>
-      <select class="field__input" name="resolution">
-        <option value="hd" data-size="1280 × 720">1280 × 720</option>
-        <option value="fullhd" data-size="1920 × 1080" selected>1920 × 1080</option>
-        <option value="qhd" data-size="2560 × 1440">2560 × 1440</option>
-        <option value="uhd" data-size="3840 × 2160">3840 × 2160</option>
-        <option value="fit" data-i18n="export.fit">Fit to the diagram</option>
-      </select>
-    </label>
-
-    <label class="checkbox" data-transparent-field>
-      <input type="checkbox" name="transparent">
-      <span data-i18n="export.transparent">Transparent background</span>
-    </label>
+      <div class="dialog__preview" data-preview-panel>
+        <span class="field__label" data-i18n="export.preview">Preview</span>
+        <div class="preview" data-preview-frame>
+          <div class="lens" data-preview-lens hidden aria-hidden="true">
+            <canvas class="lens__canvas" data-preview-lens-canvas></canvas>
+          </div>
+        </div>
+        <p class="preview__note" data-preview-note></p>
+      </div>
+    </div>
 
     <p class="dialog__note" data-export-note></p>
 
@@ -89,16 +160,48 @@
 
 <main class="workspace">
 
-  <section class="intro" data-dropzone tabindex="0" role="button" data-i18n-label="intro.open">
-    <div class="intro__inner">
-      <p class="intro__eyebrow" data-i18n="intro.eyebrow"></p>
-      <h1 class="intro__title" data-i18n="intro.title"></h1>
-      <p class="intro__lead" data-i18n-html="intro.lead"></p>
-      <p class="intro__hint" data-i18n="intro.hint"></p>
-      <ul class="intro__notes">
-        <li data-i18n="intro.note.local"></li>
-        <li data-i18n="intro.note.readonly"></li>
-      </ul>
+  <section class="intro">
+    <div class="intro__grid">
+      <div class="intro__inner">
+        <p class="intro__eyebrow" data-i18n="intro.eyebrow"></p>
+        <h1 class="intro__title" data-i18n="intro.title"></h1>
+        <p class="intro__lead" data-i18n-html="intro.lead"></p>
+
+        <div class="intro__actions">
+          <button type="button" class="button button--primary" data-open-copy data-i18n="intro.choose">Choose a file</button>
+          <button type="button" class="button" data-example data-i18n="intro.example">See an example</button>
+        </div>
+        <p class="intro__hint" data-i18n="intro.hint"></p>
+      </div>
+
+      <div class="intro__about">
+        <h2 class="intro__about-title" data-i18n="about.title"></h2>
+        <dl class="intro__faq">
+        <div class="intro__faq-item">
+          <dt data-i18n="about.pktTerm"></dt>
+          <dd data-i18n="about.pktBody"></dd>
+        </div>
+        <div class="intro__faq-item">
+          <dt data-i18n="about.pcapTerm"></dt>
+          <dd data-i18n="about.pcapBody"></dd>
+        </div>
+        <div class="intro__faq-item">
+          <dt data-i18n="about.privacyTerm"></dt>
+          <dd data-i18n="about.privacyBody"></dd>
+        </div>
+        <div class="intro__faq-item">
+          <dt data-i18n="about.limitsTerm"></dt>
+          <dd data-i18n="about.limitsBody"></dd>
+        </div>
+        </dl>
+
+        <p class="intro__author">
+          <span data-i18n="about.madeBy"></span>
+          <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard</a>
+          <span aria-hidden="true">·</span>
+          <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub</a>
+        </p>
+      </div>
     </div>
   </section>
 
@@ -107,6 +210,9 @@
   <aside class="panel" data-panel></aside>
 
 </main>
+
+<div class="dropveil" data-dropveil aria-hidden="true"><span data-i18n="intro.drop"></span></div>
+<div class="theme-sweep" data-theme-sweep aria-hidden="true"></div>
 
 <script type="module" src="./src/app.js"></script>
 </body>

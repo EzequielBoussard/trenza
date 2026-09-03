@@ -1,5 +1,7 @@
 /* La paleta sigue el código de colores del par trenzado T568B: cada hilo tiene una
-   versión plena y una pálida, y esa pareja es la que se usa para dibujar enlaces. */
+   versión plena y una pálida, y esa pareja es la que se usa para dibujar enlaces.
+   El tema oscuro es el de casa; el claro reescribe los mismos nombres, así que el
+   diagrama y las exportaciones lo siguen sin saber que existe. */
 :root {
   --ground: #0f1218;
   --surface: #151a22;
@@ -7,8 +9,9 @@
   --line: #262e3c;
   --line-soft: #1f2634;
   --text: #e4e8f0;
-  --text-muted: #8d97ab;
-  --text-faint: #5d6678;
+  --text-muted: #98a2b6;
+  --text-faint: #858da0;
+  --on-accent: #1a0f07;
 
   --orange: #e4763c;
   --orange-pale: #f2b48d;
@@ -21,6 +24,11 @@
   --neutral: #6e7a90;
   --neutral-pale: #a8b2c4;
 
+  --icon-core: 9px;
+  --icon-bite-x: 17px;
+  --icon-bite-y: 6px;
+  --icon-rays: 0;
+
   --rail-width: 17rem;
   --panel-width: 23rem;
   --radius: 6px;
@@ -30,7 +38,40 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
 }
 
+/* Los hilos se oscurecen sobre fondo claro: el mismo naranja pálido que funciona
+   contra el grafito desaparecería contra el papel. */
+:root[data-theme='light'] {
+  --ground: #f2f4f7;
+  --surface: #ffffff;
+  --raised: #e8ebf1;
+  --line: #d3d9e2;
+  --line-soft: #e3e7ee;
+  --text: #151a22;
+  --text-muted: #545d6d;
+  --text-faint: #5f6776;
+  --on-accent: #ffffff;
+
+  --orange: #a84e14;
+  --orange-pale: #b9743f;
+  --green: #337a41;
+  --green-pale: #5b9268;
+  --blue: #245f9c;
+  --blue-pale: #558bbd;
+  --brown: #7d5730;
+  --brown-pale: #9d7a4f;
+  --neutral: #57606f;
+  --neutral-pale: #7b8494;
+
+  --icon-core: 5.5px;
+  --icon-bite-x: 27px;
+  --icon-bite-y: -7px;
+  --icon-rays: 1;
+}
+
+
 * { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
 
 html, body {
   height: 100%;
@@ -55,6 +96,11 @@ body {
 
 /* Cabecera */
 
+/* Mientras el guion de arranque no confirmó el idioma, el texto traducible espera
+   invisible: peor que un instante en blanco es verlo cambiar de idioma. */
+html[data-translating] [data-i18n],
+html[data-translating] [data-i18n-html] { visibility: hidden; }
+
 .masthead {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -67,12 +113,11 @@ body {
 
 .masthead__brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.6rem;
 }
 
 .masthead__mark {
-  align-self: center;
   width: 30px;
   height: 22px;
 }
@@ -92,19 +137,112 @@ body {
   font-family: var(--font-display);
   font-size: 1.3rem;
   font-weight: 700;
+  line-height: 1;
   letter-spacing: 0.01em;
 }
 
+/* Sin altura de línea propia, cada texto se apoyaría en su propia caja y los tres
+   quedarían a alturas distintas por más que el contenedor los centre. */
 .masthead__kind {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
+  line-height: 1;
   color: var(--text-faint);
 }
 
-.masthead__file-name {
+/* Una barra inclinada separa mejor que un punto medio, que a este cuerpo de letra
+   se pierde entre las dos extensiones. */
+.masthead__divider {
+  width: 1px;
+  height: 0.95rem;
+  background: var(--text-faint);
+  transform: rotate(20deg);
+}
+
+.masthead__format { transition: color 200ms; }
+
+body[data-view='network'] .masthead__format[data-format='network'],
+body[data-view='capture'] .masthead__format[data-format='capture'] {
+  color: var(--orange);
+}
+
+.masthead__file {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   font-family: var(--font-mono);
   font-size: 0.78rem;
+  line-height: 1;
   color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .icon-button:hover {
+    border-color: var(--orange);
+    color: var(--text);
+  }
+}
+
+/* Un disco al que un segundo círculo le muerde un lado. Con el mordisco encima queda
+   la luna; cuando se va del lienzo y aparecen los rayos, queda el sol. */
+.theme-icon {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+
+.theme-icon__core {
+  r: var(--icon-core);
+  fill: currentColor;
+  transition: r 320ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.theme-icon__bite {
+  cx: var(--icon-bite-x);
+  cy: var(--icon-bite-y);
+  transition: cx 380ms cubic-bezier(0.2, 0.8, 0.3, 1), cy 380ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.theme-icon__rays {
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  transform-origin: center;
+  opacity: var(--icon-rays);
+  transform: rotate(calc((1 - var(--icon-rays)) * -55deg)) scale(calc(0.45 + 0.55 * var(--icon-rays)));
+  transition: opacity 260ms ease-out, transform 380ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+body[data-theme-sweep] .theme-icon__core,
+body[data-theme-sweep] .theme-icon__bite,
+body[data-theme-sweep] .theme-icon__rays {
+  transition-delay: 300ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-icon__core,
+  .theme-icon__bite,
+  .theme-icon__rays { transition: none; }
 }
 
 .masthead__actions {
@@ -124,9 +262,11 @@ body {
   cursor: pointer;
 }
 
-.language:hover {
-  border-color: var(--orange);
-  color: var(--text);
+@media (hover: hover) {
+  .language:hover {
+    border-color: var(--orange);
+    color: var(--text);
+  }
 }
 
 .button {
@@ -142,9 +282,11 @@ body {
   transition: border-color 120ms, background 120ms;
 }
 
-.button:hover:not(:disabled) {
-  border-color: var(--orange);
-  background: #232b3b;
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    border-color: var(--orange);
+    background: color-mix(in srgb, var(--raised) 88%, var(--text));
+  }
 }
 
 .button:disabled {
@@ -164,13 +306,15 @@ body {
 .button--primary {
   border-color: var(--orange);
   background: var(--orange);
-  color: #1a0f07;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
-.button--primary:hover:not(:disabled) {
-  background: var(--orange-pale);
-  border-color: var(--orange-pale);
+@media (hover: hover) {
+  .button--primary:hover:not(:disabled) {
+    background: var(--orange-pale);
+    border-color: var(--orange-pale);
+  }
 }
 
 /* Diálogo de exportación */
@@ -185,7 +329,7 @@ body {
 }
 
 .dialog::backdrop {
-  background: rgb(6 8 12 / 0.65);
+  background: rgb(0 0 0 / 0.55);
 }
 
 .dialog__form {
@@ -193,6 +337,113 @@ body {
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
+}
+
+.dialog__body,
+.dialog__fields,
+.dialog__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dialog__preview { gap: 0.35rem; }
+
+/* Con sitio de sobra, la vista previa va al costado de los campos y se lleva todo el ancho
+   que sobre: es la parte que hay que mirar. El diálogo se ensancha sólo cuando la lleva,
+   porque para un pcap, que no tiene nada que mostrar, sobraría todo ese hueco. */
+/* Apilada todavía, pero con sitio para que la vista se vea: una tableta de pie no tiene
+   ancho para dos columnas y le sobra de más para un diálogo de teléfono. */
+@media (min-width: 34rem) {
+  .dialog--wide { width: min(40rem, calc(100vw - 2rem)); }
+}
+
+@media (min-width: 50rem) {
+  .dialog--wide { width: min(88rem, calc(100vw - 4rem)); }
+
+  .dialog--wide .dialog__body {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 1.75rem;
+  }
+
+  .dialog--wide .dialog__fields { flex: 0 0 17rem; }
+
+  .dialog--wide .dialog__preview {
+    flex: 1;
+    min-width: 0;
+    position: sticky;
+    top: 0;
+  }
+}
+
+.preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ground);
+}
+
+/* La lupa muestra el recorte a la escala del archivo que se va a bajar, que es la única
+   forma de saber antes de tiempo si el texto se va a leer. Sólo con ratón: en una pantalla
+   táctil no hay puntero al que seguir.
+
+   Va apaisada y con las esquinas apenas redondeadas, no redonda: lo que se mira son dos
+   renglones de texto, y un círculo les come las puntas. De paso evita el recorte con
+   `border-radius` dentro de un elemento transformado, que en Safari es terreno resbaladizo. */
+.lens {
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.lens__canvas { display: block; }
+
+@media (hover: none), (pointer: coarse) {
+  .lens { display: none !important; }
+}
+
+/* El damero deja ver la transparencia por lo que es y no como un fondo de color. */
+.preview--alpha {
+  background-image:
+    linear-gradient(45deg, var(--line-soft) 25%, transparent 25% 75%, var(--line-soft) 75%),
+    linear-gradient(45deg, var(--line-soft) 25%, transparent 25% 75%, var(--line-soft) 75%);
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
+}
+
+/* Apilada bajo los campos, la vista no puede empujar el botón de exportar fuera de la
+   pantalla; al costado sí puede ocupar lo que tenga. */
+.preview canvas {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 30vh;
+  border-radius: 4px;
+}
+
+@media (min-width: 50rem) {
+  .dialog--wide .preview { min-height: 14rem; }
+  .dialog--wide .preview canvas { max-height: 66vh; }
+}
+
+.preview__note {
+  margin: 0;
+  min-height: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-faint);
 }
 
 .dialog__title {
@@ -265,7 +516,7 @@ body {
 
 .choice__option:has(input:checked) {
   border-color: var(--orange);
-  color: #fff;
+  background: color-mix(in srgb, var(--orange) 14%, var(--ground));
 }
 
 .checkbox {
@@ -277,13 +528,18 @@ body {
   cursor: pointer;
 }
 
-.checkbox[hidden] { display: none; }
-
+/* En una pantalla corta el diálogo se desplaza por dentro, y sin esto el botón de exportar
+   queda por debajo del borde: se ve el formulario y no hay con qué confirmarlo. */
 .dialog__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  padding-top: 0.25rem;
+  margin: 0 -1.5rem -1.5rem;
+  padding: 0.75rem 1.5rem 1.25rem;
+  background: var(--surface);
 }
 
 .statusbar {
@@ -296,8 +552,8 @@ body {
   color: var(--text-muted);
 }
 
-.statusbar[data-tone='ok'] { color: var(--green-pale); }
-.statusbar[data-tone='error'] { color: var(--orange-pale); }
+.statusbar[data-tone='ok'] { color: var(--green); }
+.statusbar[data-tone='error'] { color: var(--orange); }
 
 /* Estructura */
 
@@ -309,8 +565,9 @@ body {
   min-height: 0;
 }
 
-/* Cerrar sólo tiene sentido con algo abierto. */
-body:not([data-loaded]) [data-reset] { display: none; }
+/* Cerrar sólo tiene sentido con algo abierto, y exportar sólo con un diagrama. */
+body:not([data-loaded]) [data-reset],
+body:not([data-loaded]) [data-export] { display: none; }
 
 body:not([data-loaded]) .rail,
 body:not([data-loaded]) .stage,
@@ -318,7 +575,10 @@ body:not([data-loaded]) .panel { display: none; }
 
 body[data-loaded] .intro { display: none; }
 
-body:not([data-loaded]) .workspace { grid-template-columns: 1fr; }
+body:not([data-loaded]) .workspace {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+}
 
 .rail,
 .panel {
@@ -371,9 +631,11 @@ body:not([data-loaded]) .workspace { grid-template-columns: 1fr; }
   cursor: pointer;
 }
 
-.zoom__button:hover {
-  background: var(--raised);
-  color: var(--text);
+@media (hover: hover) {
+  .zoom__button:hover {
+    background: var(--raised);
+    color: var(--text);
+  }
 }
 
 /* Columnas de ancho uniforme: así las entradas quedan alineadas entre sí en vez de
@@ -396,10 +658,42 @@ body:not([data-loaded]) .workspace { grid-template-columns: 1fr; }
   color: var(--text-muted);
 }
 
+/* Cada entrada filtra el diagrama, así que es un botón: hereda la letra del cuadro y no
+   trae nada del estilo propio de los botones del navegador. */
 .legend__item {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  width: 100%;
+  padding: 0.15rem 0.3rem;
+  margin: -0.15rem -0.3rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .legend__item:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
+}
+
+.legend__item.is-active {
+  background: color-mix(in srgb, var(--orange) 20%, transparent);
+  color: var(--text);
+}
+
+/* Con el dedo el renglón de texto queda corto para acertarle: se le da alto de verdad, y
+   sin margen negativo, que superpondría el área de una entrada con la de la vecina. */
+@media (pointer: coarse) {
+  .legend { gap: 0.1rem 0.75rem; }
+
+  .legend__item {
+    padding-block: 0.8rem;
+    margin-block: 0;
+  }
 }
 
 .legend__swatch {
@@ -418,27 +712,104 @@ body:not([data-loaded]) .workspace { grid-template-columns: 1fr; }
 
 .intro {
   display: grid;
-  place-items: center;
-  padding: 2rem;
-  cursor: pointer;
+  align-content: safe center;
+  justify-content: safe center;
+  padding: clamp(1.25rem, 4vw, 3.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background:
     radial-gradient(circle at 1px 1px, var(--line-soft) 1px, transparent 0) 0 0 / 28px 28px,
     var(--ground);
 }
 
-.intro__inner {
-  max-width: 34rem;
-  padding: 2.5rem;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  transition: border-color 140ms;
+.intro__grid {
+  display: grid;
+  grid-template-columns: minmax(20rem, 30rem) minmax(22rem, 42rem);
+  gap: clamp(1.5rem, 3vw, 3.5rem);
+  align-items: start;
+  width: 100%;
+  max-width: 76rem;
 }
 
-.intro:hover .intro__inner,
-body[data-dragging] .intro__inner {
-  border-color: var(--orange);
+.intro__inner {
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
 }
+
+.intro__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.intro__about {
+  padding-top: 0.35rem;
+}
+
+.intro__about-title {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.intro__faq {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.25rem 2rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.intro__faq dt {
+  margin-bottom: 0.25rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.intro__faq dd {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.intro__author {
+  margin: 1.5rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+.link {
+  color: var(--orange);
+  text-underline-offset: 2px;
+}
+
+.link:hover { text-decoration-thickness: 2px; }
+
+/* El velo cubre la ventana entera mientras se arrastra: soltar vale en cualquier lado. */
+.dropveil {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  place-items: center;
+  border: 3px dashed var(--orange);
+  background: color-mix(in srgb, var(--ground) 82%, transparent);
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+body[data-dragging] .dropveil { display: grid; }
 
 .intro__eyebrow {
   margin: 0 0 0.5rem;
@@ -453,7 +824,7 @@ body[data-dragging] .intro__inner {
 .intro__title {
   margin: 0 0 0.75rem;
   font-family: var(--font-display);
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-size: clamp(1.75rem, 3.4vw, 3.1rem);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -470,19 +841,13 @@ body[data-dragging] .intro__inner {
   color: var(--text);
 }
 
+/* El tono pálido sirve para trazos, no para texto: contra el fondo claro no llega
+   al contraste mínimo de lectura. */
 .intro__hint {
   margin: 0 0 1.5rem;
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: var(--orange-pale);
-}
-
-.intro__notes {
-  margin: 0;
-  padding: 1rem 0 0 1.1rem;
-  border-top: 1px solid var(--line);
-  font-size: 0.8rem;
-  color: var(--text-faint);
+  color: var(--orange);
 }
 
 /* Lista lateral */
@@ -555,7 +920,9 @@ body[data-dragging] .intro__inner {
   cursor: pointer;
 }
 
-.device-chip:hover { background: var(--raised); }
+@media (hover: hover) {
+  .device-chip:hover { background: var(--raised); }
+}
 .device-chip.is-selected { background: var(--raised); color: #fff; }
 
 .device-chip--router { border-left-color: var(--orange); }
@@ -650,6 +1017,16 @@ body[data-dragging] .intro__inner {
 .node--security .node__disc { stroke: var(--orange-pale); }
 .node--iot .node__disc { stroke: var(--green-pale); }
 
+/* El contorno del color del fondo se pinta debajo del relleno: así el texto se lee
+   aunque le pase por encima un cable o el aro del nodo elegido. */
+.node__label,
+.node__address {
+  paint-order: stroke;
+  stroke: var(--ground);
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+
 .node__label {
   fill: var(--text);
   font-family: var(--font-display);
@@ -658,9 +1035,17 @@ body[data-dragging] .intro__inner {
 }
 
 .node__address {
-  fill: var(--text-faint);
+  fill: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 10px;
+}
+
+/* El navegador dibuja su propio recuadro al hacer foco sobre un grupo SVG. Se anula
+   y el aviso para el teclado se dibuja dentro del diagrama. */
+.node:focus { outline: none; }
+.node:focus-visible .node__halo {
+  stroke: var(--text);
+  stroke-width: 2;
 }
 
 .tray__rule {
@@ -675,12 +1060,44 @@ body[data-dragging] .intro__inner {
   font-size: 12px;
 }
 
-.node--hide-name .node__label,
-.node--hide-address .node__address { display: none; }
+/* Tres niveles: el elegido, los que cuelgan de él, y el resto apagado. Sin el nivel
+   del medio, el que tocaste se confunde con sus vecinos. */
+.node__ring {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 2;
+  opacity: 0;
+  transform: scale(0.72);
+  transform-origin: center;
+  transition: opacity 160ms ease-out, transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
 
-/* El nodo seleccionado muestra siempre su etiqueta, por apretada que esté la zona. */
-.node.is-selected .node__label,
-.node.is-selected .node__address { display: block; }
+.node.is-selected .node__ring {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.node.is-selected .node__halo {
+  fill: color-mix(in srgb, var(--orange) 18%, var(--ground));
+  stroke: var(--orange);
+  stroke-width: 2;
+}
+
+/* El subrayado lleva el acento sin teñir el texto: el nombre sigue en el color de
+   lectura y la marca naranja queda al lado, no encima. */
+.node.is-selected .node__label {
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--orange);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.node.is-neighbour .node__halo {
+  stroke: var(--neutral-pale);
+  stroke-dasharray: 3 3;
+}
 
 .node.is-dimmed { opacity: 0.22; }
 
@@ -689,7 +1106,9 @@ body[data-dragging] .intro__inner {
   stroke-width: 2;
 }
 
-.node:hover .node__disc { stroke-width: 2.5; }
+@media (hover: hover) {
+  .node:hover .node__disc { stroke-width: 2.5; }
+}
 
 /* Panel de detalle */
 
@@ -840,8 +1259,19 @@ body[data-dragging] .intro__inner {
   white-space: nowrap;
 }
 
+.table--packets tbody { user-select: none; }
+
 .packet-row { cursor: pointer; }
-.packet-row:hover { background: var(--surface); }
+
+.table--packets mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--orange) 34%, transparent);
+  color: inherit;
+}
+@media (hover: hover) {
+  .packet-row:hover { background: var(--surface); }
+}
 .packet-row.is-selected { background: var(--raised); }
 
 .table__detail {
@@ -903,8 +1333,103 @@ body[data-dragging] .intro__inner {
     border-bottom: 1px solid var(--line);
   }
 
+  /* Apilada, la cabecera se lee como un bloque centrado; alineada a la izquierda,
+     los controles quedan colgando de un borde y el resto vacío. */
   .masthead {
     grid-template-columns: 1fr;
-    gap: 0.6rem;
+    gap: 0.7rem;
+    justify-items: center;
   }
+
+  .masthead__brand,
+  .masthead__file,
+  .masthead__actions {
+    justify-content: center;
+  }
+
+  .masthead__actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 62rem) {
+  .intro__grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 44rem;
+  }
+}
+
+/* Sin puntero fino, los controles necesitan un blanco que el dedo acierte. */
+@media (hover: none) {
+  .button,
+  .icon-button,
+  .language,
+  .field__input,
+  .choice__option {
+    min-height: 44px;
+  }
+
+  .intro__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Barrido de cambio de tema: una franja inclinada con líneas de barrido cruza la
+   pantalla y los colores cambian por detrás de su filo, que va en el color de acento. */
+.theme-sweep {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+body[data-theme-sweep] .theme-sweep { display: block; }
+
+/* La franja es más ancha que la pantalla y se queda quieta un instante en el medio:
+   ahí, con todo tapado, cambian los colores. El tono es fijo a propósito, porque uno
+   que siguiera al tema cambiaría a la vista justo en ese instante. */
+.theme-sweep::before {
+  content: '';
+  position: absolute;
+  /* El sesgo corre los bordes laterales tanto como la mitad del alto de la franja:
+     poca altura de más y sobrante lateral en vmax, para que ni una pantalla alta y
+     angosta deje los vértices al descubierto. */
+  top: -10%;
+  bottom: -10%;
+  left: -20vmax;
+  width: calc(100% + 40vmax);
+  border-left: 2px solid var(--orange);
+  border-right: 2px solid var(--orange);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgb(228 118 60 / 0.16) 0 1px,
+      transparent 1px 5px),
+    #0d1117;
+  will-change: transform;
+  animation: theme-sweep var(--sweep-duration, 880ms) both;
+}
+
+/* Cada tramo lleva su propia curva: entra frenando hasta cubrir, se detiene mientras
+   cambian los colores y sale acelerando. Una sola curva para todo haría que el
+   frenado y el arranque se notaran como un tirón. */
+@keyframes theme-sweep {
+  0% {
+    transform: translateX(-135%) skewX(-14deg);
+    animation-timing-function: cubic-bezier(0.25, 0.7, 0.3, 1);
+  }
+  62% {
+    transform: translateX(0) skewX(-14deg);
+    animation-timing-function: linear;
+  }
+  68% {
+    transform: translateX(0) skewX(-14deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4);
+  }
+  100% { transform: translateX(135%) skewX(-14deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-sweep { display: none !important; }
 }

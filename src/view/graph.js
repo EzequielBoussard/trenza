@@ -57,15 +57,34 @@ export function threadFor(link) {
   return WIRING_THREADS[link.wiring] || MEDIA_THREADS[link.media] || 'neutral';
 }
 
-/** Lee los colores desde las variables CSS para que diagrama y exportación coincidan. */
-export function readPalette() {
-  const styles = getComputedStyle(document.documentElement);
-  const names = [
-    'orange', 'orange-pale', 'green', 'green-pale', 'blue', 'blue-pale',
-    'brown', 'brown-pale', 'neutral', 'neutral-pale',
-    'ground', 'surface', 'raised', 'line', 'text', 'text-muted', 'text-faint',
-  ];
-  return Object.fromEntries(names.map((name) => [name, styles.getPropertyValue(`--${name}`).trim()]));
+// Los colores viven en variables CSS para que el diagrama en pantalla y la exportación
+// sigan el mismo tema sin enterarse de cuál es.
+const PALETTE_NAMES = [
+  'orange', 'orange-pale', 'green', 'green-pale', 'blue', 'blue-pale',
+  'brown', 'brown-pale', 'neutral', 'neutral-pale',
+  'ground', 'surface', 'raised', 'line', 'text', 'text-muted', 'text-faint',
+];
+
+/**
+ * Sin argumento devuelve los colores que se están viendo. Con uno, los del otro tema: las
+ * variables cuelgan del elemento raíz, así que hay que ponérselo un instante. Nadie ve el
+ * cambio, porque entre ponerlo y devolverlo no se cede el turno y el navegador no repinta.
+ */
+export function readPalette(theme) {
+  const root = document.documentElement;
+  const previous = root.getAttribute('data-theme');
+  const borrowed = theme !== undefined && theme !== previous;
+  if (borrowed) root.setAttribute('data-theme', theme);
+
+  try {
+    const styles = getComputedStyle(root);
+    return Object.fromEntries(PALETTE_NAMES.map((name) => [name, styles.getPropertyValue(`--${name}`).trim()]));
+  } finally {
+    if (borrowed) {
+      if (previous === null) root.removeAttribute('data-theme');
+      else root.setAttribute('data-theme', previous);
+    }
+  }
 }
 
 export function selectVisible(model, showInfrastructure) {
@@ -137,37 +156,62 @@ export function measureBounds(devices) {
   return { minX, minY, spanX: Math.max(...xs) - minX || 1, spanY: Math.max(...ys) - minY || 1 };
 }
 
-/** Reparte los dispositivos dentro de un rectángulo conservando la proporción original. */
-export function projectIntoRect(devices, rect) {
+// Cuánto se admite estirar un eje respecto del otro al repartir la red. Casi ninguna red
+// tiene la proporción del marco que le toca —ni la del visor, ni la de un 16:9— y sin esto
+// el dibujo queda con franjas vacías. Estirar un esquema no lo falsea; deformarlo al doble, sí.
+export const LAYOUT_STRETCH = 1.75;
+
+/**
+ * Reparte los dispositivos dentro de un rectángulo. `stretch` es cuánto se admite estirar
+ * un eje respecto del otro: con 1 la red conserva su proporción y, si el rectángulo tiene
+ * otra, quedan franjas vacías a los costados o arriba y abajo; por encima de 1 la red se
+ * reparte hasta llenarlas. Es un esquema, no un plano: separar más los equipos en un eje
+ * no dice nada falso sobre la red.
+ */
+export function projectIntoRect(devices, rect, { stretch = 1 } = {}) {
   const { minX, minY, spanX, spanY } = measureBounds(devices);
-  const scale = Math.min(rect.width / spanX, rect.height / spanY);
-  const offsetX = rect.x + (rect.width - spanX * scale) / 2;
-  const offsetY = rect.y + (rect.height - spanY * scale) / 2;
+  const fit = Math.min(rect.width / spanX, rect.height / spanY);
+  const scaleX = Math.min(rect.width / spanX, fit * stretch);
+  const scaleY = Math.min(rect.height / spanY, fit * stretch);
+  const offsetX = rect.x + (rect.width - spanX * scaleX) / 2;
+  const offsetY = rect.y + (rect.height - spanY * scaleY) / 2;
 
   return new Map(
     devices.map((device) => [
       device.id,
-      { x: (device.x - minX) * scale + offsetX, y: (device.y - minY) * scale + offsetY },
+      { x: (device.x - minX) * scaleX + offsetX, y: (device.y - minY) * scaleY + offsetY },
     ]),
   );
 }
 
-// Geometría de la etiqueta de un dispositivo, medida desde su centro.
-export const LABEL_GEOMETRY = {
-  discRadius: 22,
+// Geometría del bloque de etiqueta, medida desde el centro del dispositivo. El radio es el
+// del halo que se dibuja, no uno menor: con 22 reservados sobre un disco de 26, una
+// dirección podía apoyarse en el anillo de afuera y quedar tapada por él.
+const LABEL_GEOMETRY = {
+  discRadius: 26,
   nameTop: 26,
-  nameBottom: 42,
-  addressTop: 43,
-  addressBottom: 55,
-  gap: 4,
+  nameBottom: 44,
+  addressTop: 45,
+  addressBottom: 59,
+  gap: 5,
 };
+
+// Nombre y dirección son una sola pieza y se corren juntos: separarlos dejaba la dirección
+// flotando lejos de su nombre, sin que se supiera de quién era. Cuando el lugar de siempre
+// está ocupado, el bloque entero baja un renglón, lo justo para pasar por debajo del que ya
+// estaba ahí.
+const BLOCK_STEP = 36;
+const BLOCK_SLOTS = [0, BLOCK_STEP, BLOCK_STEP * 2];
+
+/** Lo que un bloque sobresale hacia abajo cuando le toca el último renglón. */
+export const LABEL_REACH_BELOW = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOCK_SLOTS.length - 1];
 
 /**
  * Escala mínima, en píxeles por unidad del archivo, para que ningún par de
  * dispositivos se pise. Dos vecinos alcanza con que se separen en un eje, así que
  * de cada par se toma el eje más barato y del conjunto, el caso peor.
  */
-export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 70, cap = 3.5 } = {}) {
+export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3.5 } = {}) {
   let required = 0;
 
   for (let i = 0; i < devices.length; i++) {
@@ -188,14 +232,28 @@ export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 70, cap = 3
 }
 
 /**
- * Decide qué etiquetas se dibujan. Los discos y los nombres tienen prioridad; una
- * dirección que se superpondría con algo ya reservado no se dibuja, porque dos
- * textos encimados no se leen ninguno de los dos.
+ * Decide a qué altura va el bloque de cada dispositivo. Si su lugar está ocupado baja al
+ * siguiente renglón, y si no queda ninguno libre se dibuja igual en el suyo: una etiqueta
+ * que aparece y desaparece al acercarse molesta más que dos que se rozan. `crowded` marca
+ * las que quedaron encimadas, que es de lo que la exportación se guía para darle más lugar
+ * al dibujo hasta que no quede ninguna.
  */
 export function planLabels(devices, positions, { nameWidth, addressWidth }) {
   const reserved = [];
-  const collides = (box) => reserved.some((other) =>
-    box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1);
+  const overlaps = (box, other) =>
+    box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1;
+
+  // El disco es redondo: una caja que sólo alcanza la esquina de su cuadrado no lo toca de
+  // verdad, y descartar por eso un lugar que servía cuesta hasta once píxeles en diagonal.
+  const discs = [];
+  const touchesDisc = (box, disc) => {
+    const dx = disc.x - Math.max(box.x1, Math.min(disc.x, box.x2));
+    const dy = disc.y - Math.max(box.y1, Math.min(disc.y, box.y2));
+    return dx * dx + dy * dy < LABEL_GEOMETRY.discRadius ** 2;
+  };
+
+  const collides = (box) => reserved.some((other) => overlaps(box, other))
+    || discs.some((disc) => touchesDisc(box, disc));
 
   const ordered = [...devices].sort((a, b) => {
     const first = positions.get(a.id);
@@ -203,38 +261,32 @@ export function planLabels(devices, positions, { nameWidth, addressWidth }) {
     return first.y - second.y || first.x - second.x;
   });
 
-  for (const device of ordered) {
-    const { x, y } = positions.get(device.id);
-    reserved.push({
-      x1: x - LABEL_GEOMETRY.discRadius,
-      x2: x + LABEL_GEOMETRY.discRadius,
-      y1: y - LABEL_GEOMETRY.discRadius,
-      y2: y + LABEL_GEOMETRY.discRadius,
-    });
-  }
+  for (const device of ordered) discs.push(positions.get(device.id));
 
   const plan = new Map();
 
   for (const device of ordered) {
     const { x, y } = positions.get(device.id);
-    const half = nameWidth(device.name) / 2 + LABEL_GEOMETRY.gap;
-    const box = { x1: x - half, x2: x + half, y1: y + LABEL_GEOMETRY.nameTop, y2: y + LABEL_GEOMETRY.nameBottom };
-    const visible = !collides(box);
-    if (visible) reserved.push(box);
-    plan.set(device.id, { name: visible, address: false });
-  }
-
-  for (const device of ordered) {
     const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
-    if (!address) continue;
+    const half = Math.max(
+      nameWidth(device.name),
+      address ? addressWidth(address.address) : 0,
+    ) / 2 + LABEL_GEOMETRY.gap;
+    const bottom = address ? LABEL_GEOMETRY.addressBottom : LABEL_GEOMETRY.nameBottom;
+    const boxAt = (offset) => ({
+      x1: x - half,
+      x2: x + half,
+      y1: y + LABEL_GEOMETRY.nameTop + offset,
+      y2: y + bottom + offset,
+    });
 
-    const { x, y } = positions.get(device.id);
-    const half = addressWidth(address.address) / 2 + LABEL_GEOMETRY.gap;
-    const box = { x1: x - half, x2: x + half, y1: y + LABEL_GEOMETRY.addressTop, y2: y + LABEL_GEOMETRY.addressBottom };
-    if (collides(box)) continue;
+    const free = BLOCK_SLOTS.find((offset) => !collides(boxAt(offset)));
+    const offset = free ?? 0;
 
-    reserved.push(box);
-    plan.get(device.id).address = true;
+    // La caja se reserva aunque haya quedado encimada: la tinta está ahí igual, y el
+    // que venga después tiene que contar con ella.
+    reserved.push(boxAt(offset));
+    plan.set(device.id, { offset, crowded: free === undefined });
   }
 
   return plan;

@@ -1,8 +1,11 @@
-import { countOf, t } from '../i18n.js';
+import { countOf, t, withLanguage } from '../i18n.js';
 import { download } from '../download.js';
+import { SvgContext, haloText, strokeGlyph } from './svg-context.js';
 import {
   CATEGORY_GLYPHS,
   CATEGORY_THREADS,
+  LABEL_REACH_BELOW,
+  LAYOUT_STRETCH,
   LEGEND_ENTRIES,
   frameForNetwork,
   measureBounds,
@@ -19,12 +22,34 @@ import {
 
 const MAX_PIXELS = 40e6;
 
-// Alto de la banda del título y de cada fila de la leyenda, y cuánto sobresale un
-// dispositivo de su centro: el halo hacia arriba, el nombre y la dirección hacia abajo.
-const HEADER_HEIGHT = 74;
+// Un diagrama es texto fino sobre color plano, justo lo que peor le sienta al JPEG. Con
+// menos calidad que esta, las letras salen con la basura típica del formato alrededor.
+const JPEG_QUALITY = 0.95;
+
+// La banda del título mide lo que ocupan sus dos renglones más un respiro. Sólo la parte
+// de los renglones crece con la letra: si creciera el respiro también, agrandar el título
+// le sacaría alto al dibujo sin que se vea mejor nada.
+const HEADER_TEXT = 52;
+const HEADER_GAP = 22;
 const LEGEND_ROW_HEIGHT = 22;
-const NODE_EXTENT = { top: 32, bottom: 60 };
+// Cuánto sobresale un dispositivo de su centro: arriba el halo, abajo el nombre y la
+// dirección, contando el renglón de más que la dirección puede llegar a usar.
+const NODE_EXTENT = { top: 32, bottom: LABEL_REACH_BELOW + 6 };
+const NAME_BASELINE = 38;
+const ADDRESS_BASELINE = 54;
 const MARGIN = 40;
+
+// En cuántas unidades se reparte el dibujo cuando la medida de salida está fija. Es lo
+// único que decide el tamaño de todo en la imagen: el diagrama se dibuja en estas
+// unidades y después se multiplica por la escala, así que a menos unidades, más grandes
+// salen los nombres, las direcciones y los iconos. Subir la resolución sube la escala y
+// con ella todo el dibujo, en vez de sumar píxeles al mismo diagrama diminuto.
+//
+// El valor sale del visor: reparte la red en 1600 unidades con nombres de 13 px, y con
+// los de 15 de la exportación esas mismas proporciones caen cerca de 1850. Es el punto de
+// partida: si con ese ancho alguna etiqueta se queda afuera, el diseño se ensancha.
+const DESIGN_WIDTH = 2200;
+const DESIGN_STEPS = 24;
 
 // Límites del área donde se reparten los dispositivos. El mínimo evita diagramas
 // diminutos; el máximo, archivos de decenas de megapíxeles.
@@ -32,54 +57,120 @@ const MIN_CONTENT_WIDTH = 760;
 const MAX_CONTENT_WIDTH = 4200;
 const MAX_CONTENT_HEIGHT = 3000;
 
-// Tamaños de salida fijos, más la opción de dejar que el diagrama pida el suyo.
-export const EXPORT_RESOLUTIONS = {
+// Medidas de salida fijas. La quinta opción, ajustar al diagrama, no es una medida:
+// se agrega aparte porque significa «el tamaño que el dibujo pida».
+const EXPORT_RESOLUTIONS = {
   hd: { width: 1280, height: 720 },
   fullhd: { width: 1920, height: 1080 },
   qhd: { width: 2560, height: 1440 },
   uhd: { width: 3840, height: 2160 },
-  fit: null,
 };
 
 export const DEFAULT_RESOLUTION = 'fullhd';
 
-// Una página A4 apaisada, el tamaño que cualquiera puede imprimir.
-const PAGE_LIMIT = { width: 842, height: 595 };
+export const SIZE_LABELS = Object.fromEntries([
+  ...Object.entries(EXPORT_RESOLUTIONS).map(([name, size]) => [name, `${size.width} × ${size.height}`]),
+  ...Object.entries({ a4: 'A4', letter: 'Carta', a3: 'A3' }),
+]);
 
-const LABEL_FONT = '600 13px "IBM Plex Sans Condensed", sans-serif';
-const ADDRESS_FONT = '400 10px "IBM Plex Mono", monospace';
-const LEGEND_FONT = '400 12px "IBM Plex Sans", sans-serif';
-const WATERMARK_FONT = '500 11px "IBM Plex Mono", monospace';
+// Hojas en puntos, apaisadas, y la definición a la que se rasteriza para imprimir.
+const PAPER_SIZES = {
+  a4: { width: 842, height: 595 },
+  letter: { width: 792, height: 612 },
+  a3: { width: 1191, height: 842 },
+};
+
+export const DEFAULT_PAPER = 'a4';
+
+// El PDF lleva el diagrama como imagen, así que esta es toda la nitidez que va a tener:
+// 300 puntos por pulgada es la definición de imprenta y aguanta ampliar al 300 % en
+// pantalla antes de que se note el píxel. Con 200 el texto se veía blando al acercarse.
+const PRINT_DPI = 300;
+
+// Por debajo de este cuerpo, en puntos, la etiqueta impresa deja de leerse.
+const MIN_LABEL_POINTS = 4.5;
+
+// La exportación usa una tipografía más grande y con más peso que la pantalla: la
+// imagen casi siempre se mira reducida, y ahí un cuerpo de 13 px se vuelve ilegible. La
+// dirección va bastante por debajo del nombre porque es lo que decide cuánto hay que
+// separar los equipos: con trece caracteres en monoespaciada, cada punto de cuerpo de más
+// obliga a estirar el dibujo entero y termina achicando todo lo demás.
+const LABEL_SIZE = 15;
+const ADDRESS_SIZE = 10;
+
+// Por debajo de este cuerpo, en píxeles del archivo final, la etiqueta deja de leerse.
+const MIN_LABEL_SIZE = 11;
+
+// Grosor del contorno del color del fondo que va debajo de cada etiqueta, el mismo que
+// en pantalla: sin él, un cable que cruza por detrás del texto lo vuelve ilegible.
+const LABEL_HALO = 3.5;
+
+const LABEL_FONT = `600 ${LABEL_SIZE}px "IBM Plex Sans Condensed", sans-serif`;
+const ADDRESS_FONT = `500 ${ADDRESS_SIZE}px "IBM Plex Mono", monospace`;
 
 // Dirección del visor, estampada en cada exportación para que la imagen diga de dónde salió.
-export const SITE_URL = 'trenza.pages.dev';
-const TITLE_FONT = '700 24px "IBM Plex Sans Condensed", sans-serif';
-const SUBTITLE_FONT = '400 13px "IBM Plex Sans", sans-serif';
+const SITE_URL = 'trenza.pages.dev';
 
-export const EXPORT_FORMATS = {
+// El marco —título, leyenda, dirección— no depende de cuántos dispositivos haya sino del
+// tamaño de la imagen: los cuerpos de abajo son los de una imagen de este ancho, y en una
+// más grande crecen con ella. Son cinco cadenas que no compiten con nada, así que pueden
+// ocupar lo que necesiten para leerse de un vistazo; el aire que las rodea, no: cada
+// unidad de margen se la saca al dibujo, que es lo que de verdad está apretado. Por eso
+// la letra crece contra un ancho de referencia menor que el del espaciado.
+const CHROME_WIDTH = 1100;
+const SPACING_WIDTH = 1600;
+const MAX_CHROME_ZOOM = 3.5;
+
+function chromeFor(width) {
+  const grow = (reference) => Math.min(MAX_CHROME_ZOOM, Math.max(1, width / reference));
+  const zoom = grow(CHROME_WIDTH);
+
+  return {
+    zoom,
+    margin: MARGIN * grow(SPACING_WIDTH),
+    header: HEADER_TEXT * zoom + HEADER_GAP,
+    legendRow: LEGEND_ROW_HEIGHT * zoom,
+    titleFont: `700 ${24 * zoom}px "IBM Plex Sans Condensed", sans-serif`,
+    subtitleFont: `400 ${13 * zoom}px "IBM Plex Sans", sans-serif`,
+    legendFont: `400 ${13 * zoom}px "IBM Plex Sans", sans-serif`,
+    watermarkFont: `500 ${12 * zoom}px "IBM Plex Mono", monospace`,
+  };
+}
+
+const EXPORT_FORMATS = {
   png: { extension: 'png', mime: 'image/png' },
   jpg: { extension: 'jpg', mime: 'image/jpeg' },
+  svg: { extension: 'svg', mime: 'image/svg+xml', vector: true },
   pdf: { extension: 'pdf', mime: 'application/pdf' },
 };
+
+export const VECTOR_FORMATS = Object.keys(EXPORT_FORMATS).filter((name) => EXPORT_FORMATS[name].vector);
 
 export function suggestExportName(fileName) {
   return (fileName || 'red').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '-').trim() || 'red';
 }
 
-function measuringContext() {
-  return document.createElement('canvas').getContext('2d');
-}
+/**
+ * Elegir el tamaño de salida obliga a medir el reparto una y otra vez, y ahí cada nombre
+ * se consulta miles de veces. Los cuerpos de las etiquetas son fijos, así que dentro de
+ * una misma exportación cada cadena se mide una sola vez.
+ */
+function labelMeasurer() {
+  const context = document.createElement('canvas').getContext('2d');
+  const widths = new Map();
+  const width = (font, text) => {
+    const key = `${font}\n${text}`;
+    if (!widths.has(key)) {
+      context.font = font;
+      widths.set(key, context.measureText(text).width);
+    }
+    return widths.get(key);
+  };
 
-function labelMeasurer(context) {
   return {
-    nameWidth: (text) => {
-      context.font = LABEL_FONT;
-      return context.measureText(text).width;
-    },
-    addressWidth: (text) => {
-      context.font = ADDRESS_FONT;
-      return context.measureText(text).width;
-    },
+    context,
+    nameWidth: (text) => width(LABEL_FONT, text),
+    addressWidth: (text) => width(ADDRESS_FONT, text),
   };
 }
 
@@ -97,18 +188,19 @@ function halfLabelWidth(measure, device) {
  * Reparte la leyenda en columnas de ancho uniforme para que las entradas queden
  * alineadas entre sí, y en varias filas si no entran a lo ancho.
  */
-function planLegend(context, links, availableWidth) {
+function planLegend(context, links, availableWidth, chrome) {
   const entries = LEGEND_ENTRIES.filter((entry) => new Set(links.map(threadFor)).has(entry.thread))
     .map((entry) => ({ ...entry, label: t(entry.key) }));
 
   if (entries.length === 0) return { entries, columns: 0, rows: 0, columnWidth: 0, height: 0 };
 
-  context.font = LEGEND_FONT;
-  const columnWidth = Math.ceil(Math.max(...entries.map((entry) => context.measureText(entry.label).width))) + 26 + 32;
+  context.font = chrome.legendFont;
+  const widest = Math.max(...entries.map((entry) => context.measureText(entry.label).width));
+  const columnWidth = Math.ceil(widest) + (26 + 32) * chrome.zoom;
   const columns = Math.max(1, Math.min(entries.length, Math.floor(availableWidth / columnWidth)));
   const rows = Math.ceil(entries.length / columns);
 
-  return { entries, columns, rows, columnWidth, height: rows * LEGEND_ROW_HEIGHT };
+  return { entries, columns, rows, columnWidth, height: rows * chrome.legendRow };
 }
 
 function drawLinks(context, links, positions, palette) {
@@ -175,31 +267,33 @@ function drawNodes(context, devices, positions, palette, labels) {
     context.lineJoin = 'round';
     context.lineCap = 'round';
     context.strokeStyle = palette[symbol];
-    context.stroke(new Path2D(CATEGORY_GLYPHS[device.category] || CATEGORY_GLYPHS.other));
+    strokeGlyph(context, CATEGORY_GLYPHS[device.category] || CATEGORY_GLYPHS.other);
     context.restore();
 
     context.textAlign = 'center';
-    if (shown.name) {
-      context.fillStyle = palette.text;
-      context.font = LABEL_FONT;
-      context.fillText(device.name, x, y + 38);
-    }
+    context.strokeStyle = palette.ground;
+    context.lineWidth = LABEL_HALO;
+    context.lineJoin = 'round';
+
+    context.fillStyle = palette.text;
+    context.font = LABEL_FONT;
+    haloText(context, device.name, x, y + NAME_BASELINE + shown.offset);
 
     const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
-    if (address && shown.address) {
-      context.fillStyle = palette['text-faint'];
+    if (address) {
+      context.fillStyle = palette['text-muted'];
       context.font = ADDRESS_FONT;
-      context.fillText(address.address, x, y + 52);
+      haloText(context, address.address, x, y + ADDRESS_BASELINE + shown.offset);
     }
   }
 }
 
-function drawTray(context, stray, positions, palette, { left, right, top }) {
+function drawTray(context, stray, positions, palette, chrome, { left, right, top }) {
   if (stray.length === 0) return;
 
   context.strokeStyle = palette.line;
-  context.lineWidth = 1;
-  context.setLineDash([2, 4]);
+  context.lineWidth = chrome.zoom;
+  context.setLineDash([2 * chrome.zoom, 4 * chrome.zoom]);
   context.beginPath();
   context.moveTo(left, top);
   context.lineTo(right, top);
@@ -208,201 +302,77 @@ function drawTray(context, stray, positions, palette, { left, right, top }) {
 
   context.textAlign = 'left';
   context.fillStyle = palette['text-faint'];
-  context.font = LEGEND_FONT;
-  context.fillText(t('diagram.unconnected'), left, top + 16);
+  context.font = chrome.legendFont;
+  context.fillText(t('diagram.unconnected'), left, top + 16 * chrome.zoom);
 }
 
-function watermarkWidth(context) {
-  context.font = WATERMARK_FONT;
+function watermarkWidth(context, chrome) {
+  context.font = chrome.watermarkFont;
   return Math.ceil(context.measureText(SITE_URL).width);
 }
 
-function drawWatermark(context, palette, { right, bottom }) {
+function drawWatermark(context, palette, chrome, { right, bottom }) {
   context.textAlign = 'right';
-  context.font = WATERMARK_FONT;
+  context.font = chrome.watermarkFont;
   context.fillStyle = palette['text-faint'];
   context.fillText(SITE_URL, right, bottom);
   context.textAlign = 'left';
 }
 
-function drawCaption(context, { title, subtitle, palette, left, top }) {
+function drawCaption(context, { title, subtitle, palette, chrome, left, top }) {
   context.textAlign = 'left';
   context.fillStyle = palette.text;
-  context.font = TITLE_FONT;
-  context.fillText(title, left, top + 24);
+  context.font = chrome.titleFont;
+  context.fillText(title, left, top + 24 * chrome.zoom);
 
   context.fillStyle = palette['text-muted'];
-  context.font = SUBTITLE_FONT;
-  context.fillText(subtitle, left, top + 46);
+  context.font = chrome.subtitleFont;
+  context.fillText(subtitle, left, top + 46 * chrome.zoom);
 }
 
-function drawLegend(context, legend, { palette, left, top }) {
+function drawLegend(context, legend, { palette, chrome, left, top }) {
+  const { zoom } = chrome;
   context.textAlign = 'left';
-  context.font = LEGEND_FONT;
+  context.font = chrome.legendFont;
 
   legend.entries.forEach((entry, index) => {
     const x = left + (index % legend.columns) * legend.columnWidth;
-    const y = top + Math.floor(index / legend.columns) * LEGEND_ROW_HEIGHT + 10;
+    const y = top + Math.floor(index / legend.columns) * chrome.legendRow + 10 * zoom;
 
-    context.lineWidth = 2;
+    context.lineWidth = 2 * zoom;
     context.strokeStyle = palette[entry.thread];
     context.beginPath();
-    context.moveTo(x, y - 3);
-    context.lineTo(x + 18, y - 3);
+    context.moveTo(x, y - 3 * zoom);
+    context.lineTo(x + 18 * zoom, y - 3 * zoom);
     context.stroke();
 
     context.strokeStyle = palette[`${entry.thread}-pale`];
     context.beginPath();
-    context.moveTo(x, y + 1);
-    context.lineTo(x + 18, y + 1);
+    context.moveTo(x, y + zoom);
+    context.lineTo(x + 18 * zoom, y + zoom);
     context.stroke();
 
     context.fillStyle = palette['text-muted'];
-    context.fillText(entry.label, x + 26, y + 4);
+    context.fillText(entry.label, x + 26 * zoom, y + 4 * zoom);
   });
 }
 
 /**
- * Resuelve la geometría del diagrama sin dibujar nada: dónde va cada dispositivo y
- * qué etiquetas caben. Separarlo del dibujo permite preguntar por adelantado si una
- * resolución alcanza para mostrar la red entera.
+ * Mide lo que el diagrama necesita: cuánto hay que separar los dispositivos para que
+ * las etiquetas no se pisen, y cuánto margen piden el título, la leyenda y la bandeja.
+ * De ahí sale el tamaño natural, el más chico en el que el dibujo respira.
  */
-export function planExport(model, { showInfrastructure, resolution }) {
+function measureDiagram(model, showInfrastructure, chrome, measure) {
   const visible = selectVisible(model, showInfrastructure);
   if (visible.devices.length === 0) throw new Error(t('error.noDevices'));
 
   const { placed, stray } = partitionDevices(visible.devices, visible.links);
   const links = visible.links;
 
-  const context2d = measuringContext();
-  const measure = labelMeasurer(context2d);
+  const context2d = measure.context;
   const halfWidth = (device) => halfLabelWidth(measure, device);
   const labelReach = Math.ceil(Math.max(...visible.devices.map(halfWidth)));
 
-  const size = EXPORT_RESOLUTIONS[resolution];
-  const frame = size
-    ? fixedFrame(size, { context2d, links, stray, labelReach })
-    : adaptiveFrame({ context2d, placed, links, stray, labelReach, halfWidth });
-
-  const positions = projectIntoRect(placed, frame.content);
-  for (const [id, point] of trayPositions(stray, frame.tray, {
-    x: MARGIN,
-    y: frame.trayTop,
-    width: frame.width - MARGIN * 2,
-  })) {
-    positions.set(id, point);
-  }
-
-  const devices = [...placed, ...stray];
-  const labels = planLabels(devices, positions, measure);
-
-  // Sólo cuenta como oculto lo que existe y no se pudo dibujar: un dispositivo sin
-  // dirección no deja ninguna etiqueta afuera.
-  const hidden = devices.reduce((total, device) => {
-    const shown = labels.get(device.id);
-    const hasAddress = device.interfaces.some((entry) => entry.addresses.length > 0);
-    return total + (shown.name ? 0 : 1) + (hasAddress && !shown.address ? 1 : 0);
-  }, 0);
-
-  return { frame, positions, labels, devices, links, stray, hidden };
-}
-
-/** Qué resoluciones alcanzan para dibujar la red entera, sin dejar ninguna etiqueta afuera. */
-export function resolutionsThatFit(model, { showInfrastructure }) {
-  return Object.fromEntries(
-    Object.keys(EXPORT_RESOLUTIONS).map((resolution) => {
-      try {
-        return [resolution, planExport(model, { showInfrastructure, resolution }).hidden === 0];
-      } catch {
-        return [resolution, false];
-      }
-    }),
-  );
-}
-
-/**
- * Dibuja la red completa en un lienzo. Con una resolución fija el lienzo es
- * exactamente ese y el diagrama se ajusta adentro; con `fit` el lienzo crece hasta
- * que las etiquetas dejan de pisarse.
- */
-export async function renderNetworkToCanvas(model, options) {
-  const { showInfrastructure, resolution, transparent, title, palette } = options;
-
-  await document.fonts.ready;
-  const plan = planExport(model, { showInfrastructure, resolution });
-  const { frame, positions, labels, devices, links, stray } = plan;
-
-  if (frame.width * frame.height > MAX_PIXELS) throw new Error(t('error.tooLarge'));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = frame.width;
-  canvas.height = frame.height;
-  const context = canvas.getContext('2d');
-
-  if (!transparent) {
-    context.fillStyle = palette.ground;
-    context.fillRect(0, 0, frame.width, frame.height);
-  }
-
-  drawLinks(context, links, positions, palette);
-  drawTray(context, stray, positions, palette, {
-    left: MARGIN,
-    right: frame.width - MARGIN,
-    top: frame.trayTop,
-  });
-  drawNodes(context, devices, positions, palette, labels);
-  drawCaption(context, {
-    title,
-    subtitle: t('export.caption', {
-      devices: countOf('devices', devices.length),
-      links: countOf('links', links.length),
-    }),
-    palette,
-    left: MARGIN,
-    top: MARGIN,
-  });
-  drawLegend(context, frame.legend, {
-    palette,
-    left: MARGIN,
-    top: frame.height - MARGIN - frame.legend.height,
-  });
-  drawWatermark(context, palette, { right: frame.width - MARGIN, bottom: frame.height - MARGIN });
-
-  return { canvas, frame, hidden: plan.hidden };
-}
-
-function bands(context2d, links, stray, width) {
-  // La leyenda comparte la franja de abajo con la marca de agua, y no debe alcanzarla.
-  const legend = planLegend(context2d, links, width - MARGIN * 2 - watermarkWidth(context2d) - 24);
-  const tray = trayPlan(stray, width - MARGIN * 2);
-  return { legend, tray };
-}
-
-/** El lienzo mide lo pedido y el diagrama se acomoda en lo que sobra. */
-function fixedFrame(size, { context2d, links, stray, labelReach }) {
-  const { legend, tray } = bands(context2d, links, stray, size.width);
-  // Un margen lateral no puede comerse el lienzo, por larga que sea una etiqueta.
-  const side = Math.min(MARGIN + labelReach, size.width * 0.22);
-  const top = MARGIN + HEADER_HEIGHT + NODE_EXTENT.top;
-  const bottom = MARGIN + legend.height + 16 + tray.height + NODE_EXTENT.bottom;
-
-  return {
-    width: size.width,
-    height: size.height,
-    legend,
-    tray,
-    trayTop: size.height - MARGIN - legend.height - 16 - tray.height,
-    content: {
-      x: side,
-      y: top,
-      width: Math.max(120, size.width - side * 2),
-      height: Math.max(120, size.height - top - bottom),
-    },
-  };
-}
-
-/** El lienzo crece hasta que ninguna etiqueta se pisa con otra. */
-function adaptiveFrame({ context2d, placed, links, stray, labelReach, halfWidth }) {
   const { spanX, spanY } = measureBounds(placed);
   const spread = Math.min(
     Math.max(spreadScaleFor(placed, halfWidth), MIN_CONTENT_WIDTH / spanX),
@@ -410,30 +380,234 @@ function adaptiveFrame({ context2d, placed, links, stray, labelReach, halfWidth 
     MAX_CONTENT_HEIGHT / spanY,
   );
 
-  const side = MARGIN + labelReach;
+  const side = chrome.margin + labelReach;
+  const top = chrome.margin + chrome.header + NODE_EXTENT.top;
+  const provisional = frameForNetwork(placed, { left: side, right: side, top, bottom: top }, spread);
+  const across = provisional.width - chrome.margin * 2;
+
+  const legend = planLegend(context2d, links, across - watermarkWidth(context2d, chrome) - 24 * chrome.zoom, chrome);
+  const tray = trayPlan(stray, across);
   const insets = {
     left: side,
     right: side,
-    top: MARGIN + HEADER_HEIGHT + NODE_EXTENT.top,
-    bottom: MARGIN + NODE_EXTENT.bottom + LEGEND_ROW_HEIGHT,
+    top,
+    bottom: chrome.margin + NODE_EXTENT.bottom + legend.height + 16 * chrome.zoom + tray.height,
   };
 
-  // Leyenda y bandeja se planifican antes de fijar el alto, porque sus filas
-  // deciden cuánto espacio hay que reservar abajo.
-  const provisional = frameForNetwork(placed, insets, spread);
-  const { legend, tray } = bands(context2d, links, stray, provisional.width);
+  const natural = frameForNetwork(placed, insets, spread);
+  return { placed, stray, links, measure, chrome, insets, legend, tray, natural };
+}
 
-  const frame = frameForNetwork(placed, {
-    ...insets,
-    bottom: MARGIN + NODE_EXTENT.bottom + legend.height + 16 + tray.height,
-  }, spread);
+/**
+ * Coloca el diagrama dentro de un espacio de diseño dado. El marco —título, leyenda y
+ * dirección— se ancla a los bordes de ese espacio, no al rectángulo del dibujo: si no,
+ * en un lienzo más alto que el diagrama la leyenda queda flotando en el medio.
+ */
+function layoutInto(shape, design) {
+  const { chrome } = shape;
+  const trayTop = design.height - chrome.margin - shape.legend.height - 16 * chrome.zoom - shape.tray.height;
+  const content = {
+    x: shape.insets.left,
+    y: shape.insets.top,
+    width: Math.max(120, design.width - shape.insets.left - shape.insets.right),
+    height: Math.max(120, trayTop - NODE_EXTENT.bottom - shape.insets.top),
+  };
 
+  const positions = projectIntoRect(shape.placed, content, { stretch: LAYOUT_STRETCH });
+  for (const [id, point] of trayPositions(shape.stray, shape.tray, {
+    x: chrome.margin,
+    y: trayTop,
+    width: design.width - chrome.margin * 2,
+  })) {
+    positions.set(id, point);
+  }
+
+  const devices = [...shape.placed, ...shape.stray];
+  const labels = planLabels(devices, positions, shape.measure);
+
+  // Se dibuja todo. Lo que se mide es qué tan prolijo quedó: cuántos bloques se rozan y
+  // cuántos tuvieron que bajar de renglón. Un bloque corrido no pierde información pero
+  // rompe la alineación, y una fila de equipos iguales con uno más abajo canta.
+  const hidden = devices.reduce((total, device) => total + (labels.get(device.id).crowded ? 1 : 0), 0);
+  const stepped = devices.reduce((total, device) => total + (labels.get(device.id).offset > 0 ? 1 : 0), 0);
+
+  return { ...shape, design, trayTop, positions, labels, devices, hidden, stepped };
+}
+
+/**
+ * Qué tan lejos está un reparto de quedar prolijo. Una etiqueta rozando a otra pesa mucho
+ * más que una corrida de renglón, pero las dos cuentan: el objetivo es que todos los
+ * bloques queden a la misma altura bajo su icono.
+ */
+function untidiness(plan) {
+  return plan.hidden * 1000 + plan.stepped;
+}
+
+/**
+ * Resuelve una exportación: en qué espacio se dibuja el diagrama y a qué escala se lleva
+ * a la imagen final.
+ */
+function planExport(model, { showInfrastructure, pixels }) {
+  const measure = labelMeasurer();
+  const shapeFor = (width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure);
+
+  // El marco crece con la imagen, y al crecer pide más margen, lo que corre el tamaño
+  // natural. Dos pasadas alcanzan para que el par se asiente.
+  let shape = shapeFor(CHROME_WIDTH);
+  for (let pass = 0; pass < 2; pass++) {
+    const next = shapeFor(shape.natural.width);
+    if (next.chrome.zoom === shape.chrome.zoom) break;
+    shape = next;
+  }
+
+  if (!pixels) return { ...layoutInto(shape, shape.natural), scale: 1 };
+
+  // Se arranca del ancho de referencia y, si alguna etiqueta se quedó sin lugar, el diseño
+  // se ensancha hasta que entren todas: una dirección a medias no sirve para nada, y el
+  // precio es cuerpo de letra, no información. El tope es el ancho natural, donde por
+  // construcción no se pisa nada; más allá sólo se agregaría aire.
+  const aspect = pixels.width / pixels.height;
+  const planAt = (width) => layoutInto(shapeFor(width), { width, height: width / aspect });
+  const ceiling = shape.natural.width;
+
+  let best = planAt(Math.min(ceiling, DESIGN_WIDTH));
+  for (let step = 1; step <= DESIGN_STEPS && untidiness(best) > 0; step++) {
+    const width = DESIGN_WIDTH + (ceiling - DESIGN_WIDTH) * step / DESIGN_STEPS;
+    if (width > ceiling) break;
+
+    // Más ancho no siempre es más prolijo: al estirarse cambia también la separación
+    // vertical, así que se comparan todos y gana el primero que llegue a cero.
+    const candidate = planAt(width);
+    if (untidiness(candidate) < untidiness(best)) best = candidate;
+  }
+
+  return { ...best, scale: pixels.width / best.design.width };
+}
+
+/** Medidas de salida que sirven: las que dejan el texto por encima del piso legible. */
+export function offeredSizes(model, { showInfrastructure, format }) {
+  const survives = (size) => {
+    try {
+      const pixels = canvasSizeFor(format, size);
+      const { scale } = planExport(model, { showInfrastructure, pixels });
+      return format === 'pdf'
+        ? LABEL_SIZE * scale * 72 / PRINT_DPI >= MIN_LABEL_POINTS
+        : LABEL_SIZE * scale >= MIN_LABEL_SIZE;
+    } catch {
+      return false;
+    }
+  };
+
+  try {
+    measureDiagram(model, showInfrastructure, chromeFor(CHROME_WIDTH), labelMeasurer());
+  } catch {
+    return [];
+  }
+
+  const candidates = format === 'pdf' ? PAPER_SIZES : EXPORT_RESOLUTIONS;
+  return Object.entries(candidates)
+    .filter(([, size]) => survives(size))
+    .map(([name]) => name)
+    .concat('fit');
+}
+
+/** Píxeles del lienzo para la medida pedida, o ninguno si el dibujo pone el tamaño. */
+function canvasSizeFor(format, size) {
+  if (!size) return null;
+  if (format !== 'pdf') return size;
   return {
-    ...frame,
-    legend,
-    tray,
-    trayTop: frame.height - MARGIN - legend.height - 16 - tray.height,
+    width: Math.round(size.width * PRINT_DPI / 72),
+    height: Math.round(size.height * PRINT_DPI / 72),
   };
+}
+
+/**
+ * Dibuja la red completa. Con una medida fija el lienzo mide exactamente eso: el
+ * diagrama se reparte en lo que queda y el marco se apoya en los bordes.
+ */
+async function renderNetworkToCanvas(model, { showInfrastructure, format, size, transparent, title, palette, language, budget }) {
+  await document.fonts.ready;
+
+  // Todo el dibujo va dentro de `withLanguage`: la leyenda y el pie se escriben en el
+  // idioma pedido, y además su ancho entra en el cálculo del encuadre.
+  return withLanguage(language, () => {
+    const pixels = canvasSizeFor(format, size);
+    const plan = planExport(model, { showInfrastructure, pixels });
+    const { design, scale } = plan;
+
+    const width = Math.round(design.width * scale);
+    const height = Math.round(design.height * scale);
+    if (!budget && width * height > MAX_PIXELS) throw new Error(t('error.tooLarge'));
+
+    // La vista previa sale del mismo plan en un lienzo chico: mismo reparto, mismas
+    // etiquetas, mismo encuadre; lo único que cambia es cuántos píxeles hay debajo.
+    const shrink = budget ? Math.min(1, budget / width) : 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(width * shrink);
+    canvas.height = Math.round(height * shrink);
+    const context = canvas.getContext('2d');
+    context.setTransform(scale * shrink, 0, 0, scale * shrink, 0, 0);
+
+    if (!transparent) {
+      context.fillStyle = palette.ground;
+      context.fillRect(0, 0, design.width, design.height);
+    }
+
+    paintDiagram(context, plan, { palette, title });
+
+    /**
+     * Vuelve a pintar el mismo plan en otro lienzo, a la escala de verdad y centrado en un
+     * punto: es lo que mira la lupa. Reaprovechar el plan es lo que lo hace barato, porque
+     * lo caro no es dibujar sino decidir el reparto. Lo que cae fuera del lienzo lo
+     * descarta el propio contexto.
+     */
+    const magnify = (target, at) => {
+      const view = target.getContext('2d');
+      view.setTransform(1, 0, 0, 1, 0, 0);
+      view.clearRect(0, 0, target.width, target.height);
+      view.setTransform(scale, 0, 0, scale, target.width / 2 - at.x * scale, target.height / 2 - at.y * scale);
+
+      view.fillStyle = palette.ground;
+      view.fillRect(at.x - target.width / scale, at.y - target.height / scale, target.width * 2 / scale, target.height * 2 / scale);
+      paintDiagram(view, plan, { palette, title });
+    };
+
+    return { canvas, plan, width, height, magnify };
+  });
+}
+
+/** El mismo dibujo para el lienzo y para el SVG, expresado sobre un contexto 2D. */
+function paintDiagram(context, plan, { palette, title }) {
+  const { chrome, design } = plan;
+
+  drawLinks(context, plan.links, plan.positions, palette);
+  drawTray(context, plan.stray, plan.positions, palette, chrome, {
+    left: chrome.margin,
+    right: design.width - chrome.margin,
+    top: plan.trayTop,
+  });
+  drawNodes(context, plan.devices, plan.positions, palette, plan.labels);
+  drawCaption(context, {
+    title,
+    subtitle: t('export.caption', {
+      devices: countOf('devices', plan.devices.length),
+      links: countOf('links', plan.links.length),
+    }),
+    palette,
+    chrome,
+    left: chrome.margin,
+    top: chrome.margin,
+  });
+  drawLegend(context, plan.legend, {
+    palette,
+    chrome,
+    left: chrome.margin,
+    top: design.height - chrome.margin - plan.legend.height,
+  });
+  drawWatermark(context, palette, chrome, {
+    right: design.width - chrome.margin,
+    bottom: design.height - chrome.margin,
+  });
 }
 
 function canvasToBlob(canvas, mime, quality) {
@@ -516,25 +690,94 @@ async function buildPdf(canvas, pointsPerPixel) {
 }
 
 /** Genera el archivo con la red completa, no sólo con la parte visible en pantalla. */
-export async function createNetworkExport(model, { format, name, resolution, transparent, showInfrastructure }) {
+/** El SVG sale del tamaño natural del diagrama: escalarlo es tarea de quien lo abra. */
+async function buildSvg(model, { showInfrastructure, transparent, title, palette, language }) {
+  await document.fonts.ready;
+
+  return withLanguage(language, () => {
+    const plan = planExport(model, { showInfrastructure, pixels: null });
+    const context = new SvgContext();
+
+    if (!transparent) {
+      context.fillStyle = palette.ground;
+      context.fillRect(0, 0, plan.design.width, plan.design.height);
+    }
+    paintDiagram(context, plan, { palette, title });
+
+    const markup = context.toSvg({ width: plan.design.width, height: plan.design.height, title });
+    return { blob: new Blob([markup], { type: 'image/svg+xml' }), plan };
+  });
+}
+
+/** Traduce la medida elegida en el diálogo al rectángulo de salida, si es que hay una. */
+function sizeFor(format, choice) {
+  if (choice === 'fit' || !choice) return null;
+  return format === 'pdf' ? PAPER_SIZES[choice] : EXPORT_RESOLUTIONS[choice];
+}
+
+/**
+ * El mismo dibujo que se va a descargar, en un lienzo del tamaño que entre en pantalla.
+ * Devuelve además la medida real, porque es la que hay que decirle al usuario: en la vista
+ * previa dos resoluciones del mismo formato se ven igual, y lo único que las separa es la
+ * definición. El SVG y el PDF se previsualizan como lo que son, un vector y una hoja.
+ */
+export async function renderNetworkPreview(model, request, budget) {
+  const { format, name, size: choice, transparent, showInfrastructure, language, theme } = request;
   const descriptor = EXPORT_FORMATS[format];
   if (!descriptor) throw new Error(t('error.unknownFormat', { format }));
 
-  const { canvas, hidden } = await renderNetworkToCanvas(model, {
+  const { canvas, plan, width, height, magnify } = await renderNetworkToCanvas(model, {
     showInfrastructure,
-    resolution,
+    format,
+    size: descriptor.vector ? null : sizeFor(format, choice),
     transparent: transparent && format === 'png',
     title: name,
-    palette: readPalette(),
+    palette: readPalette(theme),
+    language,
+    budget,
   });
 
-  // El PDF entra en una hoja imprimible; más píxeles suben la definición, no el tamaño.
-  const pointsPerPixel = Math.min(0.75, PAGE_LIMIT.width / canvas.width, PAGE_LIMIT.height / canvas.height);
+  return { canvas, hidden: plan.hidden, width, height, design: plan.design, magnify };
+}
+
+export async function createNetworkExport(model, { format, name, size: choice, transparent, showInfrastructure, language, theme }) {
+  const descriptor = EXPORT_FORMATS[format];
+  if (!descriptor) throw new Error(t('error.unknownFormat', { format }));
+
+  const palette = readPalette(theme);
+  const fileName = `${name}.${descriptor.extension}`;
+
+  if (descriptor.vector) {
+    const { blob, plan } = await buildSvg(model, { showInfrastructure, transparent, title: name, palette, language });
+    return { blob, fileName, hidden: plan.hidden, width: plan.design.width, height: plan.design.height };
+  }
+
+  const { canvas, plan } = await renderNetworkToCanvas(model, {
+    showInfrastructure,
+    format,
+    size: sizeFor(format, choice),
+    transparent: transparent && format === 'png',
+    title: name,
+    palette,
+    language,
+  });
+
+  // La hoja mide lo que pidió el usuario; los píxeles de más sólo suben la definición.
+  const paper = format === 'pdf' ? PAPER_SIZES[choice] : null;
+  const pointsPerPixel = paper ? paper.width / canvas.width : 0.75;
+
   const blob = format === 'pdf'
     ? await buildPdf(canvas, pointsPerPixel)
-    : await canvasToBlob(canvas, descriptor.mime, format === 'jpg' ? 0.92 : undefined);
+    : await canvasToBlob(canvas, descriptor.mime, format === 'jpg' ? JPEG_QUALITY : undefined);
 
-  return { blob, hidden, fileName: `${name}.${descriptor.extension}`, width: canvas.width, height: canvas.height };
+  return {
+    blob,
+    fileName,
+    hidden: plan.hidden,
+    width: canvas.width,
+    height: canvas.height,
+    paper: paper ? choice : null,
+  };
 }
 
 export async function exportNetwork(model, options) {
