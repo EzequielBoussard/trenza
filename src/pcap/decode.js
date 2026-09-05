@@ -39,7 +39,10 @@ function readPcap(view, bytes) {
     offset += capturedLength;
   }
 
-  return { container: 'pcap', linkType, packets };
+  // Lo que sobra al final es un registro que quedó a medias: la captura se cortó. Sin
+  // guardarlo, un archivo truncado justo después de la cabecera dice «0 paquetes» y
+  // parece que el visor no supo leerlo.
+  return { container: 'pcap', linkType, packets, truncated: bytes.length - offset };
 }
 
 function readOptionTimestampResolution(view, bytes, start, end, little) {
@@ -107,7 +110,12 @@ function readPcapng(view, bytes) {
     offset += blockLength;
   }
 
-  return { container: 'pcapng', linkType: interfaces[0] ? interfaces[0].linkType : 1, packets };
+  return {
+    container: 'pcapng',
+    linkType: interfaces[0] ? interfaces[0].linkType : 1,
+    packets,
+    truncated: bytes.length - offset,
+  };
 }
 
 /** Lee una captura en formato pcap clásico o pcapng y devuelve sus paquetes crudos. */

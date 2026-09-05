@@ -3,6 +3,35 @@ import { getLocale, t } from '../i18n.js';
 
 const PAGE_SIZE = 300;
 
+/**
+ * Las columnas de la tabla, en orden, con de dónde sale el valor por el que se ordena.
+ * `text` marca las que se comparan como texto; el resto, como número.
+ */
+const COLUMNS = [
+  { key: 'table.number', of: (packet) => packet.index },
+  { key: 'table.time', of: (packet) => packet.timestamp },
+  { key: 'table.source', of: (packet) => packet.source, text: true },
+  { key: 'table.destination', of: (packet) => packet.destination, text: true },
+  { key: 'table.protocol', of: (packet) => packet.protocol, text: true },
+  { key: 'table.length', of: (packet) => packet.originalLength },
+  { key: 'table.detail', of: (packet) => packet.summary, text: true },
+];
+
+/**
+ * La comparación de texto va con orden numérico, y eso es lo que hace falta acá: sin él
+ * `192.168.1.10` va antes que `192.168.1.2`, porque compara dígito a dígito. Con él compara
+ * cada tramo de números por su valor, que es justo lo que uno espera de una dirección.
+ */
+const collator = () => new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
+
+/**
+ * Los campos por los que busca el filtro, que son los mismos que después se resaltan. Se
+ * miran de a uno y no pegados en una sola cadena: pegados, `icmp 192` coincidía en la
+ * juntura entre el protocolo y el origen, y la fila salía sin una sola marca encima, sin
+ * que se pudiera ver por qué estaba ahí. Si una fila aparece, algo tiene resaltado.
+ */
+const SEARCHED = ['protocol', 'source', 'destination', 'summary'];
+
 function createElement(tag, className, textContent) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -50,6 +79,7 @@ export class PacketTableView {
     this.rendered = 0;
     this.selected = new Set();
     this.anchor = null;
+    this.sort = null;
   }
 
   /** Los paquetes elegidos, en el orden en que están en la captura. */
@@ -98,21 +128,62 @@ export class PacketTableView {
   load(packets) {
     this.packets = packets;
     this.origin = packets.length > 0 ? packets[0].timestamp : 0;
-    this.setFilter('');
+    this.collator = collator();
+    this.filter = '';
+    this.sort = null;
+    this.selected = new Set();
+    this.refresh();
   }
 
   setFilter(text) {
     this.filter = text.trim().toLowerCase();
-    this.visible = this.filter
-      ? this.packets.filter((packet) =>
-          `${packet.protocol} ${packet.source} ${packet.destination} ${packet.summary}`
-            .toLowerCase()
-            .includes(this.filter))
-      : this.packets;
-    this.rendered = 0;
+    // Filtrar esconde filas, y una selección con filas escondidas adentro engaña: el
+    // diálogo seguiría ofreciendo exportar paquetes que no están a la vista. Se limpia, y
+    // se avisa, que si no el resto de la interfaz se queda con la cuenta vieja.
     this.selected = new Set();
+    this.refresh();
+    this.onSelect([], null);
+  }
+
+  /**
+   * Un clic por columna recorre tres estados: primero de menor a mayor, después al revés y
+   * después de vuelta al orden de la captura. El tercero hace falta porque ordenar por
+   * cualquier cosa pierde la secuencia, que en una captura es la mitad de la información.
+   */
+  sortByColumn(index) {
+    const same = this.sort && this.sort.column === index;
+    this.sort = same && this.sort.descending ? null : { column: index, descending: Boolean(same) };
+    this.refresh();
+  }
+
+  /**
+   * Filtra y ordena, en ese orden, y vuelve a dibujar. Las dos cosas salen siempre de la
+   * misma pasada: hacerlas por separado dejaba una tabla ordenada que al filtrar volvía al
+   * orden de la captura, o al revés.
+   */
+  refresh() {
+    const filtered = this.filter
+      ? this.packets.filter((packet) =>
+          SEARCHED.some((field) => String(packet[field] ?? '').toLowerCase().includes(this.filter)))
+      : this.packets;
+
+    this.visible = this.sort ? this.sorted(filtered) : filtered;
+    this.rendered = 0;
     this.anchor = null;
     this.draw();
+  }
+
+  sorted(packets) {
+    const { of, text } = COLUMNS[this.sort.column];
+    const direction = this.sort.descending ? -1 : 1;
+    const compare = text
+      ? ((a, b) => this.collator.compare(String(of(a) ?? ''), String(of(b) ?? '')))
+      : ((a, b) => of(a) - of(b));
+
+    // Se copia porque `sort` ordena en el lugar, y sin la copia el orden de la captura se
+    // perdería para siempre en la primera ordenada. Es estable, así que los empates
+    // conservan la secuencia original.
+    return [...packets].sort((a, b) => compare(a, b) * direction);
   }
 
   draw() {
@@ -121,9 +192,25 @@ export class PacketTableView {
     const table = createElement('table', 'table table--packets');
     const head = createElement('thead');
     const headRow = createElement('tr');
-    for (const key of ['table.number', 'table.time', 'table.source', 'table.destination', 'table.protocol', 'table.length', 'table.detail']) {
-      headRow.append(createElement('th', null, t(key)));
-    }
+
+    COLUMNS.forEach((column, index) => {
+      const label = t(column.key);
+      const heading = createElement('th');
+      const sorting = this.sort && this.sort.column === index;
+
+      // El encabezado es un botón de verdad y no un `th` con un `click` encima: así se
+      // llega con el tabulador y el lector de pantalla dice que se puede ordenar.
+      const button = createElement('button', 'sortable', label);
+      button.type = 'button';
+      button.setAttribute('aria-label', t('table.sortBy', { column: label }));
+      // La flecha va siempre, vacía si no ordena por acá: así ordenar no corre los títulos.
+      button.append(createElement('span', 'sortable__mark', sorting ? (this.sort.descending ? '▾' : '▴') : ''));
+
+      heading.setAttribute('aria-sort', sorting ? (this.sort.descending ? 'descending' : 'ascending') : 'none');
+      button.addEventListener('click', () => this.sortByColumn(index));
+      heading.append(button);
+      headRow.append(heading);
+    });
     head.append(headRow);
     this.body = createElement('tbody');
     table.append(head, this.body);
@@ -221,13 +308,21 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
   }
 
   const span = packets.length > 1 ? packets[packets.length - 1].timestamp - packets[0].timestamp : 0;
-  const facts = createElement('dl', 'facts');
-  for (const [term, value] of [
+  const entries = [
     [t('panel.format'), capture.container],
     [t('panel.packets'), String(packets.length)],
     [t('panel.totalBytes'), bytes.toLocaleString(getLocale())],
     [t('panel.duration'), span > 0 ? `${span.toFixed(3)} s` : '—'],
-  ]) {
+  ];
+
+  // El corte se cuenta acá y no sólo en la barra de estado: es un dato del archivo, y es
+  // donde alguien va a mirar cuando la cuenta de paquetes le parezca corta.
+  if (capture.truncated > 0) {
+    entries.push([t('panel.truncated'), t('panel.truncatedValue', { bytes: capture.truncated })]);
+  }
+
+  const facts = createElement('dl', 'facts');
+  for (const [term, value] of entries) {
     facts.append(createElement('dt', null, term), createElement('dd', null, value));
   }
 

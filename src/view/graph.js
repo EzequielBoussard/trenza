@@ -186,15 +186,51 @@ export function projectIntoRect(devices, rect, { stretch = 1 } = {}) {
 
 // Geometría del bloque de etiqueta, medida desde el centro del dispositivo. El radio es el
 // del halo que se dibuja, no uno menor: con 22 reservados sobre un disco de 26, una
-// dirección podía apoyarse en el anillo de afuera y quedar tapada por él.
+// dirección podía apoyarse en el anillo de afuera y quedar tapada por él. Y `nameTop` no
+// puede bajar de ese radio: el nombre quedaría dentro del disco y chocaría con él siempre.
 const LABEL_GEOMETRY = {
   discRadius: 26,
   nameTop: 26,
-  nameBottom: 44,
-  addressTop: 45,
+  nameBottom: 46,
+  addressTop: 47,
   addressBottom: 59,
   gap: 5,
 };
+
+/**
+ * El cuerpo de las etiquetas y dónde apoyan sus renglones, en unidades de diseño. Lo
+ * comparten el visor y la exportación, que son el mismo dibujo a distinta escala.
+ *
+ * Lo que decide cuánto hay que separar los equipos es la caja más ancha de cada bloque, y
+ * ésa es la de la dirección en sesenta de los setenta y un equipos del showcase. De ahí
+ * salen los cuatro valores:
+ *
+ * - La dirección va en condensada y no en monoespaciada. Una dirección tiene trece
+ *   caracteres, así que su ancho es lo único que fija el reparto, y en condensada el mismo
+ *   ancho alcanza para dos puntos más de cuerpo. Alinear dígitos, que es para lo que sirve
+ *   la monoespaciada, no aporta nada en una etiqueta suelta centrada bajo un icono; en la
+ *   tabla de paquetes, donde sí hay columnas que alinear, se sigue usando.
+ * - El nombre viaja gratis: no fija el reparto, así que subirlo no obliga a separar nada.
+ *   Entre 17 y 24 el lienzo no se mueve ni una unidad, y a partir de ahí es sólo una
+ *   cuestión de proporción contra el icono.
+ *
+ * Las dos líneas de base están donde la tinta entra justa en la caja reservada: el nombre
+ * ocupa de 27 a 45 y la dirección de 49 a 57, medidos desde el centro del dispositivo.
+ */
+export const LABEL_TYPE = {
+  nameSize: 20,
+  addressSize: 11,
+  nameBaseline: 41,
+  addressBaseline: 57,
+};
+
+// Las familias son las mismas que declara la hoja de estilos, alternativas incluidas: lo
+// que se mide para repartir tiene que ser lo que después se dibuja, y si la tipografía no
+// llegara a cargar, medir contra otra alternativa repartiría la red para una letra que
+// nadie va a ver.
+const CONDENSED = "'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif";
+export const LABEL_FONT = `600 ${LABEL_TYPE.nameSize}px ${CONDENSED}`;
+export const ADDRESS_FONT = `500 ${LABEL_TYPE.addressSize}px ${CONDENSED}`;
 
 // Nombre y dirección son una sola pieza y se corren juntos: separarlos dejaba la dirección
 // flotando lejos de su nombre, sin que se supiera de quién era. Cuando el lugar de siempre

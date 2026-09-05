@@ -2,9 +2,12 @@ import { countOf, t, withLanguage } from '../i18n.js';
 import { download } from '../download.js';
 import { SvgContext, haloText, strokeGlyph } from './svg-context.js';
 import {
+  ADDRESS_FONT,
   CATEGORY_GLYPHS,
   CATEGORY_THREADS,
+  LABEL_FONT,
   LABEL_REACH_BELOW,
+  LABEL_TYPE,
   LAYOUT_STRETCH,
   LEGEND_ENTRIES,
   frameForNetwork,
@@ -20,7 +23,11 @@ import {
   trayPositions,
 } from './graph.js';
 
-const MAX_PIXELS = 40e6;
+// El lienzo más grande que se puede pedir. El techo lo pone Safari en iPhone, que no
+// entrega lienzos de más de dieciséis millones y pico de píxeles y devuelve uno en blanco
+// sin avisar. Un A3 a 300 puntos por pulgada son 17,4 millones, así que sin este tope el
+// PDF más grande salía vacío justo en el navegador que menos se puede probar.
+const MAX_CANVAS_PIXELS = 16.7e6;
 
 // Un diagrama es texto fino sobre color plano, justo lo que peor le sienta al JPEG. Con
 // menos calidad que esta, las letras salen con la basura típica del formato alrededor.
@@ -35,8 +42,6 @@ const LEGEND_ROW_HEIGHT = 22;
 // Cuánto sobresale un dispositivo de su centro: arriba el halo, abajo el nombre y la
 // dirección, contando el renglón de más que la dirección puede llegar a usar.
 const NODE_EXTENT = { top: 32, bottom: LABEL_REACH_BELOW + 6 };
-const NAME_BASELINE = 38;
-const ADDRESS_BASELINE = 54;
 const MARGIN = 40;
 
 // En cuántas unidades se reparte el dibujo cuando la medida de salida está fija. Es lo
@@ -45,9 +50,8 @@ const MARGIN = 40;
 // salen los nombres, las direcciones y los iconos. Subir la resolución sube la escala y
 // con ella todo el dibujo, en vez de sumar píxeles al mismo diagrama diminuto.
 //
-// El valor sale del visor: reparte la red en 1600 unidades con nombres de 13 px, y con
-// los de 15 de la exportación esas mismas proporciones caen cerca de 1850. Es el punto de
-// partida: si con ese ancho alguna etiqueta se queda afuera, el diseño se ensancha.
+// El valor es el punto de partida de la búsqueda, no el resultado: si con ese ancho alguna
+// etiqueta se queda sin lugar, el diseño se ensancha hasta que entren todas.
 const DESIGN_WIDTH = 2200;
 const DESIGN_STEPS = 24;
 
@@ -87,26 +91,21 @@ export const DEFAULT_PAPER = 'a4';
 // pantalla antes de que se note el píxel. Con 200 el texto se veía blando al acercarse.
 const PRINT_DPI = 300;
 
-// Por debajo de este cuerpo, en puntos, la etiqueta impresa deja de leerse.
-const MIN_LABEL_POINTS = 4.5;
+// El piso de legibilidad se mide sobre la dirección, que es el texto más chico del dibujo
+// y el que trae el dato: el nombre es casi el doble, así que ponerlo sobre el nombre dejaba
+// pasar salidas con direcciones ilegibles. En papel se aguanta un cuerpo bastante menor que
+// en pantalla porque 300 puntos por pulgada resuelven trazos que un monitor no.
+const MIN_ADDRESS_POINTS = 2.5;
+const MIN_ADDRESS_SIZE = 7;
 
-// La exportación usa una tipografía más grande y con más peso que la pantalla: la
-// imagen casi siempre se mira reducida, y ahí un cuerpo de 13 px se vuelve ilegible. La
-// dirección va bastante por debajo del nombre porque es lo que decide cuánto hay que
-// separar los equipos: con trece caracteres en monoespaciada, cada punto de cuerpo de más
-// obliga a estirar el dibujo entero y termina achicando todo lo demás.
-const LABEL_SIZE = 15;
-const ADDRESS_SIZE = 10;
-
-// Por debajo de este cuerpo, en píxeles del archivo final, la etiqueta deja de leerse.
-const MIN_LABEL_SIZE = 11;
+// La misma tipografía que en pantalla: el visor y la imagen son el mismo dibujo a distinta
+// escala, y cualquier diferencia acá hace que la descarga no se parezca a lo que se vio.
+const LABEL_SIZE = LABEL_TYPE.nameSize;
+const ADDRESS_SIZE = LABEL_TYPE.addressSize;
 
 // Grosor del contorno del color del fondo que va debajo de cada etiqueta, el mismo que
 // en pantalla: sin él, un cable que cruza por detrás del texto lo vuelve ilegible.
 const LABEL_HALO = 3.5;
-
-const LABEL_FONT = `600 ${LABEL_SIZE}px "IBM Plex Sans Condensed", sans-serif`;
-const ADDRESS_FONT = `500 ${ADDRESS_SIZE}px "IBM Plex Mono", monospace`;
 
 // Dirección del visor, estampada en cada exportación para que la imagen diga de dónde salió.
 const SITE_URL = 'trenza.pages.dev';
@@ -277,13 +276,13 @@ function drawNodes(context, devices, positions, palette, labels) {
 
     context.fillStyle = palette.text;
     context.font = LABEL_FONT;
-    haloText(context, device.name, x, y + NAME_BASELINE + shown.offset);
+    haloText(context, device.name, x, y + LABEL_TYPE.nameBaseline + shown.offset);
 
     const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
     if (address) {
       context.fillStyle = palette['text-muted'];
       context.font = ADDRESS_FONT;
-      haloText(context, address.address, x, y + ADDRESS_BASELINE + shown.offset);
+      haloText(context, address.address, x, y + LABEL_TYPE.addressBaseline + shown.offset);
     }
   }
 }
@@ -428,10 +427,10 @@ function layoutInto(shape, design) {
   // Se dibuja todo. Lo que se mide es qué tan prolijo quedó: cuántos bloques se rozan y
   // cuántos tuvieron que bajar de renglón. Un bloque corrido no pierde información pero
   // rompe la alineación, y una fila de equipos iguales con uno más abajo canta.
-  const hidden = devices.reduce((total, device) => total + (labels.get(device.id).crowded ? 1 : 0), 0);
+  const crowded = devices.reduce((total, device) => total + (labels.get(device.id).crowded ? 1 : 0), 0);
   const stepped = devices.reduce((total, device) => total + (labels.get(device.id).offset > 0 ? 1 : 0), 0);
 
-  return { ...shape, design, trayTop, positions, labels, devices, hidden, stepped };
+  return { ...shape, design, trayTop, positions, labels, devices, crowded, stepped };
 }
 
 /**
@@ -440,7 +439,7 @@ function layoutInto(shape, design) {
  * bloques queden a la misma altura bajo su icono.
  */
 function untidiness(plan) {
-  return plan.hidden * 1000 + plan.stepped;
+  return plan.crowded * 1000 + plan.stepped;
 }
 
 /**
@@ -491,8 +490,8 @@ export function offeredSizes(model, { showInfrastructure, format }) {
       const pixels = canvasSizeFor(format, size);
       const { scale } = planExport(model, { showInfrastructure, pixels });
       return format === 'pdf'
-        ? LABEL_SIZE * scale * 72 / PRINT_DPI >= MIN_LABEL_POINTS
-        : LABEL_SIZE * scale >= MIN_LABEL_SIZE;
+        ? ADDRESS_SIZE * scale * 72 / PRINT_DPI >= MIN_ADDRESS_POINTS
+        : ADDRESS_SIZE * scale >= MIN_ADDRESS_SIZE;
     } catch {
       return false;
     }
@@ -511,13 +510,23 @@ export function offeredSizes(model, { showInfrastructure, format }) {
     .concat('fit');
 }
 
-/** Píxeles del lienzo para la medida pedida, o ninguno si el dibujo pone el tamaño. */
+/**
+ * Píxeles del lienzo para la medida pedida, o ninguno si el dibujo pone el tamaño. La hoja
+ * se rasteriza a 300 puntos por pulgada salvo que eso pase del lienzo más grande que se
+ * puede pedir; ahí baja lo justo para entrar, que en un A3 son 294 y no se nota. La medida
+ * de la hoja no cambia: el PDF la calcula desde los píxeles que salieron.
+ */
 function canvasSizeFor(format, size) {
   if (!size) return null;
   if (format !== 'pdf') return size;
+
+  const perPoint = PRINT_DPI / 72;
+  const area = size.width * size.height * perPoint ** 2;
+  const fit = area > MAX_CANVAS_PIXELS ? Math.sqrt(MAX_CANVAS_PIXELS / area) : 1;
+
   return {
-    width: Math.round(size.width * PRINT_DPI / 72),
-    height: Math.round(size.height * PRINT_DPI / 72),
+    width: Math.round(size.width * perPoint * fit),
+    height: Math.round(size.height * perPoint * fit),
   };
 }
 
@@ -537,7 +546,7 @@ async function renderNetworkToCanvas(model, { showInfrastructure, format, size, 
 
     const width = Math.round(design.width * scale);
     const height = Math.round(design.height * scale);
-    if (!budget && width * height > MAX_PIXELS) throw new Error(t('error.tooLarge'));
+    if (!budget && width * height > MAX_CANVAS_PIXELS) throw new Error(t('error.tooLarge'));
 
     // La vista previa sale del mismo plan en un lienzo chico: mismo reparto, mismas
     // etiquetas, mismo encuadre; lo único que cambia es cuántos píxeles hay debajo.
@@ -689,7 +698,6 @@ async function buildPdf(canvas, pointsPerPixel) {
   return new Blob(chunks, { type: 'application/pdf' });
 }
 
-/** Genera el archivo con la red completa, no sólo con la parte visible en pantalla. */
 /** El SVG sale del tamaño natural del diagrama: escalarlo es tarea de quien lo abra. */
 async function buildSvg(model, { showInfrastructure, transparent, title, palette, language }) {
   await document.fonts.ready;
@@ -737,7 +745,7 @@ export async function renderNetworkPreview(model, request, budget) {
     budget,
   });
 
-  return { canvas, hidden: plan.hidden, width, height, design: plan.design, magnify };
+  return { canvas, crowded: plan.crowded, width, height, design: plan.design, magnify };
 }
 
 export async function createNetworkExport(model, { format, name, size: choice, transparent, showInfrastructure, language, theme }) {
@@ -749,7 +757,7 @@ export async function createNetworkExport(model, { format, name, size: choice, t
 
   if (descriptor.vector) {
     const { blob, plan } = await buildSvg(model, { showInfrastructure, transparent, title: name, palette, language });
-    return { blob, fileName, hidden: plan.hidden, width: plan.design.width, height: plan.design.height };
+    return { blob, fileName, crowded: plan.crowded, width: plan.design.width, height: plan.design.height };
   }
 
   const { canvas, plan } = await renderNetworkToCanvas(model, {
@@ -773,7 +781,7 @@ export async function createNetworkExport(model, { format, name, size: choice, t
   return {
     blob,
     fileName,
-    hidden: plan.hidden,
+    crowded: plan.crowded,
     width: canvas.width,
     height: canvas.height,
     paper: paper ? choice : null,

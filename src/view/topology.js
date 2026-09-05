@@ -1,6 +1,9 @@
 import { countOf, t } from '../i18n.js';
 import {
+  ADDRESS_FONT,
   CATEGORY_GLYPHS,
+  LABEL_FONT,
+  LABEL_TYPE,
   LEGEND_ENTRIES,
   partitionDevices,
   planLabels,
@@ -20,8 +23,24 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // sólo agranda. Cuanto más chico el lienzo, más grandes salen los iconos y los textos.
 const MIN_VIEW_WIDTH = 900;
 const MAX_VIEW_WIDTH = 5200;
-const VIEW_ASPECT = 1.6;
 const VIEW_STEPS = 14;
+
+// En cuántos puntos se afina el escalón que se pasó. Con cinco, el ancho queda dentro del
+// 20 % del hueco en vez de en el escalón entero, por cuatro repartos más.
+const REFINE_STEPS = 5;
+
+// El lienzo toma la proporción del panel donde va a entrar. Con una fija sobraba: un
+// lienzo apaisado dentro de un panel casi cuadrado entraba por el ancho y dejaba 312 px
+// de los 812 en blanco, y el dibujo se achicaba para caber en la parte que sí usaba. Los
+// topes son por si el panel queda con una forma imposible, que ahí estirar la red no
+// arregla nada. Sin panel medido —oculto o recién creado— vale la proporción de siempre.
+const FALLBACK_ASPECT = 1.6;
+const MIN_VIEW_ASPECT = 0.6;
+const MAX_VIEW_ASPECT = 2.6;
+
+// Cuánto tiene que cambiar la forma del panel para que valga la pena rehacer el reparto,
+// medido en logaritmo para que ensanchar y angostar pesen igual. 0,12 son un 13 %.
+const RESHAPE_THRESHOLD = 0.12;
 
 // Márgenes del área de dibujo: dejan lugar al halo del nodo arriba y al bloque de nombre y
 // dirección abajo, para que ninguna etiqueta quede cortada contra el borde.
@@ -35,20 +54,18 @@ const MAX_SCALE = 6;
 // suavizado encima se siente como retraso.
 const GLIDE_TAU = 45;
 
+// Cuánto se demora la entrada de cada dispositivo respecto del anterior, y a partir de
+// cuándo deja de demorarse: en una red de setenta equipos, el último no puede esperar
+// casi un segundo para aparecer.
+const REVEAL_STEP = 12;
+const REVEAL_CAP = 420;
+
 // Cuánto acerca cada unidad de rueda. Una muesca de ratón manda 100 y da un paso de 1,17.
 const WHEEL_SENSITIVITY = 0.0016;
 
 // El pellizco del trackpad llega como rueda con Control apretado y avisos mucho más chicos,
 // así que necesita más ganancia para que el gesto recorra la misma distancia.
 const PINCH_SENSITIVITY = 0.01;
-
-// Las mismas familias que declara la hoja de estilos para las etiquetas del diagrama.
-const LABEL_FONT = '600 13px "IBM Plex Sans Condensed", sans-serif';
-const ADDRESS_FONT = '400 10px "IBM Plex Mono", monospace';
-
-// Dónde apoyan los dos renglones del bloque, medidos desde el centro del dispositivo.
-const NAME_BASELINE = 38;
-const ADDRESS_BASELINE = 52;
 
 
 function element(name, attributes = {}) {
@@ -57,18 +74,25 @@ function element(name, attributes = {}) {
   return node;
 }
 
+/**
+ * Buscar el lienzo obliga a repartir la red hasta quince veces, y en cada pasada se
+ * consulta el ancho de cada nombre y de cada dirección. Los cuerpos son fijos, así que
+ * cada cadena se mide una sola vez y las demás pasadas salen de la tabla.
+ */
 function labelMeasurer() {
   const context = document.createElement('canvas').getContext('2d');
-  return {
-    nameWidth: (text) => {
-      context.font = LABEL_FONT;
-      return context.measureText(text).width;
-    },
-    addressWidth: (text) => {
-      context.font = ADDRESS_FONT;
-      return context.measureText(text).width;
-    },
+  const measured = (font) => {
+    const widths = new Map();
+    return (text) => {
+      if (!widths.has(text)) {
+        context.font = font;
+        widths.set(text, context.measureText(text).width);
+      }
+      return widths.get(text);
+    };
   };
+
+  return { nameWidth: measured(LABEL_FONT), addressWidth: measured(ADDRESS_FONT) };
 }
 
 function control(label, title, action) {
@@ -93,9 +117,27 @@ export class TopologyView {
     this.selectedId = null;
     this.thread = null;
     this.measure = labelMeasurer();
+    this.watchPanelShape();
+  }
+
+  /**
+   * El lienzo se calcula para la forma del panel, así que un panel con otra forma pide otro
+   * lienzo. Se rehace sólo si la vista está sin tocar: rehacer el reparto mueve todo de
+   * lugar, y hacérselo a alguien que estaba mirando algo de cerca molesta más que la franja
+   * que evita. Un cambio chico tampoco cuenta, que no vale la pena por unos píxeles.
+   */
+  watchPanelShape() {
+    new ResizeObserver(() => {
+      if (!this.last || !this.aspect) return;
+      const { x, y, scale } = this.target;
+      if (x !== 0 || y !== 0 || scale !== 1) return;
+      if (Math.abs(Math.log(this.panelAspect() / this.aspect)) < RESHAPE_THRESHOLD) return;
+      this.render(this.last.model, { showInfrastructure: this.last.showInfrastructure });
+    }).observe(this.container);
   }
 
   render(model, { showInfrastructure }) {
+    this.last = { model, showInfrastructure };
     const { devices: visible, links } = selectVisible(model, showInfrastructure);
 
     this.container.replaceChildren();
@@ -105,7 +147,8 @@ export class TopologyView {
     // solo tirado en un rincón del espacio de trabajo aplastaría toda la red.
     const { placed, stray } = partitionDevices(visible, links);
     const devices = [...placed, ...stray];
-    const { width, height, positions, plan, tray, trayTop } = this.layoutFor(placed, stray);
+    this.aspect = this.panelAspect();
+    const { width, height, positions, plan, tray, trayTop } = this.layoutFor(placed, stray, this.aspect);
 
     const svg = element('svg', {
       viewBox: `0 0 ${width} ${height}`,
@@ -173,8 +216,13 @@ export class TopologyView {
         tabindex: '0',
         role: 'button',
         'aria-label': `${device.name}, ${t(`category.${device.category}`)}`,
-        style: `--reveal-delay:${Math.min(order * 12, 420)}ms`,
       });
+
+      // El retraso va por CSSOM y no como atributo `style`: la política de seguridad de
+      // contenido no lleva `unsafe-inline`, así que un atributo de estilo se descarta, y
+      // con setenta y un dispositivos eso eran setenta y un rechazos por dibujado. Escribir
+      // la propiedad no pasa por esa puerta.
+      node.style.setProperty('--reveal-delay', `${Math.min(order * REVEAL_STEP, REVEAL_CAP)}ms`);
 
       node.append(
         element('circle', { class: 'node__ring', r: 31 }),
@@ -194,13 +242,13 @@ export class TopologyView {
         class: 'node__labels',
         transform: `translate(0 ${plan.get(device.id).offset})`,
       });
-      const label = element('text', { class: 'node__label', y: NAME_BASELINE, 'text-anchor': 'middle' });
+      const label = element('text', { class: 'node__label', y: LABEL_TYPE.nameBaseline, 'text-anchor': 'middle' });
       label.textContent = device.name;
       labels.append(label);
 
       const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
       if (address) {
-        const addressLabel = element('text', { class: 'node__address', y: ADDRESS_BASELINE, 'text-anchor': 'middle' });
+        const addressLabel = element('text', { class: 'node__address', y: LABEL_TYPE.addressBaseline, 'text-anchor': 'middle' });
         addressLabel.textContent = address.address;
         labels.append(addressLabel);
       }
@@ -233,16 +281,23 @@ export class TopologyView {
     if (this.selectedId) this.highlight(this.selectedId);
   }
 
+  /** Proporción del panel, que es la que le conviene al lienzo para no dejar franjas. */
+  panelAspect() {
+    const { width, height } = this.container.getBoundingClientRect();
+    if (!width || !height) return FALLBACK_ASPECT;
+    return Math.min(MAX_VIEW_ASPECT, Math.max(MIN_VIEW_ASPECT, width / height));
+  }
+
   /**
    * Reparte la red y, si alguna etiqueta quedó rozando a otra, agranda el lienzo y vuelve a
    * probar. Es la misma idea que en la exportación: antes que esconder un nombre o una
    * dirección, darle más lugar al dibujo.
    */
-  layoutFor(placed, stray) {
+  layoutFor(placed, stray, aspect) {
     const devices = [...placed, ...stray];
 
     const attempt = (width) => {
-      const height = Math.round(width / VIEW_ASPECT);
+      const height = Math.round(width / aspect);
       const trayWidth = width - VIEW_INSETS.x * 2;
       const tray = trayPlan(stray, trayWidth);
       const trayTop = height - VIEW_INSETS.bottom - tray.height;
@@ -271,11 +326,23 @@ export class TopologyView {
     };
 
     let best = attempt(MIN_VIEW_WIDTH);
+    let short = best.width;
+
     for (let step = 1; step <= VIEW_STEPS && best.untidiness > 0; step++) {
       // Más ancho no siempre es más prolijo: al estirarse cambia también la separación
       // vertical, así que se prueban todos y gana el primero que llegue a cero.
       const candidate = attempt(MIN_VIEW_WIDTH + (MAX_VIEW_WIDTH - MIN_VIEW_WIDTH) * step / VIEW_STEPS);
       if (candidate.untidiness < best.untidiness) best = candidate;
+      if (candidate.untidiness > 0) short = candidate.width;
+    }
+
+    // El paso grueso se pasa: el ancho que alcanza está en algún punto entre el último que
+    // se quedó corto y éste, y quedarse con el escalón entero cuesta hasta un 12 % de
+    // cuerpo de letra. Se afinan unos pocos puntos y gana el primero que siga prolijo; si
+    // ninguno lo está, queda el que ya se tenía.
+    for (let step = 1; step < REFINE_STEPS && best.untidiness === 0; step++) {
+      const candidate = attempt(short + (best.width - short) * step / REFINE_STEPS);
+      if (candidate.untidiness === 0) return candidate;
     }
     return best;
   }

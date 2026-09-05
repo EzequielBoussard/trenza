@@ -282,10 +282,20 @@ function showCapture(bytes) {
   state.packetSelection = [];
 
   paintCapture();
-  setStatus('status.capture', {
-    packets: { key: 'unit.packets', values: { count: state.capture.packets.length } },
-    container: state.capture.container,
-  }, 'ok');
+
+  // Una captura cortada a la mitad no es un error: los paquetes enteros que trae valen.
+  // Pero hay que decirlo, porque si el corte llegó antes del primer paquete la pantalla
+  // dice «0 paquetes» y parece que el visor no supo leer el archivo.
+  const { packets, container, truncated } = state.capture;
+  const values = { packets: { key: 'unit.packets', values: { count: packets.length } }, container };
+
+  if (truncated > 0) {
+    setStatus(packets.length > 0 ? 'status.captureCut' : 'status.captureCutEmpty',
+      { ...values, bytes: truncated }, 'warn');
+    return;
+  }
+
+  setStatus('status.capture', values, 'ok');
 }
 
 async function open(name, bytes) {
@@ -453,11 +463,11 @@ function wireExport() {
         ? `${Math.round(result.width)} × ${Math.round(result.height)}`
         : `${result.width} × ${result.height} px`;
       const paper = request.format === 'pdf' && SIZE_LABELS[request.size];
-      const trimmed = result.hidden > 0
-        ? t('export.previewTrimmed', { hidden: countOf('labels', result.hidden) })
+      const touching = result.crowded > 0
+        ? t('export.previewCrowded', { crowded: countOf('labels', result.crowded) })
         : '';
 
-      elements.previewNote.textContent = [paper, measure, trimmed].filter(Boolean).join(' · ');
+      elements.previewNote.textContent = [paper, measure, touching].filter(Boolean).join(' · ');
     } catch (error) {
       if (token !== previewToken) return;
       elements.previewFrame.replaceChildren();
@@ -593,7 +603,7 @@ function wireExport() {
       const message = VECTOR_FORMATS.includes(request.format) ? 'status.exportedVector'
         : result.paper ? 'status.exportedPaper'
           : request.format === 'pdf' ? 'status.exportedPlain'
-            : result.hidden > 0 ? 'status.exportedTrimmed' : 'status.exported';
+            : result.crowded > 0 ? 'status.exportedCrowded' : 'status.exported';
 
       setStatus(message, {
         file: result.fileName,
@@ -601,7 +611,7 @@ function wireExport() {
         height: result.height,
         paper: SIZE_LABELS[result.paper],
         size: Math.round(result.bytes / 1024),
-        hidden: { key: 'unit.labels', values: { count: result.hidden } },
+        crowded: { key: 'unit.labels', values: { count: result.crowded } },
       }, 'ok');
     } catch (error) {
       setStatus('status.exportFailed', { reason: error.message }, 'error');

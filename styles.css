@@ -101,12 +101,16 @@ body {
 html[data-translating] [data-i18n],
 html[data-translating] [data-i18n-html] { visibility: hidden; }
 
+/* En un iPhone apaisado la muesca se come el costado y el indicador de inicio, el pie. Los
+   márgenes de resguardo valen cero en todo lo demás, así que no hace falta condicionarlos. */
 .masthead {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 1.5rem;
   padding: 0.75rem 1.25rem;
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -555,6 +559,10 @@ body[data-theme-sweep] .theme-icon__rays {
 .statusbar[data-tone='ok'] { color: var(--green); }
 .statusbar[data-tone='error'] { color: var(--orange); }
 
+/* El aviso no es un error: el archivo se abrió, pero venía cortado. Va en el marrón del
+   código T568B, que es el único tono de la paleta que no está tomado por sí o por no. */
+.statusbar[data-tone='warn'] { color: var(--brown); }
+
 /* Estructura */
 
 .workspace {
@@ -563,6 +571,9 @@ body[data-theme-sweep] .theme-icon__rays {
   grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--panel-width);
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Cerrar sólo tiene sentido con algo abierto, y exportar sólo con un diagrama. */
@@ -629,6 +640,16 @@ body:not([data-loaded]) .workspace {
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
+}
+
+/* Dos rem son treinta y dos píxeles, que con el dedo se falla. No llegan a los cuarenta y
+   cuatro que pide Apple porque son tres apilados sobre un diagrama que en un teléfono mide
+   trescientos ochenta de alto, y ahí la columna taparía un tercio del dibujo. */
+@media (pointer: coarse) {
+  .zoom__button {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 
 @media (hover: hover) {
@@ -897,6 +918,14 @@ body[data-dragging] .dropveil { display: grid; }
   cursor: pointer;
 }
 
+/* La casilla mide trece píxeles, y el renglón que la acompaña, diecinueve. Con el dedo eso
+   es apuntar a una línea de texto: la etiqueta entera pasa a tener alto de verdad, que es
+   la que recibe el toque. */
+@media (pointer: coarse) {
+  .toggle,
+  .checkbox { min-height: 44px; }
+}
+
 .device-list {
   margin: 0;
   padding: 0 0.5rem 1.5rem;
@@ -1027,17 +1056,22 @@ body[data-dragging] .dropveil { display: grid; }
   stroke-linejoin: round;
 }
 
+/* Los cuerpos son los de LABEL_TYPE en graph.js, en unidades del lienzo: el nombre viaja
+   gratis y la dirección es la que fija cuánto hay que separar los equipos. La dirección va
+   en condensada porque en ese mismo ancho entran dos puntos más de cuerpo que en
+   monoespaciada, que acá no alinea nada. */
 .node__label {
   fill: var(--text);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 600;
 }
 
 .node__address {
   fill: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* El navegador dibuja su propio recuadro al hacer foco sobre un grupo SVG. Se anula
@@ -1086,7 +1120,7 @@ body[data-dragging] .dropveil { display: grid; }
 /* El subrayado lleva el acento sin teñir el texto: el nombre sigue en el color de
    lectura y la marca naranja queda al lado, no encima. */
 .node.is-selected .node__label {
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 700;
   text-decoration: underline;
   text-decoration-color: var(--orange);
@@ -1193,6 +1227,10 @@ body[data-dragging] .dropveil { display: grid; }
 
 .table__mono { font-family: var(--font-mono); }
 
+/* Una lista de veinticuatro nombres de interfaz no tiene un solo lugar donde cortar, y sin
+   permitirlo la tabla se lleva por delante el ancho del panel. */
+.table__wrap { overflow-wrap: anywhere; }
+
 .connections {
   margin: 0;
   padding: 0;
@@ -1252,6 +1290,39 @@ body[data-dragging] .dropveil { display: grid; }
   padding: 0.45rem 0.7rem;
   background: var(--surface);
   z-index: 1;
+}
+
+/* El botón hereda el aspecto del encabezado en vez de traer el suyo: lo que se ve es la
+   misma fila de títulos de siempre, sólo que ahora se puede tocar. El relleno viaja del
+   `th` al botón para que el área que responde sea la celda entera y no el largo del
+   texto, que en `#` son ocho píxeles. */
+.table--packets th:has(.sortable) { padding: 0; }
+
+.sortable {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .sortable:hover { color: var(--text); }
+}
+
+.sortable__mark {
+  min-width: 0.6em;
+  color: var(--orange);
+  font-size: 0.9em;
+  line-height: 1;
 }
 
 .table--packets td {

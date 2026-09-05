@@ -22,7 +22,21 @@ export async function readSourceFromLocation() {
   if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
 
   return {
-    name: decodeURIComponent(url.pathname.split('/').pop()) || 'file',
+    name: fileNameFrom(url),
     bytes: new Uint8Array(await response.arrayBuffer()),
   };
+}
+
+/**
+ * El último tramo de la ruta, ya sin codificar. Una dirección puede traer un `%` suelto
+ * que no forma ninguna secuencia válida, y ahí `decodeURIComponent` lanza: el archivo se
+ * descargó bien y quedarse sin abrirlo por el nombre sería absurdo, así que vale el crudo.
+ */
+function fileNameFrom(url) {
+  const last = url.pathname.split('/').pop();
+  try {
+    return decodeURIComponent(last) || 'file';
+  } catch {
+    return last || 'file';
+  }
 }

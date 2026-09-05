@@ -1,4 +1,5 @@
 import { t } from '../i18n.js';
+import { readInterfaces, readRoutes, readVlans } from './config.js';
 
 const DEVICE_CATEGORIES = [
   { match: /router/i, category: 'router' },
@@ -33,41 +34,6 @@ function classify(typeText, modelText) {
     if (rule.match.test(subject)) return rule.category;
   }
   return 'other';
-}
-
-// Las interfaces con nombre sólo aparecen en la configuración; el árbol de puertos
-// guarda direcciones pero no la nomenclatura que usa el equipo.
-function interfacesFromConfig(configLines) {
-  const interfaces = [];
-  let current = null;
-
-  for (const raw of configLines) {
-    const line = raw.trim();
-    const opened = line.match(/^interface\s+(\S+)/i);
-    if (opened) {
-      current = { name: opened[1], addresses: [], description: '', enabled: true };
-      interfaces.push(current);
-      continue;
-    }
-    if (!current) continue;
-    if (line === '!' || /^(line|router|ip route)\b/i.test(line)) {
-      current = null;
-      continue;
-    }
-
-    const ipv4 = line.match(/^ip address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)/i);
-    if (ipv4) current.addresses.push({ address: ipv4[1], mask: ipv4[2] });
-
-    const ipv6 = line.match(/^ipv6 address\s+(\S+)/i);
-    if (ipv6) current.addresses.push({ address: ipv6[1], mask: '' });
-
-    const description = line.match(/^description\s+(.+)/i);
-    if (description) current.description = description[1];
-
-    if (/^shutdown$/i.test(line)) current.enabled = false;
-  }
-
-  return interfaces.filter((entry) => entry.addresses.length > 0 || entry.description);
 }
 
 function interfacesFromPorts(engine) {
@@ -105,7 +71,10 @@ function readDevice(deviceNode) {
     ? childrenNamed(configNode, 'LINE').map((line) => line.textContent.replace(/\r/g, ''))
     : [];
 
-  const namedInterfaces = interfacesFromConfig(configLines);
+  // Se parsean todas las interfaces, no sólo las que llevan dirección: un puerto de acceso
+  // sin IP no dice nada por sí solo, pero es el que dice qué VLAN vive en ese cable.
+  const configured = readInterfaces(configLines);
+  const namedInterfaces = configured.filter((entry) => entry.addresses.length > 0 || entry.description);
   const workspace = childrenNamed(deviceNode, 'WORKSPACE')[0];
   const logical = workspace ? childrenNamed(workspace, 'LOGICAL')[0] : null;
 
@@ -118,6 +87,8 @@ function readDevice(deviceNode) {
     x: logical ? Number(childText(logical, 'X')) || 0 : 0,
     y: logical ? Number(childText(logical, 'Y')) || 0 : 0,
     interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
+    vlans: readVlans(configLines, configured),
+    routes: readRoutes(configLines),
     runningConfig: configLines,
     links: [],
   };

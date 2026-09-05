@@ -23,6 +23,7 @@ export class SvgContext {
   constructor() {
     this.elements = [];
     this.path = [];
+    this.circle = null;
     this.state = {
       fillStyle: '#000',
       strokeStyle: '#000',
@@ -65,6 +66,10 @@ export class SvgContext {
 
   beginPath() {
     this.path = [];
+    // El círculo pendiente también se descarta, como en el contexto 2D. Sin esto, un
+    // `arc` seguido de `fill` sin `stroke` dejaría el círculo colgado y el siguiente
+    // trazo de cualquier otra figura lo volvería a dibujar.
+    this.circle = null;
   }
 
   moveTo(x, y) {
@@ -112,7 +117,7 @@ export class SvgContext {
     const { weight, size, family } = parseFont(this.state.font);
     const { strokeStyle, lineWidth, lineJoin } = this.state;
     this.elements.push(`<text x="${round(x + this.state.offsetX)}" y="${round(y + this.state.offsetY)}"`
-      + ` fill="${this.state.fillStyle}" font-family="${escape(family)}" font-size="${size}"`
+      + ` fill="${this.state.fillStyle}" font-family="${escape(family)}" font-size="${round(size)}"`
       + ` font-weight="${weight}" text-anchor="${ANCHORS[this.state.textAlign] || 'start'}"`
       + (halo ? ` paint-order="stroke" stroke="${strokeStyle}" stroke-width="${round(lineWidth)}"`
         + ` stroke-linejoin="${lineJoin}"` : '')

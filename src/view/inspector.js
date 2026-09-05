@@ -15,6 +15,34 @@ function definitionList(entries) {
   return list;
 }
 
+/**
+ * Una tabla de encabezados traducidos y filas de celdas, que es lo que son casi todas.
+ * `wrap` marca las celdas que pueden partirse por cualquier lado: una lista de veinticuatro
+ * `GigabitEthernet0/n` no tiene un solo lugar donde cortar, y sin eso la tabla se lleva por
+ * delante el ancho del panel. En una dirección IP no se usa, que partida no se lee.
+ */
+function dataTable(headings, rows) {
+  const table = createElement('table', 'table');
+  const headRow = createElement('tr');
+  for (const key of headings) headRow.append(createElement('th', null, t(key)));
+
+  const head = createElement('thead');
+  head.append(headRow);
+
+  const body = createElement('tbody');
+  for (const cells of rows) {
+    const row = createElement('tr');
+    for (const { text, mono, wrap } of cells) {
+      const className = [mono && 'table__mono', wrap && 'table__wrap'].filter(Boolean).join(' ');
+      row.append(createElement('td', className || null, text));
+    }
+    body.append(row);
+  }
+
+  table.append(head, body);
+  return table;
+}
+
 function interfaceTable(interfaces) {
   const table = createElement('table', 'table');
   const head = createElement('thead');
@@ -44,6 +72,35 @@ function interfaceTable(interfaces) {
 
   table.append(head, body);
   return table;
+}
+
+/**
+ * Cada VLAN con su nombre y los puertos que la llevan. Se agrupa por VLAN y no por puerto
+ * porque la pregunta es «qué VLAN hay y por dónde pasa», y un switch de veinticuatro bocas
+ * contestada al revés son veinticuatro renglones para leer de a uno.
+ */
+function vlanTable(vlans) {
+  return dataTable(
+    ['table.vlan', 'table.vlanName', 'table.accessPorts', 'table.trunkPorts'],
+    vlans.map((vlan) => [
+      { text: vlan.id, mono: true },
+      { text: vlan.name || '—' },
+      { text: vlan.ports.join(', ') || '—', mono: true, wrap: true },
+      { text: vlan.trunks.join(', ') || '—', mono: true, wrap: true },
+    ]),
+  );
+}
+
+/** Las rutas escritas a mano, en el orden en que están en la configuración. */
+function routeTable(routes) {
+  return dataTable(
+    ['table.destination', 'table.mask', 'table.via'],
+    routes.map((route) => [
+      { text: route.destination, mono: true },
+      { text: route.mask || '—', mono: true },
+      { text: route.via, mono: true },
+    ]),
+  );
 }
 
 function connectionList(device, devicesById) {
@@ -90,6 +147,14 @@ export function renderDeviceInspector(container, device, devicesById) {
 
   if (device.interfaces.length > 0) {
     container.append(section(t('panel.interfaces'), interfaceTable(device.interfaces)));
+  }
+
+  if (device.vlans.length > 0) {
+    container.append(section(t('panel.vlans'), vlanTable(device.vlans)));
+  }
+
+  if (device.routes.length > 0) {
+    container.append(section(t('panel.routes'), routeTable(device.routes)));
   }
 
   if (device.links.length > 0) {
