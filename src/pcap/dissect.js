@@ -104,7 +104,7 @@ function dissectTcp(bytes, offset, length) {
 
   return {
     name: 'TCP',
-    fields: [
+    fields: () => [
       [t('field.sourcePort'), describePort(source)],
       [t('field.destinationPort'), describePort(destination)],
       [t('field.sequence'), view.getUint32(offset + 4, false)],
@@ -130,7 +130,7 @@ function dissectUdp(bytes, offset) {
 
   return {
     name: 'UDP',
-    fields: [
+    fields: () => [
       [t('field.sourcePort'), describePort(source)],
       [t('field.destinationPort'), describePort(destination)],
       [t('field.length'), length],
@@ -148,7 +148,7 @@ function dissectIcmp(bytes, offset, version) {
 
   return {
     name: version === 6 ? 'ICMPv6' : 'ICMP',
-    fields: [
+    fields: () => [
       [t('field.type'), name ? `${type} (${name})` : String(type)],
       [t('field.code'), code],
     ],
@@ -161,12 +161,11 @@ function dissectArp(bytes, offset) {
   const senderMac = formatMac(bytes, offset + 8);
   const senderIp = formatIPv4(bytes, offset + 14);
   const targetIp = formatIPv4(bytes, offset + 24);
-  const action = t(operation === 1 ? 'field.request' : 'field.reply');
 
   return {
     name: 'ARP',
-    fields: [
-      [t('field.operation'), `${operation} (${action})`],
+    fields: () => [
+      [t('field.operation'), `${operation} (${t(operation === 1 ? 'field.request' : 'field.reply')})`],
       [t('field.sourceMac'), senderMac],
       [t('field.sourceIp'), senderIp],
       [t('field.destinationMac'), formatMac(bytes, offset + 18)],
@@ -191,7 +190,7 @@ function dissectIPv4(bytes, offset) {
   return {
     layer: {
       name: 'IPv4',
-      fields: [
+      fields: () => [
         [t('field.source'), source],
         [t('field.destination'), destination],
         [t('field.protocol'), IP_PROTOCOLS[protocol] ? `${protocol} (${IP_PROTOCOLS[protocol]})` : String(protocol)],
@@ -217,7 +216,7 @@ function dissectIPv6(bytes, offset) {
   return {
     layer: {
       name: 'IPv6',
-      fields: [
+      fields: () => [
         [t('field.source'), source],
         [t('field.destination'), destination],
         [t('field.nextHeader'), IP_PROTOCOLS[protocol] ? `${protocol} (${IP_PROTOCOLS[protocol]})` : String(protocol)],
@@ -235,6 +234,11 @@ function dissectIPv6(bytes, offset) {
 /**
  * Descompone un paquete en capas legibles. Se detiene con lo que haya podido leer
  * cuando la captura está truncada, en vez de descartar el paquete entero.
+ *
+ * Los campos de cada capa se arman recién cuando alguien los pide, porque sólo se ven los
+ * del paquete elegido. Armándolos de entrada, una captura de cien mil paquetes construía
+ * 1,17 millones de pares de etiqueta y valor traducidos que nadie iba a leer: 1441 ms de
+ * pantalla congelada, contra 101 ms que cuesta recorrer los bytes.
  */
 export function dissectPacket(packet) {
   const bytes = packet.bytes;
@@ -242,7 +246,8 @@ export function dissectPacket(packet) {
   let source = '';
   let destination = '';
   let protocol = '—';
-  let summary = t('packet.undissected', { bytes: packet.capturedLength });
+  let summary = '';
+  let ethernet = false;
 
   try {
     let offset = 0;
@@ -250,23 +255,25 @@ export function dissectPacket(packet) {
 
     if (packet.linkType === 1 && bytes.length >= 14) {
       etherType = (bytes[12] << 8) | bytes[13];
-      source = formatMac(bytes, 6);
-      destination = formatMac(bytes, 0);
-      const label = `0x${etherType.toString(16).padStart(4, '0')}`;
+      ethernet = true;
+      const carried = etherType;
       layers.push({
         name: 'Ethernet',
-        fields: [
-          [t('field.sourceMac'), source],
-          [t('field.destinationMac'), destination],
-          [t('field.etherType'), ETHERTYPES[etherType] ? `${label} (${ETHERTYPES[etherType]})` : label],
-        ],
+        fields: () => {
+          const label = `0x${carried.toString(16).padStart(4, '0')}`;
+          return [
+            [t('field.sourceMac'), formatMac(bytes, 6)],
+            [t('field.destinationMac'), formatMac(bytes, 0)],
+            [t('field.etherType'), ETHERTYPES[carried] ? `${label} (${ETHERTYPES[carried]})` : label],
+          ];
+        },
       });
       offset = 14;
 
       while (etherType === 0x8100 || etherType === 0x88a8) {
         const vlanId = ((bytes[offset] << 8) | bytes[offset + 1]) & 0x0fff;
         etherType = (bytes[offset + 2] << 8) | bytes[offset + 3];
-        layers.push({ name: 'VLAN 802.1Q', fields: [[t('field.vlan'), vlanId]] });
+        layers.push({ name: 'VLAN 802.1Q', fields: () => [[t('field.vlan'), vlanId]] });
         offset += 4;
       }
       protocol = ETHERTYPES[etherType] || `0x${etherType.toString(16)}`;
@@ -311,7 +318,24 @@ export function dissectPacket(packet) {
     summary = t('packet.truncated');
   }
 
-  return { ...packet, layers, source, destination, protocol, summary };
+  // Las MAC valen como origen y destino sólo cuando ninguna capa de red puso direcciones.
+  // Formatearlas cuesta treinta veces más que leer una IP —seis bytes a hexadecimal, con
+  // sus relleno y su unión— y en tráfico IP, que es casi todo, se descartarían las dos.
+  if (!source && ethernet) {
+    source = formatMac(bytes, 6);
+    destination = formatMac(bytes, 0);
+  }
+
+  return {
+    ...packet,
+    layers,
+    source,
+    destination,
+    protocol,
+    // El texto de reserva se arma sólo si no hubo otro: interpolarlo para después pisarlo
+    // es una traducción por paquete tirada a la basura.
+    summary: summary || t('packet.undissected', { bytes: packet.capturedLength }),
+  };
 }
 
 export function toHexDump(bytes) {

@@ -83,6 +83,46 @@ test('no acepta archivos con otra firma', () => {
   assert.throws(() => decodeCapture(new Uint8Array(64)), /neither pcap nor pcapng/);
 });
 
+test('los campos de cada capa se arman recién cuando se piden', () => {
+  const tcp = Buffer.alloc(20);
+  tcp[12] = 0x50;
+  const capture = decodeCapture(buildCapture([
+    Buffer.concat([ethernet(MAC_ROUTER, MAC_CLIENT, 0x0800), ipv4(6, '10.0.0.1', '10.0.0.2', tcp)]),
+  ]));
+
+  const [ethernetLayer] = dissectPacket(capture.packets[0]).layers;
+  assert.equal(typeof ethernetLayer.fields, 'function', 'los campos se armaron de entrada');
+
+  // Las MAC siguen estando, sólo que se formatean al pedirlas: en una captura grande son
+  // dos cadenas por paquete que nadie mira.
+  const fields = new Map(ethernetLayer.fields());
+  assert.equal(fields.get('Source MAC'), '00:01:02:03:04:05');
+  assert.equal(fields.get('Destination MAC'), '00:aa:bb:cc:dd:ee');
+});
+
+test('sin capa de red, el origen y el destino son las MAC', () => {
+  const capture = decodeCapture(buildCapture([
+    Buffer.concat([ethernet(MAC_ROUTER, MAC_CLIENT, 0x8899), Buffer.alloc(4)]),
+  ]));
+
+  const packet = dissectPacket(capture.packets[0]);
+  assert.equal(packet.source, '00:01:02:03:04:05');
+  assert.equal(packet.destination, '00:aa:bb:cc:dd:ee');
+  assert.equal(packet.protocol, '0x8899');
+  assert.match(packet.summary, /not dissected/);
+});
+
+test('una captura entera no se declara cortada, y una cortada sí', () => {
+  const frame = Buffer.concat([ethernet(MAC_ROUTER, MAC_CLIENT, 0x0800), ipv4(1, '10.0.0.1', '10.0.0.2', Buffer.alloc(8))]);
+  const entera = buildCapture([frame, frame]);
+
+  assert.equal(decodeCapture(entera).truncated, 0);
+
+  const cortada = decodeCapture(entera.slice(0, entera.length - 12));
+  assert.equal(cortada.packets.length, 1, 'el paquete entero se pierde');
+  assert.ok(cortada.truncated > 0, 'el corte no se detectó');
+});
+
 test('sobrevive a un paquete truncado', () => {
   const capture = decodeCapture(buildCapture([Buffer.from([0x00, 0x01, 0x02])]));
   const packet = dissectPacket(capture.packets[0]);

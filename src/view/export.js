@@ -98,9 +98,9 @@ const PRINT_DPI = 300;
 const MIN_ADDRESS_POINTS = 2.5;
 const MIN_ADDRESS_SIZE = 7;
 
-// La misma tipografía que en pantalla: el visor y la imagen son el mismo dibujo a distinta
+// El cuerpo de la dirección es contra el que se mide el piso de legibilidad. Sale del mismo
+// lugar que el resto de la tipografía: el visor y la imagen son el mismo dibujo a distinta
 // escala, y cualquier diferencia acá hace que la descarga no se parezca a lo que se vio.
-const LABEL_SIZE = LABEL_TYPE.nameSize;
 const ADDRESS_SIZE = LABEL_TYPE.addressSize;
 
 // Grosor del contorno del color del fondo que va debajo de cada etiqueta, el mismo que

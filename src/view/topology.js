@@ -23,11 +23,13 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // sólo agranda. Cuanto más chico el lienzo, más grandes salen los iconos y los textos.
 const MIN_VIEW_WIDTH = 900;
 const MAX_VIEW_WIDTH = 5200;
-const VIEW_STEPS = 14;
 
-// En cuántos puntos se afina el escalón que se pasó. Con cinco, el ancho queda dentro del
-// 20 % del hueco en vez de en el escalón entero, por cuatro repartos más.
-const REFINE_STEPS = 5;
+// Cuánto se agranda el lienzo entre un intento y el siguiente. Los huecos donde el reparto
+// queda prolijo son angostos y no vienen en orden, así que un paso grueso los saltea: con
+// escalones de trescientas unidades, la red del showcase pasaba de 2400 —que ya estaba
+// limpia— a 3664, un tercio de cuerpo de letra tirado. Cada intento cuesta cuatro décimas
+// de milisegundo, así que recorrer el rango entero de a cincuenta son 33 ms en el peor caso.
+const VIEW_STEP = 50;
 
 // El lienzo toma la proporción del panel donde va a entrar. Con una fija sobraba: un
 // lienzo apaisado dentro de un panel casi cuadrado entraba por el ancho y dejaba 312 px
@@ -325,24 +327,14 @@ export class TopologyView {
       return { width, height, positions, plan, tray, trayTop, untidiness };
     };
 
+    // Se prueba de menos a más ancho y gana el primero que quede prolijo, que por ser el
+    // primero es también el más chico: cuanto más chico el lienzo, más grande sale todo.
+    // Más ancho no siempre es más prolijo —al estirarse cambia la separación vertical—, así
+    // que si ninguno llega a cero queda el que menos lejos se haya quedado.
     let best = attempt(MIN_VIEW_WIDTH);
-    let short = best.width;
-
-    for (let step = 1; step <= VIEW_STEPS && best.untidiness > 0; step++) {
-      // Más ancho no siempre es más prolijo: al estirarse cambia también la separación
-      // vertical, así que se prueban todos y gana el primero que llegue a cero.
-      const candidate = attempt(MIN_VIEW_WIDTH + (MAX_VIEW_WIDTH - MIN_VIEW_WIDTH) * step / VIEW_STEPS);
+    for (let width = MIN_VIEW_WIDTH + VIEW_STEP; width <= MAX_VIEW_WIDTH && best.untidiness > 0; width += VIEW_STEP) {
+      const candidate = attempt(width);
       if (candidate.untidiness < best.untidiness) best = candidate;
-      if (candidate.untidiness > 0) short = candidate.width;
-    }
-
-    // El paso grueso se pasa: el ancho que alcanza está en algún punto entre el último que
-    // se quedó corto y éste, y quedarse con el escalón entero cuesta hasta un 12 % de
-    // cuerpo de letra. Se afinan unos pocos puntos y gana el primero que siga prolijo; si
-    // ninguno lo está, queda el que ya se tenía.
-    for (let step = 1; step < REFINE_STEPS && best.untidiness === 0; step++) {
-      const candidate = attempt(short + (best.width - short) * step / REFINE_STEPS);
-      if (candidate.untidiness === 0) return candidate;
     }
     return best;
   }

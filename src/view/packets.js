@@ -277,7 +277,7 @@ export function renderPacketInspector(container, packet) {
     const wrapper = createElement('section', 'panel-section');
     wrapper.append(createElement('h3', 'panel-section__title', layer.name));
     const list = createElement('dl', 'facts');
-    for (const [term, value] of layer.fields) {
+    for (const [term, value] of layer.fields()) {
       list.append(createElement('dt', null, term), createElement('dd', 'facts__mono', String(value)));
     }
     wrapper.append(list);
