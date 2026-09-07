@@ -1,6 +1,10 @@
+// Los símbolos siguen la convención que usa quien lee diagramas de red: el router lleva las
+// cuatro flechas de «elige por dónde sale», y el switch, dos flechas opuestas de «cruza
+// tráfico entre bocas». La dirección importa: sin flechas, dos rieles con topes se leen como
+// el control de un ecualizador, que es de lo más común en cualquier interfaz.
 export const CATEGORY_GLYPHS = {
-  router: 'M4 12h16M4 12l3-3M4 12l3 3M20 12l-3-3M20 12l-3 3',
-  switch: 'M3 9h18M3 15h18M8 9V5M16 15v4',
+  router: 'M3 12h18M12 3v18M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3',
+  switch: 'M4 9h16M20 9l-3-3M20 9l-3 3M20 15H4M4 15l3-3M4 15l3 3',
   wireless: 'M12 18h.01M8.5 14.5a5 5 0 0 1 7 0M5.5 11.5a9 9 0 0 1 13 0',
   server: 'M4 6h16v5H4zM4 13h16v5H4zM7.5 8.5h.01M7.5 15.5h.01',
   endpoint: 'M4 6h16v9H4zM9 19h6M12 15v4',

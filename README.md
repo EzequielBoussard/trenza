@@ -123,6 +123,8 @@ Las dos entradas de la leyenda son botones: tocar una deja encendidos sólo los 
 
 Un clic en el vacío del diagrama, o la tecla `Escape`, deselecciona lo que haya, sea un dispositivo o un tipo de cable. Arrastrar para desplazarse no cuenta como clic: el umbral es de cinco píxeles.
 
+Los símbolos de cada dispositivo son propios y no los de Cisco, que es el juego que la industria da por estándar pero que el proyecto no distribuye. Siguen su convención igual donde ésta dice algo: el router lleva las cuatro flechas de «elige por dónde sale» y el switch, dos opuestas de «cruza tráfico entre bocas». Sin flechas, dos rieles con topes se leen como el control de un ecualizador, que es de lo más común en cualquier interfaz. El resto son símbolos que se entienden fuera de las redes también —el arco del wifi, el monitor, la nube, las unidades apiladas del servidor, el chip, el bastidor—, y ahí gana el que reconoce cualquiera. La seguridad va con un escudo y no con el muro de ladrillos del cortafuegos de Cisco, porque a diez píxeles el muro se vuelve una mancha y el escudo conserva su silueta; ese tamaño es el que manda, porque es el que se ve con la red entera en pantalla.
+
 Al elegir un dispositivo, el diagrama queda en tres niveles: el elegido con aro y halo naranjas y el nombre en negrita y subrayado en el color de acento, los que cuelgan de él con halo punteado, y el resto apagado. Sin el nivel del medio, el que tocaste se confunde con sus vecinos.
 
 Cada etiqueta lleva un contorno del color del fondo pintado debajo del relleno —`paint-order: stroke`—, así se lee aunque le pase por encima un cable o el aro del nodo elegido. El nombre del elegido no va en el color de acento justamente porque competiría con esos aros.
