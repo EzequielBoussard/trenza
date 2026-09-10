@@ -40,6 +40,10 @@ export function readInterfaces(configLines) {
     const access = line.match(/^switchport access vlan\s+(\d+)/i);
     if (access) current.vlan = access[1];
 
+    // Un tronco sin lista de permitidas las lleva todas, que es lo que hace Cisco por
+    // omisión y lo que escribe Packet Tracer cuando se configura por la interfaz.
+    if (/^switchport mode trunk$/i.test(line)) current.trunkAll = true;
+
     // Un tronco puede declarar sus VLAN en varias líneas, con `add` en las siguientes.
     const trunk = line.match(/^switchport trunk allowed vlan\s+(?:add\s+)?(\S+)/i);
     if (trunk) current.trunk = current.trunk ? `${current.trunk},${trunk[1]}` : trunk[1];
@@ -66,17 +70,27 @@ function expandVlanList(list) {
   return ids;
 }
 
+// Packet Tracer crea estas en cada switch por su cuenta y nadie las toca. Aparecen siempre,
+// así que listarlas sería una fila de ruido por dispositivo; se muestran sólo si algún
+// puerto las nombra, que ahí sí alguien decidió algo.
+const DEFAULT_VLANS = new Set(['1', '1002', '1003', '1004', '1005']);
+
 /**
- * Las VLAN salen de dos lados y hay que cruzarlos: los bloques `vlan` dan el número y el
- * nombre, y los puertos dicen a cuál pertenecen. Una VLAN puede aparecer sólo en un puerto,
- * sin bloque propio que la declare, así que se define al vuelo.
+ * Las VLAN salen de dos lados del archivo y hay que cruzarlos. El árbol XML del dispositivo
+ * trae la base con el número y el nombre —y es la única fuente cuando el switch se configuró
+ * por la interfaz de Packet Tracer, que no escribe nada en la configuración—; la
+ * configuración dice qué puerto pertenece a cuál, que el XML no guarda. `declared` son las
+ * del XML; una VLAN que sólo aparezca en un puerto se define igual, al vuelo.
  */
-export function readVlans(configLines, interfaces) {
+export function readVlans(configLines, interfaces, declared = []) {
   const vlans = new Map();
+  const named = new Set();
   const define = (id) => {
     if (!vlans.has(id)) vlans.set(id, { id, name: '', ports: [], trunks: [] });
     return vlans.get(id);
   };
+
+  for (const vlan of declared) define(vlan.id).name = vlan.name;
 
   let open = null;
   for (const raw of configLines) {
@@ -88,17 +102,33 @@ export function readVlans(configLines, interfaces) {
     }
     if (!open) continue;
 
-    const named = line.match(/^name\s+(.+)$/i);
-    if (named) open.name = named[1];
+    const label = line.match(/^name\s+(.+)$/i);
+    if (label) open.name = label[1];
     else open = null;
   }
 
   for (const entry of interfaces) {
-    if (entry.vlan) define(entry.vlan).ports.push(entry.name);
-    for (const id of expandVlanList(entry.trunk)) define(id).trunks.push(entry.name);
+    if (entry.vlan) {
+      define(entry.vlan).ports.push(entry.name);
+      named.add(entry.vlan);
+    }
+    for (const id of expandVlanList(entry.trunk)) {
+      define(id).trunks.push(entry.name);
+      named.add(id);
+    }
   }
 
-  return [...vlans.values()].sort((a, b) => Number(a.id) - Number(b.id));
+  // Los troncos sin lista se resuelven al final, cuando ya se sabe qué VLAN hay.
+  for (const entry of interfaces) {
+    if (!entry.trunkAll) continue;
+    for (const vlan of vlans.values()) {
+      if (!vlan.trunks.includes(entry.name)) vlan.trunks.push(entry.name);
+    }
+  }
+
+  return [...vlans.values()]
+    .filter((vlan) => !DEFAULT_VLANS.has(vlan.id) || named.has(vlan.id))
+    .sort((a, b) => Number(a.id) - Number(b.id));
 }
 
 /** Las rutas escritas a mano. Las que aprende un protocolo no están en la configuración. */

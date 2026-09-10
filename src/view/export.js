@@ -53,6 +53,14 @@ const MARGIN = 40;
 // El valor es el punto de partida de la búsqueda, no el resultado: si con ese ancho alguna
 // etiqueta se queda sin lugar, el diseño se ensancha hasta que entren todas.
 const DESIGN_WIDTH = 2200;
+
+// Cuánto se ensancha el diseño entre un intento y el siguiente, y cuántos intentos como
+// mucho. El paso es fijo y no una fracción del rango: dividir el rango lo volvía grueso
+// justo en las redes grandes, que son las que más lo necesitan, y ahí cada escalón de más
+// es cuerpo de letra perdido. Veinticuatro intentos cubren mil doscientas unidades, de
+// sobra en todo lo probado, y acotan lo que puede tardar una vista previa que se rehace
+// con cada cambio del diálogo.
+const DESIGN_STEP = 50;
 const DESIGN_STEPS = 24;
 
 // Límites del área donde se reparten los dispositivos. El mínimo evita diagramas
@@ -461,22 +469,24 @@ function planExport(model, { showInfrastructure, pixels }) {
 
   if (!pixels) return { ...layoutInto(shape, shape.natural), scale: 1 };
 
-  // Se arranca del ancho de referencia y, si alguna etiqueta se quedó sin lugar, el diseño
-  // se ensancha hasta que entren todas: una dirección a medias no sirve para nada, y el
-  // precio es cuerpo de letra, no información. El tope es el ancho natural, donde por
-  // construcción no se pisa nada; más allá sólo se agregaría aire.
+  // Se arranca del ancho más chico que valga la pena y, si alguna etiqueta se quedó sin
+  // lugar, el diseño se ensancha hasta que entren todas: una dirección a medias no sirve
+  // para nada, y el precio es cuerpo de letra, no información.
+  //
+  // La búsqueda pasa del ancho natural, y no por capricho. El natural se mide con la
+  // proporción que el dibujo pide, pero la salida impone la suya: un diagrama que a lo
+  // ancho no se pisaba, apretado a 16:9, sí. En una red de diez equipos el natural queda
+  // en 1070, por debajo del ancho de referencia, y con el techo ahí la búsqueda se
+  // terminaba en la primera vuelta sin haber probado nada.
   const aspect = pixels.width / pixels.height;
   const planAt = (width) => layoutInto(shapeFor(width), { width, height: width / aspect });
-  const ceiling = shape.natural.width;
+  const floor = Math.min(shape.natural.width, DESIGN_WIDTH);
 
-  let best = planAt(Math.min(ceiling, DESIGN_WIDTH));
+  let best = planAt(floor);
   for (let step = 1; step <= DESIGN_STEPS && untidiness(best) > 0; step++) {
-    const width = DESIGN_WIDTH + (ceiling - DESIGN_WIDTH) * step / DESIGN_STEPS;
-    if (width > ceiling) break;
-
     // Más ancho no siempre es más prolijo: al estirarse cambia también la separación
     // vertical, así que se comparan todos y gana el primero que llegue a cero.
-    const candidate = planAt(width);
+    const candidate = planAt(floor + DESIGN_STEP * step);
     if (untidiness(candidate) < untidiness(best)) best = candidate;
   }
 

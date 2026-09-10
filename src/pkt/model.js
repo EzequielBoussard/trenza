@@ -36,6 +36,20 @@ function classify(typeText, modelText) {
   return 'other';
 }
 
+/**
+ * La base de VLAN que el dispositivo guarda en el árbol, con su número y su nombre. Es la
+ * única fuente cuando el switch se configuró desde la interfaz de Packet Tracer, que no
+ * escribe nada de esto en la `running-config`.
+ */
+function vlansFromEngine(engine) {
+  const declared = childrenNamed(engine, 'VLANS')[0];
+  if (!declared) return [];
+
+  return childrenNamed(declared, 'VLAN')
+    .map((vlan) => ({ id: vlan.getAttribute('number') || '', name: vlan.getAttribute('name') || '' }))
+    .filter((vlan) => vlan.id);
+}
+
 function interfacesFromPorts(engine) {
   const interfaces = [];
   for (const port of engine.getElementsByTagName('PORT')) {
@@ -87,7 +101,7 @@ function readDevice(deviceNode) {
     x: logical ? Number(childText(logical, 'X')) || 0 : 0,
     y: logical ? Number(childText(logical, 'Y')) || 0 : 0,
     interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
-    vlans: readVlans(configLines, configured),
+    vlans: readVlans(configLines, configured, vlansFromEngine(engine)),
     routes: readRoutes(configLines),
     runningConfig: configLines,
     links: [],

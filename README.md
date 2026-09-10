@@ -6,7 +6,11 @@ Un visor de sólo lectura para archivos `.pkt` y `.pka` de Cisco Packet Tracer y
 
 De Packet Tracer: la topología lógica con las posiciones originales, el inventario de equipos, las interfaces con sus direcciones, las VLAN, las rutas estáticas, y el `running-config` de cada dispositivo que lo tenga.
 
-Las VLAN y las rutas salen de leer esa configuración, que es texto de Cisco IOS y vive en `src/pkt/config.js`, aparte del resto: así se prueba sin navegador y `model.js` se queda con una sola tarea, traducir el árbol del archivo. Las VLAN hay que cruzarlas de dos lados, porque los bloques `vlan` dan el número y el nombre pero son los puertos los que dicen a cuál pertenecen; una que sólo aparezca en la lista de un tronco existe igual, sin nombre. Se agrupan por VLAN y no por puerto porque la pregunta es «qué VLAN hay y por dónde pasa», y un switch de veinticuatro bocas contestada al revés son veinticuatro renglones para leer de a uno. De las rutas sólo están las escritas a mano: las que aprende un protocolo no viven en la configuración. Nada de esto aparece cuando no hay: la red del showcase es plana y no muestra ninguna de las dos secciones.
+Las rutas salen de leer la configuración, que es texto de Cisco IOS y vive en `src/pkt/config.js`, aparte del resto: así se prueba sin navegador y `model.js` se queda con una sola tarea, traducir el árbol del archivo. Sólo están las escritas a mano; las que aprende un protocolo no viven en la configuración.
+
+Las VLAN hay que cruzarlas de dos lados del archivo, porque cada lado guarda la mitad. El árbol XML del dispositivo trae la base con el número y el nombre, y es la única fuente cuando el switch se configuró desde la interfaz de Packet Tracer, que no escribe nada de esto en la configuración; la configuración, a su vez, dice qué puerto pertenece a cuál, que el XML no guarda. Un tronco declarado sin lista de permitidas las lleva todas, que es lo que hace Cisco por omisión. Y las que Packet Tracer crea solo en cada switch —la 1 y las 1002 a 1005— no se listan salvo que algún puerto las nombre, porque aparecen siempre y serían una fila de ruido por dispositivo.
+
+Se agrupan por VLAN y no por puerto porque la pregunta es «qué VLAN hay y por dónde pasa», y un switch de veinticuatro bocas contestada al revés son veinticuatro renglones para leer de a uno. Nada de esto aparece cuando no hay: la red del showcase es plana y no muestra ninguna de las dos secciones.
 
 De una captura: la lista de paquetes con tiempo relativo, direcciones y protocolo, el desglose por capas y el volcado hexadecimal.
 
@@ -199,6 +203,6 @@ Un servidor estático cualquiera sirve para desarrollar, pero no manda esas cabe
 
 ## Estado
 
-Validado contra archivos reales de Packet Tracer 7.3, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo y con dispositivos superpuestos.
+Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1 y 8.2.1** —trece redes, de tres a setenta y dos equipos, con VLAN, troncos y rutas estáticas—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.
 
-Sin verificar todavía: los archivos de la serie 8.x, y pcapng con varias interfaces y enlaces distintos de Ethernet.
+Sin verificar todavía: los archivos de la serie 9.x, y pcapng con varias interfaces y enlaces distintos de Ethernet.

@@ -55,6 +55,45 @@ test('lee las interfaces con su dirección, su descripción y si están apagadas
   assert.equal(interfaces[1].enabled, false, 'shutdown no apagó la interfaz');
 });
 
+test('las VLAN declaradas en el árbol valen aunque la configuración no las nombre', () => {
+  // Un switch configurado desde la interfaz de Packet Tracer no escribe bloques `vlan` en
+  // la running-config: el número y el nombre sólo están en el XML del dispositivo.
+  const config = ['!', 'interface FastEthernet0/1', ' switchport access vlan 10', '!'];
+  const declared = [
+    { id: '1', name: 'default' },
+    { id: '10', name: 'itdept' },
+    { id: '20', name: 'marketing' },
+    { id: '1002', name: 'fddi-default' },
+  ];
+
+  const vlans = readVlans(config, readInterfaces(config), declared);
+
+  assert.deepEqual(vlans.map((vlan) => `${vlan.id}:${vlan.name}`), ['10:itdept', '20:marketing'],
+    'las de fábrica no se filtraron, o se perdió el nombre del árbol');
+  assert.deepEqual(vlans[0].ports, ['FastEthernet0/1']);
+});
+
+test('un tronco sin lista de permitidas lleva todas las VLAN', () => {
+  const config = [
+    '!', 'interface FastEthernet0/1', ' switchport access vlan 10',
+    '!', 'interface FastEthernet0/3', ' switchport mode trunk', '!',
+  ];
+  const declared = [{ id: '10', name: 'itdept' }, { id: '20', name: 'marketing' }];
+
+  const vlans = readVlans(config, readInterfaces(config), declared);
+
+  assert.deepEqual(vlans.find((vlan) => vlan.id === '10').trunks, ['FastEthernet0/3']);
+  assert.deepEqual(vlans.find((vlan) => vlan.id === '20').trunks, ['FastEthernet0/3'],
+    'el tronco no alcanzó a una VLAN en la que no hay ningún puerto de acceso');
+});
+
+test('una VLAN de fábrica se muestra si algún puerto la nombra', () => {
+  const config = ['!', 'interface FastEthernet0/1', ' switchport access vlan 1', '!'];
+  const vlans = readVlans(config, readInterfaces(config), [{ id: '1', name: 'default' }]);
+
+  assert.deepEqual(vlans.map((vlan) => vlan.id), ['1']);
+});
+
 test('cruza los bloques de VLAN con los puertos que las llevan', () => {
   const vlans = readVlans(SWITCH, readInterfaces(SWITCH));
   const porId = new Map(vlans.map((vlan) => [vlan.id, vlan]));
