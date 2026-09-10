@@ -203,6 +203,8 @@ Un servidor estático cualquiera sirve para desarrollar, pero no manda esas cabe
 
 ## Estado
 
-Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1 y 8.2.1** —trece redes, de tres a setenta y dos equipos, con VLAN, troncos y rutas estáticas—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.
+Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1, 8.2.1 y 9.0.1** —catorce redes, de tres a setenta y dos equipos, con VLAN, troncos y rutas estáticas—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.
 
-Sin verificar todavía: los archivos de la serie 9.x, y pcapng con varias interfaces y enlaces distintos de Ethernet.
+La tubería no cambió en todo ese rango. Comparando la misma red guardada con 8.2.1 y con 9.0.1, la versión nueva suma treinta y seis etiquetas al XML —listas de acceso, PTP, NTP, licencias, medidas de las ventanas— y no saca ninguna: todo lo que el visor lee sigue donde estaba. Las posiciones bailan un píxel, que es cómo redondea cada versión.
+
+Sin verificar todavía: pcapng con varias interfaces y enlaces distintos de Ethernet.

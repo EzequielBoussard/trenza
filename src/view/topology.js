@@ -129,13 +129,17 @@ export class TopologyView {
    * que evita. Un cambio chico tampoco cuenta, que no vale la pena por unos píxeles.
    */
   watchPanelShape() {
-    new ResizeObserver(() => {
+    // El observador se guarda: sin una referencia viva el navegador lo recolecta y deja de
+    // avisar, así que el reparto se quedaba con la forma que tuviera el panel al abrir el
+    // archivo. Al primer aviso todavía no hay nada dibujado, y ahí no hay qué rehacer.
+    this.shapeWatcher = new ResizeObserver(() => {
       if (!this.last || !this.aspect) return;
       const { x, y, scale } = this.target;
       if (x !== 0 || y !== 0 || scale !== 1) return;
       if (Math.abs(Math.log(this.panelAspect() / this.aspect)) < RESHAPE_THRESHOLD) return;
       this.render(this.last.model, { showInfrastructure: this.last.showInfrastructure });
-    }).observe(this.container);
+    });
+    this.shapeWatcher.observe(this.container);
   }
 
   render(model, { showInfrastructure }) {
