@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readInterfaces, readRoutes, readVlans } from '../src/pkt/config.js';
+import {
+  readAccessLists,
+  readInterfaces,
+  readRoutes,
+  readRoutingProtocols,
+  readVlans,
+} from '../src/pkt/config.js';
 
 const SWITCH = `
 !
@@ -130,4 +136,111 @@ test('una configuración sin VLAN ni rutas no inventa ninguna', () => {
 
   assert.deepEqual(readVlans(plano, readInterfaces(plano)), []);
   assert.deepEqual(readRoutes(plano), []);
+  assert.deepEqual(readRoutingProtocols(plano), []);
+  assert.deepEqual(readAccessLists(plano, readInterfaces(plano)), []);
+});
+
+const ROUTER_ON_A_STICK = `
+!
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+!
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+!
+`.split('\n');
+
+test('una subinterfaz con dot1Q es la puerta de enlace de su VLAN, no un puerto de acceso', () => {
+  const interfaces = readInterfaces(ROUTER_ON_A_STICK);
+  const vlans = readVlans(ROUTER_ON_A_STICK, interfaces, [{ id: '10', name: 'Ventas' }]);
+
+  assert.deepEqual(vlans.map((vlan) => vlan.id), ['10', '20']);
+  assert.deepEqual(vlans[0].routed, ['GigabitEthernet0/0.10']);
+  assert.deepEqual(vlans[0].ports, [], 'la subinterfaz se contó como puerto de acceso');
+  assert.deepEqual(vlans[1].routed, ['GigabitEthernet0/0.20']);
+});
+
+const FILTRADO = `
+!
+interface GigabitEthernet0/0
+ ip address 200.40.30.2 255.255.255.0
+ ip access-group 110 in
+ ip access-group SALIDA out
+!
+access-list 110 remark bloquea la web
+access-list 110 deny tcp any host 10.0.0.5 eq 80
+access-list 110 permit ip any any
+!
+ip access-list extended SALIDA
+ permit tcp 192.168.1.0 0.0.0.255 any eq 443
+ deny ip any any
+!
+router ospf 1
+ router-id 1.1.1.1
+ passive-interface GigabitEthernet0/1
+ network 192.168.1.0 0.0.0.255 area 0
+ network 10.0.0.0 0.0.0.3 area 0
+!
+router rip
+ version 2
+ network 172.16.0.0
+ no auto-summary
+!
+`.split('\n');
+
+test('lee las listas de acceso con sus reglas en orden y dónde están aplicadas', () => {
+  const lists = readAccessLists(FILTRADO, readInterfaces(FILTRADO));
+  const porId = new Map(lists.map((list) => [list.id, list]));
+
+  assert.deepEqual([...porId.keys()], ['110', 'SALIDA']);
+  assert.deepEqual(porId.get('110').rules, [
+    'remark bloquea la web',
+    'deny tcp any host 10.0.0.5 eq 80',
+    'permit ip any any',
+  ]);
+  assert.deepEqual(porId.get('110').inbound, ['GigabitEthernet0/0']);
+  assert.deepEqual(porId.get('110').outbound, []);
+
+  // La nombrada abre un bloque y sus reglas están adentro, indentadas.
+  assert.deepEqual(porId.get('SALIDA').rules, [
+    'permit tcp 192.168.1.0 0.0.0.255 any eq 443',
+    'deny ip any any',
+  ]);
+  assert.deepEqual(porId.get('SALIDA').outbound, ['GigabitEthernet0/0']);
+});
+
+test('una lista aplicada pero no escrita igual aparece, porque el equipo la nombra', () => {
+  const config = ['!', 'interface FastEthernet0/0', ' ip access-group 7 in', '!'];
+  const [list] = readAccessLists(config, readInterfaces(config));
+
+  assert.equal(list.id, '7');
+  assert.deepEqual(list.rules, []);
+  assert.deepEqual(list.inbound, ['FastEthernet0/0']);
+});
+
+test('lee los protocolos de enrutamiento con sus redes y sus interfaces pasivas', () => {
+  const protocols = readRoutingProtocols(FILTRADO);
+
+  assert.deepEqual(protocols.map((entry) => `${entry.protocol} ${entry.id}`.trim()), ['OSPF 1', 'RIP']);
+  assert.deepEqual(protocols[0].networks, ['192.168.1.0 0.0.0.255 area 0', '10.0.0.0 0.0.0.3 area 0']);
+  assert.deepEqual(protocols[0].passive, ['GigabitEthernet0/1']);
+  assert.equal(protocols[1].version, '2');
+  assert.deepEqual(protocols[1].networks, ['172.16.0.0']);
+});
+
+test('un bloque de protocolo vacío igual cuenta: el equipo lo tiene activado', () => {
+  // Es lo que escribe Packet Tracer cuando alguien entra a `router rip` y sale sin más.
+  const [rip] = readRoutingProtocols(['!', 'router rip', '!', 'ip classless', '!']);
+
+  assert.equal(rip.protocol, 'RIP');
+  assert.deepEqual(rip.networks, []);
+});
+
+test('la red de un protocolo no se confunde con la de otro bloque', () => {
+  const config = ['!', 'router rip', ' network 10.0.0.0', '!', 'ip dhcp pool LAN', ' network 192.168.1.0 255.255.255.0', '!'];
+  const [rip] = readRoutingProtocols(config);
+
+  assert.deepEqual(rip.networks, ['10.0.0.0'], 'se coló la red de la reserva de DHCP');
 });

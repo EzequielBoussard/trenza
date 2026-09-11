@@ -1227,9 +1227,16 @@ body[data-dragging] .dropveil { display: grid; }
 
 .table__mono { font-family: var(--font-mono); }
 
+/* Una tabla que no entre se desplaza acá adentro y no arrastra al panel entero. */
+.table-scroller { overflow-x: auto; }
+
 /* Una lista de veinticuatro nombres de interfaz no tiene un solo lugar donde cortar, y sin
    permitirlo la tabla se lleva por delante el ancho del panel. */
 .table__wrap { overflow-wrap: anywhere; }
+
+/* Las reglas de una lista de acceso y las redes de un protocolo son una por renglón: el
+   orden es parte del dato y juntarlas con comas las vuelve un párrafo ilegible. */
+.table__lines { white-space: pre-line; }
 
 .connections {
   margin: 0;

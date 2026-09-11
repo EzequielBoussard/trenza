@@ -20,7 +20,19 @@ function definitionList(entries) {
  * `wrap` marca las celdas que pueden partirse por cualquier lado: una lista de veinticuatro
  * `GigabitEthernet0/n` no tiene un solo lugar donde cortar, y sin eso la tabla se lleva por
  * delante el ancho del panel. En una dirección IP no se usa, que partida no se lee.
+ * `lines` respeta los saltos de renglón, para lo que es una lista y no un valor suelto.
  */
+/**
+ * Red de seguridad: una tabla que no entre se desplaza dentro de su propio recuadro en vez
+ * de estirar el panel entero. Sin esto, un solo nombre largo mandaba a desplazarse de
+ * costado a todo lo que hay al lado, incluido lo que sí entraba.
+ */
+function scrollable(table) {
+  const wrapper = createElement('div', 'table-scroller');
+  wrapper.append(table);
+  return wrapper;
+}
+
 function dataTable(headings, rows) {
   const table = createElement('table', 'table');
   const headRow = createElement('tr');
@@ -32,15 +44,16 @@ function dataTable(headings, rows) {
   const body = createElement('tbody');
   for (const cells of rows) {
     const row = createElement('tr');
-    for (const { text, mono, wrap } of cells) {
-      const className = [mono && 'table__mono', wrap && 'table__wrap'].filter(Boolean).join(' ');
+    for (const { text, mono, wrap, lines } of cells) {
+      const className = [mono && 'table__mono', wrap && 'table__wrap', lines && 'table__lines']
+        .filter(Boolean).join(' ');
       row.append(createElement('td', className || null, text));
     }
     body.append(row);
   }
 
   table.append(head, body);
-  return table;
+  return scrollable(table);
 }
 
 function interfaceTable(interfaces) {
@@ -57,7 +70,9 @@ function interfaceTable(interfaces) {
     const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '—', mask: '—' }];
     for (const address of addresses) {
       const row = createElement('tr');
-      const name = createElement('td', 'table__mono', entry.name || entry.mac || '—');
+      // `GigabitEthernet0/0.10` no tiene un lugar natural donde cortar y es lo más ancho de
+      // la tabla: sin dejarlo partir, cuatro columnas no entran en el panel.
+      const name = createElement('td', 'table__mono table__wrap', entry.name || entry.mac || '—');
       if (entry.description) name.title = entry.description;
 
       row.append(
@@ -71,7 +86,7 @@ function interfaceTable(interfaces) {
   }
 
   table.append(head, body);
-  return table;
+  return scrollable(table);
 }
 
 /**
@@ -80,15 +95,22 @@ function interfaceTable(interfaces) {
  * contestada al revés son veinticuatro renglones para leer de a uno.
  */
 function vlanTable(vlans) {
-  return dataTable(
-    ['table.vlan', 'table.vlanName', 'table.accessPorts', 'table.trunkPorts'],
-    vlans.map((vlan) => [
+  // La columna de subinterfaces sólo existe en un router en un palo. En un switch sería
+  // una columna de guiones, así que ahí directamente no está.
+  const routed = vlans.some((vlan) => vlan.routed.length > 0);
+  const headings = ['table.vlan', 'table.vlanName', 'table.accessPorts', 'table.trunkPorts'];
+  if (routed) headings.push('table.routedPorts');
+
+  return dataTable(headings, vlans.map((vlan) => {
+    const cells = [
       { text: vlan.id, mono: true },
       { text: vlan.name || '—' },
       { text: vlan.ports.join(', ') || '—', mono: true, wrap: true },
       { text: vlan.trunks.join(', ') || '—', mono: true, wrap: true },
-    ]),
-  );
+    ];
+    if (routed) cells.push({ text: vlan.routed.join(', ') || '—', mono: true, wrap: true });
+    return cells;
+  }));
 }
 
 /** Las rutas escritas a mano, en el orden en que están en la configuración. */
@@ -99,6 +121,52 @@ function routeTable(routes) {
       { text: route.destination, mono: true },
       { text: route.mask || '—', mono: true },
       { text: route.via, mono: true },
+    ]),
+  );
+}
+
+/** `RIP v2`, `OSPF 1`, `EIGRP 100`: el protocolo y lo que lo identifica en el equipo. */
+function protocolLabel(entry) {
+  const version = entry.version ? `v${entry.version}` : '';
+  return [entry.protocol, entry.id, version].filter(Boolean).join(' ');
+}
+
+/**
+ * Los protocolos de enrutamiento con las redes que anuncian. Lo que el protocolo termine
+ * aprendiendo no está en el archivo: esto es lo que el equipo tiene configurado.
+ */
+function routingTable(routing) {
+  const passive = routing.some((entry) => entry.passive.length > 0);
+  const headings = ['table.protocol', 'table.networks'];
+  if (passive) headings.push('table.passive');
+
+  return dataTable(headings, routing.map((entry) => {
+    const cells = [
+      { text: protocolLabel(entry) },
+      { text: entry.networks.join('\n') || '—', mono: true, lines: true, wrap: true },
+    ];
+    if (passive) cells.push({ text: entry.passive.join('\n') || '—', mono: true, lines: true, wrap: true });
+    return cells;
+  }));
+}
+
+/**
+ * Las listas de acceso, con sus reglas en orden y dónde están aplicadas. Las dos cosas
+ * hacen falta para saber qué filtra el equipo: una lista sin aplicar no filtra nada, y una
+ * interfaz con `ip access-group` de una lista que no existe deja pasar todo.
+ */
+function accessListTable(lists) {
+  const applied = (entry) => [
+    ...entry.inbound.map((name) => `${name} in`),
+    ...entry.outbound.map((name) => `${name} out`),
+  ];
+
+  return dataTable(
+    ['table.accessList', 'table.aclRules', 'table.aclApplied'],
+    lists.map((entry) => [
+      { text: entry.id, mono: true },
+      { text: entry.rules.join('\n') || '—', mono: true, lines: true, wrap: true },
+      { text: applied(entry).join('\n') || '—', mono: true, lines: true, wrap: true },
     ]),
   );
 }
@@ -155,6 +223,14 @@ export function renderDeviceInspector(container, device, devicesById) {
 
   if (device.routes.length > 0) {
     container.append(section(t('panel.routes'), routeTable(device.routes)));
+  }
+
+  if (device.routing.length > 0) {
+    container.append(section(t('panel.routing'), routingTable(device.routing)));
+  }
+
+  if (device.accessLists.length > 0) {
+    container.append(section(t('panel.accessLists'), accessListTable(device.accessLists)));
   }
 
   if (device.links.length > 0) {

@@ -18,7 +18,7 @@ export function readInterfaces(configLines) {
     const line = raw.trim();
     const opened = line.match(/^interface\s+(\S+)/i);
     if (opened) {
-      current = { name: opened[1], addresses: [], description: '', enabled: true };
+      current = { name: opened[1], addresses: [], description: '', enabled: true, accessGroups: [] };
       interfaces.push(current);
       continue;
     }
@@ -39,6 +39,14 @@ export function readInterfaces(configLines) {
 
     const access = line.match(/^switchport access vlan\s+(\d+)/i);
     if (access) current.vlan = access[1];
+
+    // Router en un palo: la subinterfaz no es un puerto de acceso, es la puerta de enlace
+    // de esa VLAN. El número lo lleva la encapsulación, no el nombre de la interfaz.
+    const tagged = line.match(/^encapsulation\s+dot1q\s+(\d+)/i);
+    if (tagged) current.dot1q = tagged[1];
+
+    const group = line.match(/^ip access-group\s+(\S+)\s+(in|out)\b/i);
+    if (group) current.accessGroups.push({ id: group[1], direction: group[2].toLowerCase() });
 
     // Un tronco sin lista de permitidas las lleva todas, que es lo que hace Cisco por
     // omisión y lo que escribe Packet Tracer cuando se configura por la interfaz.
@@ -86,7 +94,7 @@ export function readVlans(configLines, interfaces, declared = []) {
   const vlans = new Map();
   const named = new Set();
   const define = (id) => {
-    if (!vlans.has(id)) vlans.set(id, { id, name: '', ports: [], trunks: [] });
+    if (!vlans.has(id)) vlans.set(id, { id, name: '', ports: [], trunks: [], routed: [] });
     return vlans.get(id);
   };
 
@@ -111,6 +119,10 @@ export function readVlans(configLines, interfaces, declared = []) {
     if (entry.vlan) {
       define(entry.vlan).ports.push(entry.name);
       named.add(entry.vlan);
+    }
+    if (entry.dot1q) {
+      define(entry.dot1q).routed.push(entry.name);
+      named.add(entry.dot1q);
     }
     for (const id of expandVlanList(entry.trunk)) {
       define(id).trunks.push(entry.name);
@@ -146,4 +158,89 @@ export function readRoutes(configLines) {
   }
 
   return routes;
+}
+
+/**
+ * Las listas de acceso, con las reglas en el orden en que están escritas: en una lista de
+ * acceso el orden es la regla, porque se evalúa de arriba abajo y la primera que coincide
+ * decide. Se cruzan con las interfaces para decir dónde está aplicada cada una, que es la
+ * mitad del dato: una lista escrita y no aplicada no filtra nada.
+ */
+export function readAccessLists(configLines, interfaces = []) {
+  const lists = new Map();
+  const define = (id) => {
+    if (!lists.has(id)) lists.set(id, { id, rules: [], inbound: [], outbound: [] });
+    return lists.get(id);
+  };
+
+  let open = null;
+  for (const raw of configLines) {
+    const line = raw.trim();
+
+    // Las numeradas van en una línea cada una; las nombradas abren un bloque con sus
+    // reglas adentro, y el bloque termina en la primera línea que no es una regla.
+    const numbered = line.match(/^access-list\s+(\S+)\s+(.+)$/i);
+    if (numbered) {
+      define(numbered[1]).rules.push(numbered[2].trim());
+      open = null;
+      continue;
+    }
+
+    const named = line.match(/^ip(?:v6)? access-list\s+(?:(?:standard|extended)\s+)?(\S+)/i);
+    if (named) {
+      open = define(named[1]);
+      continue;
+    }
+
+    if (!open) continue;
+    if (/^(permit|deny|remark)\b/i.test(line)) open.rules.push(line);
+    else open = null;
+  }
+
+  for (const entry of interfaces) {
+    for (const applied of entry.accessGroups || []) {
+      define(applied.id)[applied.direction === 'in' ? 'inbound' : 'outbound'].push(entry.name);
+    }
+  }
+
+  return [...lists.values()];
+}
+
+/**
+ * Los protocolos de enrutamiento dinámico. Las redes se guardan tal como están escritas
+ * —`10.0.0.0 0.0.0.255 area 0`— en vez de despiezarlas: cada protocolo le da su propia
+ * forma a esa línea y volver a armarla para mostrarla no agrega nada que el original no
+ * diga. Las rutas que el protocolo aprende no están en el archivo; esto es la
+ * configuración, no la tabla de enrutamiento.
+ */
+export function readRoutingProtocols(configLines) {
+  const protocols = [];
+  let open = null;
+
+  for (const raw of configLines) {
+    const line = raw.trim();
+
+    const header = line.match(/^router\s+([a-z0-9]+)\s*(\S*)/i);
+    if (header) {
+      open = { protocol: header[1].toUpperCase(), id: header[2], version: '', networks: [], passive: [] };
+      protocols.push(open);
+      continue;
+    }
+    if (!open) continue;
+    if (line === '!' || /^(interface|line|ip route|access-list)\b/i.test(line)) {
+      open = null;
+      continue;
+    }
+
+    const version = line.match(/^version\s+(\S+)/i);
+    if (version) open.version = version[1];
+
+    const network = line.match(/^network\s+(.+)$/i);
+    if (network) open.networks.push(network[1].trim().replace(/\s+/g, ' '));
+
+    const passive = line.match(/^passive-interface\s+(\S+)/i);
+    if (passive) open.passive.push(passive[1]);
+  }
+
+  return protocols;
 }

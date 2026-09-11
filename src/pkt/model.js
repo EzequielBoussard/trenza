@@ -1,5 +1,5 @@
 import { t } from '../i18n.js';
-import { readInterfaces, readRoutes, readVlans } from './config.js';
+import { readAccessLists, readInterfaces, readRoutes, readRoutingProtocols, readVlans } from './config.js';
 
 const DEVICE_CATEGORIES = [
   { match: /router/i, category: 'router' },
@@ -103,6 +103,8 @@ function readDevice(deviceNode) {
     interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
     vlans: readVlans(configLines, configured, vlansFromEngine(engine)),
     routes: readRoutes(configLines),
+    routing: readRoutingProtocols(configLines),
+    accessLists: readAccessLists(configLines, configured),
     runningConfig: configLines,
     links: [],
   };
