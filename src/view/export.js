@@ -176,6 +176,8 @@ function labelMeasurer() {
 
   return {
     context,
+    // Lo que no depende del tamaño de salida, guardado por exportación. Ver `measureDiagram`.
+    fixed: new Map(),
     nameWidth: (text) => width(LABEL_FONT, text),
     addressWidth: (text) => width(ADDRESS_FONT, text),
   };
@@ -370,22 +372,35 @@ function drawLegend(context, legend, { palette, chrome, left, top }) {
  * De ahí sale el tamaño natural, el más chico en el que el dibujo respira.
  */
 function measureDiagram(model, showInfrastructure, chrome, measure) {
-  const visible = selectVisible(model, showInfrastructure);
-  if (visible.devices.length === 0) throw new Error(t('error.noDevices'));
-
-  const { placed, stray } = partitionDevices(visible.devices, visible.links);
-  const links = visible.links;
-
   const context2d = measure.context;
-  const halfWidth = (device) => halfLabelWidth(measure, device);
-  const labelReach = Math.ceil(Math.max(...visible.devices.map(halfWidth)));
 
-  const { spanX, spanY } = measureBounds(placed);
-  const spread = Math.min(
-    Math.max(spreadScaleFor(placed, halfWidth), MIN_CONTENT_WIDTH / spanX),
-    MAX_CONTENT_WIDTH / spanX,
-    MAX_CONTENT_HEIGHT / spanY,
-  );
+  // La búsqueda del ancho llama a esto una vez por candidato, y sólo el marco cambia entre
+  // uno y otro: qué equipos hay, cuánto separarlos y cuánto sobresale la etiqueta más ancha
+  // salen de los nombres y de las posiciones. Separarlos cuesta un recorrido por cada par
+  // —cinco mil en la red del showcase—, repetido hasta veinticinco veces para dar lo mismo.
+  const key = showInfrastructure ? 'con' : 'sin';
+  if (!measure.fixed.has(key)) {
+    const visible = selectVisible(model, showInfrastructure);
+    if (visible.devices.length === 0) throw new Error(t('error.noDevices'));
+
+    const { placed, stray } = partitionDevices(visible.devices, visible.links);
+    const halfWidth = (device) => halfLabelWidth(measure, device);
+    const { spanX, spanY } = measureBounds(placed);
+
+    measure.fixed.set(key, {
+      placed,
+      stray,
+      links: visible.links,
+      labelReach: Math.ceil(Math.max(...visible.devices.map(halfWidth))),
+      spread: Math.min(
+        Math.max(spreadScaleFor(placed, halfWidth), MIN_CONTENT_WIDTH / spanX),
+        MAX_CONTENT_WIDTH / spanX,
+        MAX_CONTENT_HEIGHT / spanY,
+      ),
+    });
+  }
+
+  const { placed, stray, links, labelReach, spread } = measure.fixed.get(key);
 
   const side = chrome.margin + labelReach;
   const top = chrome.margin + chrome.header + NODE_EXTENT.top;
