@@ -1,4 +1,4 @@
-import { toHexDump } from '../pcap/dissect.js';
+import { linkTypeName, toHexDump } from '../pcap/dissect.js';
 import { getLocale, t } from '../i18n.js';
 
 const PAGE_SIZE = 300;
@@ -310,6 +310,9 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
   const span = packets.length > 1 ? packets[packets.length - 1].timestamp - packets[0].timestamp : 0;
   const entries = [
     [t('panel.format'), capture.container],
+    // De qué enlace salió la captura: decide cómo se lee cada paquete, y es lo primero
+    // que hay que mirar cuando el desglose no dice lo que uno esperaba.
+    [t('panel.linkLayer'), linkTypeName(capture.linkType)],
     [t('panel.packets'), String(packets.length)],
     [t('panel.totalBytes'), bytes.toLocaleString(getLocale())],
     [t('panel.duration'), span > 0 ? `${span.toFixed(3)} s` : '—'],

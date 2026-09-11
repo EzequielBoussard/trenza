@@ -58,18 +58,30 @@ function readOptionTimestampResolution(view, bytes, start, end, little) {
 }
 
 function readPcapng(view, bytes) {
-  const little = view.getUint32(8, false) !== 0x1a2b3c4d;
-  const interfaces = [];
+  let little = view.getUint32(8, false) !== 0x1a2b3c4d;
+  let interfaces = [];
+  let firstLinkType = null;
   const packets = [];
   let offset = 0;
 
   while (offset + 12 <= bytes.length) {
     const blockType = view.getUint32(offset, little);
+
+    // Un pcapng puede ser la concatenación de varias capturas, y cada sección abre con su
+    // propia cabecera: la numeración de interfaces vuelve a empezar y el orden de bytes
+    // puede ser otro. Sin reiniciar la lista, un paquete de la segunda sección se lee con
+    // el tipo de enlace y la resolución de tiempo de la primera.
+    if (blockType === PCAPNG_SECTION_HEADER) {
+      little = view.getUint32(offset + 8, false) !== 0x1a2b3c4d;
+      interfaces = [];
+    }
+
     const blockLength = view.getUint32(offset + 4, little);
     if (blockLength < 12 || offset + blockLength > bytes.length) break;
     const body = offset + 8;
 
     if (blockType === PCAPNG_INTERFACE_DESCRIPTION) {
+      if (firstLinkType === null) firstLinkType = view.getUint16(body, little);
       interfaces.push({
         linkType: view.getUint16(body, little),
         resolution: readOptionTimestampResolution(view, bytes, body + 8, offset + blockLength - 4, little),
@@ -112,7 +124,7 @@ function readPcapng(view, bytes) {
 
   return {
     container: 'pcapng',
-    linkType: interfaces[0] ? interfaces[0].linkType : 1,
+    linkType: firstLinkType ?? 1,
     packets,
     truncated: bytes.length - offset,
   };

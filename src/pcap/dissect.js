@@ -66,6 +66,21 @@ const ICMPV6_TYPES = {
 
 const TCP_FLAG_NAMES = ['FIN', 'SYN', 'RST', 'PSH', 'ACK', 'URG', 'ECE', 'CWR'];
 
+// Los enlaces que sabe leer el visor. Ethernet es casi todo lo que se captura, pero un
+// `tcpdump -i any` da «Linux cooked», la interfaz de bucle de macOS da «loopback», y un
+// enlace serie entre routers —lo que arma medio curso de redes— da Cisco HDLC.
+const LINK_TYPES = {
+  0: 'Loopback',
+  1: 'Ethernet',
+  9: 'PPP',
+  101: 'Raw IP',
+  104: 'Cisco HDLC',
+  113: 'Linux cooked',
+  228: 'Raw IPv4',
+  229: 'Raw IPv6',
+  276: 'Linux cooked v2',
+};
+
 const hex2 = (value) => value.toString(16).padStart(2, '0');
 
 function formatMac(bytes, offset) {
@@ -231,6 +246,103 @@ function dissectIPv6(bytes, offset) {
   };
 }
 
+/** Cómo se llama el enlace del que salió la captura, para el resumen del archivo. */
+export function linkTypeName(linkType) {
+  return LINK_TYPES[linkType] || t('packet.linkType', { type: linkType });
+}
+
+/** El nibble de versión dice si lo que empieza en `offset` es IPv4, IPv6 o ninguna cosa. */
+function ipEtherType(bytes, offset) {
+  const version = bytes[offset] >> 4;
+  if (version === 4) return 0x0800;
+  if (version === 6) return 0x86dd;
+  return null;
+}
+
+function etherTypeLabel(value) {
+  const hex = `0x${value.toString(16).padStart(4, '0')}`;
+  return ETHERTYPES[value] ? `${hex} (${ETHERTYPES[value]})` : hex;
+}
+
+/**
+ * La capa de enlace: qué encabezado trae el paquete, cuánto mide y qué lleva adentro. El
+ * tipo no lo dice el paquete sino la captura, y de él depende dónde empieza todo lo
+ * demás: leer un «Linux cooked» como si fuera Ethernet corre las direcciones dos bytes y
+ * el desglose sale entero pero mal.
+ */
+function dissectLink(linkType, bytes) {
+  const layers = [];
+  const named = (fields) => layers.push({ name: LINK_TYPES[linkType], fields });
+
+  if (linkType === 1) {
+    if (bytes.length < 14) return { layers, offset: 0, etherType: null, macs: false };
+
+    let etherType = (bytes[12] << 8) | bytes[13];
+    const carried = etherType;
+    layers.push({
+      name: 'Ethernet',
+      fields: () => [
+        [t('field.sourceMac'), formatMac(bytes, 6)],
+        [t('field.destinationMac'), formatMac(bytes, 0)],
+        [t('field.etherType'), etherTypeLabel(carried)],
+      ],
+    });
+
+    let offset = 14;
+    while (etherType === 0x8100 || etherType === 0x88a8) {
+      const vlanId = ((bytes[offset] << 8) | bytes[offset + 1]) & 0x0fff;
+      etherType = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      layers.push({ name: 'VLAN 802.1Q', fields: () => [[t('field.vlan'), vlanId]] });
+      offset += 4;
+    }
+
+    return { layers, offset, etherType, macs: true };
+  }
+
+  // Sin encabezado: el paquete IP arranca en el primer byte.
+  if (linkType === 101 || linkType === 228 || linkType === 229) {
+    return { layers, offset: 0, etherType: ipEtherType(bytes, 0), macs: false };
+  }
+
+  // Bucle local de BSD y macOS: cuatro bytes con la familia de direcciones, en el orden de
+  // bytes del equipo que capturó y con un valor distinto por sistema para IPv6. Mirar la
+  // versión del paquete que sigue contesta lo mismo sin depender de nada de eso.
+  if (linkType === 0) {
+    const etherType = ipEtherType(bytes, 4);
+    named(() => [[t('field.protocol'), etherType ? ETHERTYPES[etherType] : t('field.unknown')]]);
+    return { layers, offset: 4, etherType, macs: false };
+  }
+
+  if (linkType === 9) {
+    const start = bytes[0] === 0xff && bytes[1] === 0x03 ? 2 : 0;
+    const carried = (bytes[start] << 8) | bytes[start + 1];
+    const etherType = carried === 0x0021 ? 0x0800 : carried === 0x0057 ? 0x86dd : null;
+    named(() => [[t('field.protocol'), `0x${carried.toString(16).padStart(4, '0')}`]]);
+    return { layers, offset: start + 2, etherType, macs: false };
+  }
+
+  // Cisco HDLC: dirección, control y un EtherType. Es lo que sale de un enlace serie.
+  if (linkType === 104) {
+    const etherType = (bytes[2] << 8) | bytes[3];
+    named(() => [
+      [t('field.address'), `0x${bytes[0].toString(16).padStart(2, '0')}`],
+      [t('field.etherType'), etherTypeLabel(etherType)],
+    ]);
+    return { layers, offset: 4, etherType, macs: false };
+  }
+
+  // Las dos formas del encabezado que pone Linux cuando se captura de todas las interfaces
+  // a la vez: el EtherType está al final en la primera y al principio en la segunda.
+  if (linkType === 113 || linkType === 276) {
+    const at = linkType === 113 ? 14 : 0;
+    const etherType = (bytes[at] << 8) | bytes[at + 1];
+    named(() => [[t('field.etherType'), etherTypeLabel(etherType)]]);
+    return { layers, offset: linkType === 113 ? 16 : 20, etherType, macs: false };
+  }
+
+  return { layers, offset: 0, etherType: null, macs: false };
+}
+
 /**
  * Descompone un paquete en capas legibles. Se detiene con lo que haya podido leer
  * cuando la captura está truncada, en vez de descartar el paquete entero.
@@ -245,42 +357,19 @@ export function dissectPacket(packet) {
   const layers = [];
   let source = '';
   let destination = '';
-  let protocol = '—';
+  // Un paquete que el visor no sabe desarmar igual dice de qué enlace salió, que es más
+  // de lo que dice un guión.
+  let protocol = linkTypeName(packet.linkType);
   let summary = '';
   let ethernet = false;
 
   try {
-    let offset = 0;
-    let etherType = null;
-
-    if (packet.linkType === 1 && bytes.length >= 14) {
-      etherType = (bytes[12] << 8) | bytes[13];
-      ethernet = true;
-      const carried = etherType;
-      layers.push({
-        name: 'Ethernet',
-        fields: () => {
-          const label = `0x${carried.toString(16).padStart(4, '0')}`;
-          return [
-            [t('field.sourceMac'), formatMac(bytes, 6)],
-            [t('field.destinationMac'), formatMac(bytes, 0)],
-            [t('field.etherType'), ETHERTYPES[carried] ? `${label} (${ETHERTYPES[carried]})` : label],
-          ];
-        },
-      });
-      offset = 14;
-
-      while (etherType === 0x8100 || etherType === 0x88a8) {
-        const vlanId = ((bytes[offset] << 8) | bytes[offset + 1]) & 0x0fff;
-        etherType = (bytes[offset + 2] << 8) | bytes[offset + 3];
-        layers.push({ name: 'VLAN 802.1Q', fields: () => [[t('field.vlan'), vlanId]] });
-        offset += 4;
-      }
-      protocol = ETHERTYPES[etherType] || `0x${etherType.toString(16)}`;
-    } else if (packet.linkType === 101) {
-      etherType = (bytes[0] >> 4) === 6 ? 0x86dd : 0x0800;
-      protocol = ETHERTYPES[etherType];
-    }
+    const link = dissectLink(packet.linkType, bytes);
+    const offset = link.offset;
+    const etherType = link.etherType;
+    layers.push(...link.layers);
+    ethernet = link.macs;
+    if (etherType !== null) protocol = ETHERTYPES[etherType] || `0x${etherType.toString(16)}`;
 
     if (etherType === 0x0806) {
       const arp = dissectArp(bytes, offset);
