@@ -1,4 +1,4 @@
-import { countOf, getLanguage, setLanguage, t, translateDocument, withLanguage } from './i18n.js';
+import { getLanguage, setLanguage, t, translateDocument } from './i18n.js';
 import { decodePacketTracerFile } from './pkt/decode.js';
 import { buildNetworkModel } from './pkt/model.js';
 import { decodeCapture } from './pcap/decode.js';
@@ -6,20 +6,10 @@ import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
 import { renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
 import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
-import { toCsv, toPcap } from './pcap/encode.js';
 import { readSourceFromLocation } from './share.js';
-import {
-  DEFAULT_PAPER,
-  DEFAULT_RESOLUTION,
-  SIZE_LABELS,
-  VECTOR_FORMATS,
-  exportNetwork,
-  offeredSizes,
-  renderNetworkPreview,
-  suggestExportName,
-} from './view/export.js';
+import { wireExportDialog } from './view/export-dialog.js';
 import { download } from './download.js';
-import { applyTheme, currentTheme, getTheme, toggleTheme } from './theme.js';
+import { applyTheme, getTheme, toggleTheme } from './theme.js';
 
 const elements = {
   stage: document.querySelector('[data-stage]'),
@@ -378,276 +368,12 @@ function wireFileInput() {
   });
 }
 
-const CAPTURE_NOTES = { csv: 'export.csvNote', pcap: 'export.pcapNote' };
-
-function wireExport() {
-  // Cada tipo de archivo ofrece sus formatos: de una captura no sale un diagrama, y
-  // de una topología no sale una tabla de paquetes.
-  const updateFormatFields = () => {
-    const capture = state.kind === 'capture';
-    const fields = elements.exportForm.elements;
-
-    for (const option of elements.exportForm.querySelectorAll('.choice__option')) {
-      option.hidden = option.dataset.for !== state.kind;
-    }
-    if (elements.exportForm.querySelector('.choice__option[hidden] input:checked')) {
-      elements.exportForm.querySelector('.choice__option:not([hidden]) input').checked = true;
-    }
-
-    const format = fields.format.value;
-    const vector = VECTOR_FORMATS.includes(format);
-
-    elements.transparentField.hidden = capture || format === 'jpg' || format === 'pdf';
-    elements.sizeField.hidden = capture || vector;
-    if (!capture && !vector) updateSizeOptions();
-
-    // El idioma alcanza a todo lo que lleve texto; el tema, sólo a lo que se dibuja. Un
-    // pcap no tiene ni una cosa ni la otra.
-    elements.languageField.hidden = format === 'pcap';
-    elements.themeField.hidden = capture;
-    elements.scopeField.hidden = !capture || state.packetSelection.length === 0;
-    elements.exportNote.textContent = capture ? t(CAPTURE_NOTES[format] ?? '')
-      : vector ? t('export.svgNote')
-        : format === 'pdf' ? t('export.pdfNote') : '';
-
-    schedulePreview();
-  };
-
-  // Ancho al que se dibuja la vista previa. Va al doble de lo que ocupa en pantalla para
-  // que se vea nítida en pantallas densas, y aun así cuesta una fracción de la salida real.
-  const PREVIEW_WIDTH = 1800;
-  const PREVIEW_DELAY = 120;
-
-  // Ancho de la lupa, hasta dónde puede achicarse en un diálogo angosto, y su proporción.
-  const LENS_SIZE = 440;
-  const MIN_LENS_SIZE = 240;
-  const LENS_ASPECT = 0.66;
-  const LENS_ROOM = 1.5;
-
-  let previewTimer = 0;
-  let previewToken = 0;
-  let lens = null;
-
-  const exportRequest = () => {
-    const fields = elements.exportForm.elements;
-    return {
-      format: fields.format.value,
-      name: fields.name.value.trim() || suggestExportName(state.file.name),
-      size: fields.size.value,
-      transparent: fields.transparent.checked,
-      showInfrastructure: state.showInfrastructure,
-      language: fields.language.value,
-      theme: fields.theme.value,
-    };
-  };
-
-  /**
-   * Dibuja la salida tal como va a quedar. Dos resoluciones del mismo formato dan la misma
-   * imagen —el reparto no depende de los píxeles, sólo la definición—, así que el pie de
-   * la vista dice la medida real y cuántas etiquetas quedaron afuera, que es lo que cambia.
-   */
-  const drawPreview = async () => {
-    const request = exportRequest();
-    const token = ++previewToken;
-
-    try {
-      const result = await renderNetworkPreview(state.model, request, PREVIEW_WIDTH);
-      if (token !== previewToken) return;
-
-      elements.previewFrame.replaceChildren(result.canvas, elements.previewLens);
-      elements.previewFrame.classList.toggle('preview--alpha', request.transparent && request.format === 'png');
-      lens = { canvas: result.canvas, design: result.design, magnify: result.magnify };
-      elements.previewLens.hidden = true;
-
-      const measure = VECTOR_FORMATS.includes(request.format)
-        ? `${Math.round(result.width)} × ${Math.round(result.height)}`
-        : `${result.width} × ${result.height} px`;
-      const paper = request.format === 'pdf' && SIZE_LABELS[request.size];
-      const touching = result.crowded > 0
-        ? t('export.previewCrowded', { crowded: countOf('labels', result.crowded) })
-        : '';
-
-      elements.previewNote.textContent = [paper, measure, touching].filter(Boolean).join(' · ');
-    } catch (error) {
-      if (token !== previewToken) return;
-      elements.previewFrame.replaceChildren();
-      elements.previewNote.textContent = error.message;
-    }
-  };
-
-  /**
-   * La lupa dibuja el recorte a la escala real del archivo, no un aumento de la vista
-   * previa: es la única forma de ver antes de bajar si los nombres y las direcciones se van
-   * a leer. El punto del puntero se pasa a unidades de diseño, que es en las que piensa
-   * el dibujo, y de ahí sale el centro del recorte.
-   */
-  const moveLens = (event) => {
-    if (!lens) return;
-
-    const frame = lens.canvas.getBoundingClientRect();
-    const inside = event.clientX >= frame.left && event.clientX <= frame.right
-      && event.clientY >= frame.top && event.clientY <= frame.bottom;
-    elements.previewLens.hidden = !inside;
-    if (!inside) return;
-
-    const side = Math.min(LENS_SIZE, Math.max(MIN_LENS_SIZE, Math.round(frame.width / 1.9)));
-    const tall = Math.round(side * LENS_ASPECT);
-
-    // Una lupa que tapa media vista previa no aumenta nada: en un recuadro así de chico se
-    // queda guardada y se mira el diagrama entero, que es lo que hay lugar para ver.
-    if (frame.width < side * LENS_ROOM || frame.height < tall * LENS_ROOM) {
-      elements.previewLens.hidden = true;
-      return;
-    }
-
-    // Cambiar el tamaño del lienzo lo borra, así que sólo se toca cuando de verdad cambió.
-    if (elements.previewLensCanvas.width !== side || elements.previewLensCanvas.height !== tall) {
-      elements.previewLensCanvas.width = side;
-      elements.previewLensCanvas.height = tall;
-    }
-    elements.previewLens.style.width = `${side}px`;
-    elements.previewLens.style.height = `${tall}px`;
-
-    // La lupa se queda dentro del recuadro aunque el puntero llegue al borde: el diálogo se
-    // desplaza por dentro y lo que sobresalga queda cortado. El recorte sigue centrado en el
-    // puntero de verdad, así que en los bordes la lupa se separa un poco pero no miente.
-    const box = elements.previewFrame.getBoundingClientRect();
-    const within = (value, span, edge) => Math.min(Math.max(value, edge / 2), span - edge / 2);
-    elements.previewLens.style.left = `${within(event.clientX - box.left, box.width, side)}px`;
-    elements.previewLens.style.top = `${within(event.clientY - box.top, box.height, tall)}px`;
-
-    lens.magnify(elements.previewLensCanvas, {
-      x: (event.clientX - frame.left) / frame.width * lens.design.width,
-      y: (event.clientY - frame.top) / frame.height * lens.design.height,
-    });
-  };
-
-  const schedulePreview = () => {
-    const shows = state.kind === 'network';
-
-    elements.previewPanel.hidden = !shows;
-    elements.exportDialog.classList.toggle('dialog--wide', shows);
-    if (!shows) return;
-
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(drawPreview, PREVIEW_DELAY);
-  };
-
-  const updateScopeOptions = () => {
-    const [all, selection] = elements.exportForm.elements.scope.options;
-    all.textContent = t('export.scopeAll', { count: state.packets.length });
-    selection.textContent = t('export.scopeSelection', { count: state.packetSelection.length });
-    elements.exportForm.elements.scope.value = state.packetSelection.length > 0 ? 'selection' : 'all';
-  };
-
-  // Una medida en la que el diagrama quedaría ilegible no se ofrece, y punto: una
-  // opción tachada con su explicación es ruido que nadie va a elegir igual.
-  const updateSizeOptions = () => {
-    const format = elements.exportForm.elements.format.value;
-    const paper = format === 'pdf';
-    const offered = offeredSizes(state.model, { showInfrastructure: state.showInfrastructure, format });
-    const select = elements.exportForm.elements.size;
-    const chosen = select.value;
-
-    elements.sizeLabel.textContent = t(paper ? 'export.paper' : 'export.resolution');
-    select.replaceChildren(...offered.map((name) => {
-      const option = document.createElement('option');
-      option.value = name;
-      option.textContent = name === 'fit' ? t('export.fit') : SIZE_LABELS[name];
-      return option;
-    }));
-
-    // Cambiar de tema o de idioma vuelve a pasar por acá; si la medida elegida sigue
-    // estando, se respeta en vez de saltar sola a la preferida.
-    const preferred = paper ? DEFAULT_PAPER : DEFAULT_RESOLUTION;
-    const wanted = [chosen, preferred].find((name) => offered.includes(name));
-    select.value = wanted ?? offered[0];
-  };
-
-  elements.export.addEventListener('click', () => {
-    if (!state.kind) return;
-    const fields = elements.exportForm.elements;
-    fields.name.value = suggestExportName(state.file.name);
-    // El diálogo abre con lo que el usuario está mirando; cambiarlo acá no toca el visor.
-    fields.language.value = getLanguage();
-    fields.theme.value = currentTheme();
-    if (state.kind === 'capture') updateScopeOptions();
-    updateFormatFields();
-    elements.exportDialog.showModal();
-    fields.name.select();
-  });
-
-  elements.exportForm.addEventListener('change', updateFormatFields);
-  elements.previewFrame.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'mouse') moveLens(event);
-  });
-  elements.previewFrame.addEventListener('pointerleave', () => { elements.previewLens.hidden = true; });
-  elements.exportCancel.addEventListener('click', () => elements.exportDialog.close());
-
-  elements.exportForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const fields = elements.exportForm.elements;
-    const request = exportRequest();
-
-    elements.exportDialog.close();
-    setStatus('status.exporting');
-
-    if (state.kind === 'capture') {
-      exportCapture(request.name, fields.format.value, fields.scope.value, request.language);
-      return;
-    }
-
-    try {
-      const result = await exportNetwork(state.model, request);
-      // Ni un vector ni una hoja se miden en píxeles; informarlos así haría creerlo.
-      const message = VECTOR_FORMATS.includes(request.format) ? 'status.exportedVector'
-        : result.paper ? 'status.exportedPaper'
-          : request.format === 'pdf' ? 'status.exportedPlain'
-            : result.crowded > 0 ? 'status.exportedCrowded' : 'status.exported';
-
-      setStatus(message, {
-        file: result.fileName,
-        width: result.width,
-        height: result.height,
-        paper: SIZE_LABELS[result.paper],
-        size: Math.round(result.bytes / 1024),
-        crowded: { key: 'unit.labels', values: { count: result.crowded } },
-      }, 'ok');
-    } catch (error) {
-      setStatus('status.exportFailed', { reason: error.message }, 'error');
-    }
-  });
-}
-
 function wireTheme() {
   applyTheme(getTheme());
   elements.themeToggle.addEventListener('click', () => {
     toggleTheme();
     if (state.kind === 'network') paintNetwork();
   });
-
-}
-
-/** Vuelca la captura, entera o sólo el tramo elegido, a un formato que lea cualquiera. */
-function exportCapture(name, format, scope, language) {
-  const packets = scope === 'selection' && state.packetSelection.length > 0
-    ? state.packetTable.getSelection()
-    : state.packets;
-
-  const origin = state.packets.length > 0 ? state.packets[0].timestamp : 0;
-  // Sólo el CSV lleva texto, y va en el idioma elegido para exportar; el aviso de abajo
-  // es del visor y se queda en el suyo.
-  const { blob, written } = format === 'csv'
-    ? { blob: withLanguage(language, () => toCsv(packets, { origin })), written: packets.length }
-    : toPcap(packets);
-
-  const fileName = `${name}.${format}`;
-  download(blob, fileName);
-  setStatus('status.exportedData', {
-    file: fileName,
-    packets: { key: 'unit.packets', values: { count: written } },
-    size: Math.round(blob.size / 1024),
-  }, 'ok');
 }
 
 function wireLanguage() {
@@ -691,7 +417,7 @@ async function start() {
   wireTheme();
   wireFileInput();
   wireActions();
-  wireExport();
+  wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 
   try {

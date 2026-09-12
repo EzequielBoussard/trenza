@@ -773,7 +773,7 @@ export async function renderNetworkPreview(model, request, budget) {
   return { canvas, crowded: plan.crowded, width, height, design: plan.design, magnify };
 }
 
-export async function createNetworkExport(model, { format, name, size: choice, transparent, showInfrastructure, language, theme }) {
+async function createNetworkExport(model, { format, name, size: choice, transparent, showInfrastructure, language, theme }) {
   const descriptor = EXPORT_FORMATS[format];
   if (!descriptor) throw new Error(t('error.unknownFormat', { format }));
 
