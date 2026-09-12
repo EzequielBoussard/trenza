@@ -3,8 +3,10 @@ import {
   ADDRESS_FONT,
   CATEGORY_GLYPHS,
   LABEL_FONT,
+  LABEL_REACH_BELOW,
   LABEL_TYPE,
   LEGEND_ENTRIES,
+  halfLabelWidth,
   partitionDevices,
   planLabels,
   LAYOUT_STRETCH,
@@ -44,9 +46,14 @@ const MAX_VIEW_ASPECT = 2.6;
 // medido en logaritmo para que ensanchar y angostar pesen igual. 0,12 son un 13 %.
 const RESHAPE_THRESHOLD = 0.12;
 
-// Márgenes del área de dibujo: dejan lugar al halo del nodo arriba y al bloque de nombre y
-// dirección abajo, para que ninguna etiqueta quede cortada contra el borde.
-const VIEW_INSETS = { x: 120, top: 70, bottom: 90 };
+// Márgenes del área de dibujo. Arriba alcanza con el halo del nodo. Abajo tiene que caber el
+// bloque de nombre y dirección en el último renglón al que puede bajar, que es lo que mide
+// `LABEL_REACH_BELOW`: con noventa, la etiqueta de un equipo de la fila de abajo se dibujaba
+// fuera del lienzo y el SVG la recortaba —cinco píxeles de la dirección de dos equipos en un
+// panel de 768×349—, y encima era otro número que el exporte, que sí reservaba lo que hace
+// falta. A los costados no hay número fijo: es la mitad de la etiqueta más ancha, medida.
+const VIEW_INSETS = { top: 70, bottom: LABEL_REACH_BELOW + 6 };
+const VIEW_SIDE_MARGIN = 40;
 
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 6;
@@ -154,7 +161,7 @@ export class TopologyView {
     const { placed, stray } = partitionDevices(visible, links);
     const devices = [...placed, ...stray];
     this.aspect = this.panelAspect();
-    const { width, height, positions, plan, tray, trayTop } = this.layoutFor(placed, stray, this.aspect);
+    const { width, height, positions, plan, tray, trayTop, side } = this.layoutFor(placed, stray, this.aspect);
 
     const svg = element('svg', {
       viewBox: `0 0 ${width} ${height}`,
@@ -173,9 +180,9 @@ export class TopologyView {
     if (stray.length > 0) {
       const divider = element('g', { class: 'tray' });
       divider.append(element('line', {
-        class: 'tray__rule', x1: VIEW_INSETS.x, y1: trayTop, x2: width - VIEW_INSETS.x, y2: trayTop,
+        class: 'tray__rule', x1: side, y1: trayTop, x2: width - side, y2: trayTop,
       }));
-      const caption = element('text', { class: 'tray__caption', x: VIEW_INSETS.x, y: trayTop + 16 });
+      const caption = element('text', { class: 'tray__caption', x: side, y: trayTop + 16 });
       caption.textContent = t('diagram.unconnected');
       divider.append(caption);
       scene.append(divider);
@@ -305,19 +312,24 @@ export class TopologyView {
   layoutFor(placed, stray, aspect) {
     const devices = [...placed, ...stray];
 
+    // Lo que sobresale la etiqueta más ancha, que es lo que hay que dejar libre a los lados.
+    let reach = 0;
+    for (const device of devices) reach = Math.max(reach, halfLabelWidth(device, this.measure));
+    const side = Math.ceil(reach) + VIEW_SIDE_MARGIN;
+
     const attempt = (width) => {
       const height = Math.round(width / aspect);
-      const trayWidth = width - VIEW_INSETS.x * 2;
+      const trayWidth = width - side * 2;
       const tray = trayPlan(stray, trayWidth);
       const trayTop = height - VIEW_INSETS.bottom - tray.height;
 
       const positions = projectIntoRect(placed, {
-        x: VIEW_INSETS.x,
+        x: side,
         y: VIEW_INSETS.top,
         width: trayWidth,
         height: trayTop - VIEW_INSETS.top,
       }, { stretch: LAYOUT_STRETCH });
-      for (const [id, point] of trayPositions(stray, tray, { x: VIEW_INSETS.x, y: trayTop, width: trayWidth })) {
+      for (const [id, point] of trayPositions(stray, tray, { x: side, y: trayTop, width: trayWidth })) {
         positions.set(id, point);
       }
 
@@ -331,7 +343,7 @@ export class TopologyView {
         return total + (spot.crowded ? 1000 : 0) + (spot.offset > 0 ? 1 : 0);
       }, 0);
 
-      return { width, height, positions, plan, tray, trayTop, untidiness };
+      return { width, height, positions, plan, tray, trayTop, side, untidiness };
     };
 
     // Se prueba de menos a más ancho y gana el primero que quede prolijo, que por ser el

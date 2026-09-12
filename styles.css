@@ -927,9 +927,16 @@ body[data-dragging] .dropveil { display: grid; }
 /* La casilla mide trece píxeles, y el renglón que la acompaña, diecinueve. Con el dedo eso
    es apuntar a una línea de texto: la etiqueta entera pasa a tener alto de verdad, que es
    la que recibe el toque. */
+/* Con el dedo, los renglones de la lista y el campo de búsqueda quedaban en veintinueve y
+   treinta y un píxeles, que es apuntar a una línea de texto: elegir un equipo en el teléfono
+   es justamente lo que se hace ahí. Pasan a los cuarenta y cuatro del resto de los mandos.
+   Los botones de acercar siguen en cuarenta, y con motivo: son tres apilados sobre un
+   diagrama que en un teléfono mide trescientos ochenta de alto. */
 @media (pointer: coarse) {
   .toggle,
-  .checkbox { min-height: 44px; }
+  .checkbox,
+  .rail__search,
+  .device-chip { min-height: 44px; }
 }
 
 .device-list {
@@ -1102,13 +1109,19 @@ body[data-dragging] .dropveil { display: grid; }
 
 /* Tres niveles: el elegido, los que cuelgan de él, y el resto apagado. Sin el nivel
    del medio, el que tocaste se confunde con sus vecinos. */
+/* `transform-box: fill-box` no es un detalle: en SVG el origen de una transformación se
+   resuelve por omisión contra el lienzo entero, no contra el elemento, así que `center` era
+   el medio del diagrama. El aro de un equipo del borde no crecía en su lugar sino que
+   entraba volando desde ciento veintisiete píxeles más adentro, y mientras tanto su caja
+   quedaba fuera del lienzo. Con `fill-box`, `center` es el centro del propio círculo. */
 .node__ring {
   fill: none;
   stroke: var(--orange);
   stroke-width: 2;
   opacity: 0;
-  transform: scale(0.72);
+  transform-box: fill-box;
   transform-origin: center;
+  transform: scale(0.72);
   transition: opacity 160ms ease-out, transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
@@ -1343,6 +1356,14 @@ body[data-dragging] .dropveil { display: grid; }
   white-space: nowrap;
 }
 
+/* Con el dedo, una fila de veintiocho píxeles y un título de treinta y uno son apuntar a
+   una línea de texto. Se pagan tres filas menos en pantalla y se gana poder elegir la que
+   uno quiso; errarle a un título además ordena por otra columna. */
+@media (pointer: coarse) {
+  .table--packets td { padding-block: 0.8rem; }
+  .sortable { min-height: 44px; }
+}
+
 .table--packets tbody { user-select: none; }
 
 .packet-row { cursor: pointer; }
@@ -1382,9 +1403,13 @@ body[data-dragging] .dropveil { display: grid; }
     animation-delay: var(--reveal-delay, 0ms);
   }
 
+  /* Mismo motivo que en el aro: sin `fill-box` el disco no crece en su lugar, sale
+     despedido desde el medio del diagrama. */
   .node__disc {
     animation: disc-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
     animation-delay: var(--reveal-delay, 0ms);
+    transform-box: fill-box;
+    transform-origin: center;
   }
 
   .link {
