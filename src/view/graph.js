@@ -152,12 +152,24 @@ export function trayPositions(stray, plan, { x, y, width }) {
   return positions;
 }
 
+// De una pasada y sin desparramar el arreglo en argumentos: `Math.min(...xs)` arma dos
+// arreglos intermedios por llamada, y esto se llama una vez por cada ancho que se prueba.
+// Con muchos argumentos además desborda la pila, que es un límite absurdo para una red pero
+// un límite al fin.
 export function measureBounds(devices) {
-  const xs = devices.map((device) => device.x);
-  const ys = devices.map((device) => device.y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  return { minX, minY, spanX: Math.max(...xs) - minX || 1, spanY: Math.max(...ys) - minY || 1 };
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const device of devices) {
+    if (device.x < minX) minX = device.x;
+    if (device.x > maxX) maxX = device.x;
+    if (device.y < minY) minY = device.y;
+    if (device.y > maxY) maxY = device.y;
+  }
+
+  return { minX, minY, spanX: maxX - minX || 1, spanY: maxY - minY || 1 };
 }
 
 // Cuánto se admite estirar un eje respecto del otro al repartir la red. Casi ninguna red
@@ -272,28 +284,69 @@ export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3
 }
 
 /**
+ * Lo que mide la etiqueta de un dispositivo no depende de dónde caiga: sale de su nombre,
+ * de su primera dirección y del cuerpo de letra, que son fijos. La búsqueda del ancho llama
+ * a `planLabels` una vez por candidato —treinta veces en una red típica—, así que sin esto
+ * cada dispositivo aplana sus interfaces treinta veces para sacar siempre la misma
+ * dirección. Los dispositivos salen de leer el archivo y nadie los toca después.
+ */
+const labelBoxes = new WeakMap();
+
+function labelBox(device, { nameWidth, addressWidth }) {
+  let box = labelBoxes.get(device);
+  if (box) return box;
+
+  let address = '';
+  for (const entry of device.interfaces) {
+    if (entry.addresses.length > 0) { address = entry.addresses[0].address; break; }
+  }
+
+  box = {
+    half: Math.max(nameWidth(device.name), address ? addressWidth(address) : 0) / 2,
+    bottom: address ? LABEL_GEOMETRY.addressBottom : LABEL_GEOMETRY.nameBottom,
+  };
+  labelBoxes.set(device, box);
+  return box;
+}
+
+/**
+ * Mitad de la etiqueta más ancha de un dispositivo: lo que sobresale a cada lado de su
+ * icono. Es lo que hay que dejar libre en los bordes para que no quede cortada, y lo que
+ * hay que separar entre dos vecinos para que no se toquen.
+ */
+export function halfLabelWidth(device, measure) {
+  return labelBox(device, measure).half;
+}
+
+// Hasta dónde llega la influencia de un dispositivo hacia arriba y hacia abajo: lo que
+// ocupa su bloque en el último renglón, más el radio del disco. Dos dispositivos separados
+// por más que esto no pueden tocarse pase lo que pase, y ése es el corte que convierte la
+// prueba de choque de «cada uno contra todos» en «cada uno contra sus vecinos».
+const NEIGHBOURHOOD = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOCK_SLOTS.length - 1]
+  + LABEL_GEOMETRY.discRadius;
+
+/**
  * Decide a qué altura va el bloque de cada dispositivo. Si su lugar está ocupado baja al
  * siguiente renglón, y si no queda ninguno libre se dibuja igual en el suyo: una etiqueta
  * que aparece y desaparece al acercarse molesta más que dos que se rozan. `crowded` marca
  * las que quedaron encimadas, que es de lo que la exportación se guía para darle más lugar
  * al dibujo hasta que no quede ninguna.
+ *
+ * Se recorre de arriba abajo y cada uno se prueba sólo contra los que tiene cerca en
+ * vertical. Probarlo contra todos es cuadrático y se paga completo en cada candidato de
+ * ancho: en una red de trescientos equipos eran 1,73 ms por pasada y 48 ms por reparto.
  */
-export function planLabels(devices, positions, { nameWidth, addressWidth }) {
-  const reserved = [];
+export function planLabels(devices, positions, measure) {
   const overlaps = (box, other) =>
     box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1;
 
   // El disco es redondo: una caja que sólo alcanza la esquina de su cuadrado no lo toca de
   // verdad, y descartar por eso un lugar que servía cuesta hasta once píxeles en diagonal.
-  const discs = [];
   const touchesDisc = (box, disc) => {
     const dx = disc.x - Math.max(box.x1, Math.min(disc.x, box.x2));
     const dy = disc.y - Math.max(box.y1, Math.min(disc.y, box.y2));
     return dx * dx + dy * dy < LABEL_GEOMETRY.discRadius ** 2;
   };
-
-  const collides = (box) => reserved.some((other) => overlaps(box, other))
-    || discs.some((disc) => touchesDisc(box, disc));
 
   const ordered = [...devices].sort((a, b) => {
     const first = positions.get(a.id);
@@ -301,18 +354,24 @@ export function planLabels(devices, positions, { nameWidth, addressWidth }) {
     return first.y - second.y || first.x - second.x;
   });
 
-  for (const device of ordered) discs.push(positions.get(device.id));
-
+  const discs = ordered.map((device) => positions.get(device.id));
+  const reserved = new Array(ordered.length);
   const plan = new Map();
+  let first = 0;
 
-  for (const device of ordered) {
-    const { x, y } = positions.get(device.id);
-    const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
-    const half = Math.max(
-      nameWidth(device.name),
-      address ? addressWidth(address.address) : 0,
-    ) / 2 + LABEL_GEOMETRY.gap;
-    const bottom = address ? LABEL_GEOMETRY.addressBottom : LABEL_GEOMETRY.nameBottom;
+  for (let i = 0; i < ordered.length; i++) {
+    const device = ordered[i];
+    const { x, y } = discs[i];
+    const box = labelBox(device, measure);
+    const half = box.half + LABEL_GEOMETRY.gap;
+    const bottom = box.bottom;
+
+    // La ventana de vecinos. Como se recorre en orden de altura, su borde de arriba sólo
+    // avanza, y el de abajo se busca desde ahí.
+    while (first < i && discs[first].y < y - NEIGHBOURHOOD) first++;
+    let last = i;
+    while (last + 1 < ordered.length && discs[last + 1].y <= y + NEIGHBOURHOOD) last++;
+
     const boxAt = (offset) => ({
       x1: x - half,
       x2: x + half,
@@ -320,12 +379,22 @@ export function planLabels(devices, positions, { nameWidth, addressWidth }) {
       y2: y + bottom + offset,
     });
 
+    const collides = (box) => {
+      // Su propio disco entra en la cuenta, como antes: es lo que hace valer que `nameTop`
+      // no pueda bajar del radio, porque si bajara todo bloque chocaría con su propio icono.
+      for (let j = first; j <= last; j++) {
+        if (touchesDisc(box, discs[j])) return true;
+        if (j < i && overlaps(box, reserved[j])) return true;
+      }
+      return false;
+    };
+
     const free = BLOCK_SLOTS.find((offset) => !collides(boxAt(offset)));
     const offset = free ?? 0;
 
     // La caja se reserva aunque haya quedado encimada: la tinta está ahí igual, y el
     // que venga después tiene que contar con ella.
-    reserved.push(boxAt(offset));
+    reserved[i] = boxAt(offset);
     plan.set(device.id, { offset, crowded: free === undefined });
   }
 

@@ -11,6 +11,7 @@ import {
   LAYOUT_STRETCH,
   LEGEND_ENTRIES,
   frameForNetwork,
+  halfLabelWidth,
   measureBounds,
   partitionDevices,
   planLabels,
@@ -181,16 +182,6 @@ function labelMeasurer() {
     nameWidth: (text) => width(LABEL_FONT, text),
     addressWidth: (text) => width(ADDRESS_FONT, text),
   };
-}
-
-/** Mitad de la etiqueta más ancha de un dispositivo: lo que sobresale a cada lado. */
-function halfLabelWidth(measure, device) {
-  const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
-  const width = Math.max(
-    measure.nameWidth(device.name),
-    address ? measure.addressWidth(address.address) : 0,
-  );
-  return width / 2;
 }
 
 /**
@@ -384,7 +375,7 @@ function measureDiagram(model, showInfrastructure, chrome, measure) {
     if (visible.devices.length === 0) throw new Error(t('error.noDevices'));
 
     const { placed, stray } = partitionDevices(visible.devices, visible.links);
-    const halfWidth = (device) => halfLabelWidth(measure, device);
+    const halfWidth = (device) => halfLabelWidth(device, measure);
     const { spanX, spanY } = measureBounds(placed);
 
     measure.fixed.set(key, {

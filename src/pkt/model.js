@@ -23,8 +23,22 @@ function childText(parent, tagName) {
   return '';
 }
 
+/** El primero con ese nombre, o nada. Casi todas las etiquetas del árbol son únicas. */
+function childNamed(parent, tagName) {
+  for (const child of parent.children) {
+    if (child.tagName === tagName) return child;
+  }
+  return null;
+}
+
+// De una pasada, sin copiar antes la lista entera de hijos: el nodo de un dispositivo tiene
+// decenas y esto se pregunta varias veces por cada uno.
 function childrenNamed(parent, tagName) {
-  return Array.from(parent.children).filter((child) => child.tagName === tagName);
+  const found = [];
+  for (const child of parent.children) {
+    if (child.tagName === tagName) found.push(child);
+  }
+  return found;
 }
 
 function classify(typeText, modelText) {
@@ -42,7 +56,7 @@ function classify(typeText, modelText) {
  * escribe nada de esto en la `running-config`.
  */
 function vlansFromEngine(engine) {
-  const declared = childrenNamed(engine, 'VLANS')[0];
+  const declared = childNamed(engine, 'VLANS');
   if (!declared) return [];
 
   return childrenNamed(declared, 'VLAN')
@@ -69,18 +83,18 @@ function interfacesFromPorts(engine) {
 }
 
 function readDevice(deviceNode) {
-  const engine = childrenNamed(deviceNode, 'ENGINE')[0];
+  const engine = childNamed(deviceNode, 'ENGINE');
   if (!engine) return null;
 
   const id = childText(engine, 'SAVE_REF_ID');
   if (!id) return null;
 
-  const typeNode = childrenNamed(engine, 'TYPE')[0];
+  const typeNode = childNamed(engine, 'TYPE');
   const typeText = typeNode ? typeNode.textContent.trim() : '';
   const modelText = typeNode ? typeNode.getAttribute('model') || '' : '';
   const category = classify(typeText, modelText);
 
-  const configNode = childrenNamed(engine, 'RUNNINGCONFIG')[0];
+  const configNode = childNamed(engine, 'RUNNINGCONFIG');
   const configLines = configNode
     ? childrenNamed(configNode, 'LINE').map((line) => line.textContent.replace(/\r/g, ''))
     : [];
@@ -89,8 +103,8 @@ function readDevice(deviceNode) {
   // sin IP no dice nada por sí solo, pero es el que dice qué VLAN vive en ese cable.
   const configured = readInterfaces(configLines);
   const namedInterfaces = configured.filter((entry) => entry.addresses.length > 0 || entry.description);
-  const workspace = childrenNamed(deviceNode, 'WORKSPACE')[0];
-  const logical = workspace ? childrenNamed(workspace, 'LOGICAL')[0] : null;
+  const workspace = childNamed(deviceNode, 'WORKSPACE');
+  const logical = workspace ? childNamed(workspace, 'LOGICAL') : null;
 
   return {
     id,
@@ -111,7 +125,7 @@ function readDevice(deviceNode) {
 }
 
 function readLink(linkNode) {
-  const cable = childrenNamed(linkNode, 'CABLE')[0];
+  const cable = childNamed(linkNode, 'CABLE');
   if (!cable) return null;
 
   const ports = childrenNamed(cable, 'PORT');
@@ -140,8 +154,8 @@ export function buildNetworkModel(xmlText) {
   const network = root.getElementsByTagName('NETWORK')[0];
   if (!network) throw new Error(t('error.noTopology'));
 
-  const devicesNode = childrenNamed(network, 'DEVICES')[0];
-  const linksNode = childrenNamed(network, 'LINKS')[0];
+  const devicesNode = childNamed(network, 'DEVICES');
+  const linksNode = childNamed(network, 'LINKS');
 
   const devices = devicesNode
     ? childrenNamed(devicesNode, 'DEVICE').map(readDevice).filter(Boolean)
