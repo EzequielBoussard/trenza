@@ -659,21 +659,27 @@ body:not([data-loaded]) .workspace {
   }
 }
 
-/* Columnas de ancho uniforme: así las entradas quedan alineadas entre sí en vez de
+/* La leyenda va debajo del diagrama, no flotando encima. Flotando tapaba equipos: el
+   reparto usa el lienzo entero porque nada le dice que un rincón esté ocupado, y en una
+   red rala —cinco equipos repartidos hasta los bordes— el de abajo a la izquierda quedaba
+   debajo. Reservarle el hueco en el reparto sería lienzo perdido siempre; como franja
+   cuesta unos treinta píxeles de alto y no hay ancho de pantalla en el que tape nada.
+
+   Columnas de ancho uniforme: así las entradas quedan alineadas entre sí en vez de
    correrse según lo largo que sea cada texto. */
+.stage__canvas {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
 .legend {
-  position: absolute;
-  left: 0.9rem;
-  bottom: 0.9rem;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, max-content));
   gap: 0.35rem 0.75rem;
-  max-width: calc(100% - 5rem);
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 0.5rem 0.9rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
   list-style: none;
   font-size: 0.72rem;
   color: var(--text-muted);

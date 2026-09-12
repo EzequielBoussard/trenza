@@ -274,7 +274,10 @@ export class TopologyView {
 
     scene.append(linkLayer, nodeLayer);
     svg.append(scene);
-    this.container.append(svg, this.buildControls(), this.buildLegend(links));
+    const legend = this.buildLegend(links);
+    this.container.append(svg, this.buildControls());
+    // Sin enlaces no hay leyenda: una franja vacía al pie del diagrama no dice nada.
+    if (legend) this.container.append(legend);
 
     this.svg = svg;
     this.scene = scene;
@@ -384,7 +387,7 @@ export class TopologyView {
       item.append(button);
       legend.append(item);
     }
-    return legend;
+    return legend.childElementCount > 0 ? legend : null;
   }
 
   /** Enciende un tipo de cable y apaga el resto. Con el mismo que ya estaba, vuelve atrás. */
