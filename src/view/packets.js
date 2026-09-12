@@ -32,6 +32,29 @@ const collator = () => new Intl.Collator(getLocale(), { numeric: true, sensitivi
  */
 const SEARCHED = ['protocol', 'source', 'destination', 'summary'];
 
+/**
+ * Los campos buscables de cada paquete en minúscula, armados la primera vez que alguien
+ * filtra y guardados después. Sin esto, cada tecla los rehace: en una captura de cien mil
+ * paquetes son cuatrocientas mil conversiones por pulsación, y se nota al escribir. Se
+ * arman recién al filtrar, así que quien no filtra no los paga.
+ *
+ * Van todos seguidos en un solo arreglo, cuatro por paquete, y no en un arreglo por
+ * paquete: cien mil arreglos de cuatro cuestan más en armarse que las cadenas que guardan.
+ */
+function haystacksFor(packets) {
+  const haystacks = new Array(packets.length * SEARCHED.length);
+
+  for (let i = 0; i < packets.length; i++) {
+    const packet = packets[i];
+    const at = i * SEARCHED.length;
+    for (let field = 0; field < SEARCHED.length; field++) {
+      haystacks[at + field] = String(packet[SEARCHED[field]] ?? '').toLowerCase();
+    }
+  }
+
+  return haystacks;
+}
+
 function createElement(tag, className, textContent) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -80,6 +103,9 @@ export class PacketTableView {
     this.selected = new Set();
     this.anchor = null;
     this.sort = null;
+    this.haystacks = null;
+    this.matching = null;
+    this.searched = '';
   }
 
   /** Los paquetes elegidos, en el orden en que están en la captura. */
@@ -132,6 +158,11 @@ export class PacketTableView {
     this.filter = '';
     this.sort = null;
     this.selected = new Set();
+    // Los resúmenes vienen traducidos, así que un cambio de idioma trae paquetes nuevos:
+    // lo que se guardó para buscar ya no sirve.
+    this.haystacks = null;
+    this.matching = null;
+    this.searched = '';
     this.refresh();
   }
 
@@ -157,15 +188,52 @@ export class PacketTableView {
   }
 
   /**
+   * Los paquetes que pasan el filtro, por posición en la captura. Cuando el texto nuevo
+   * contiene al anterior no puede reaparecer ninguna fila que ya estaba escondida —si una
+   * cadena contiene `icmp`, contiene `icm`—, así que se filtra el resultado anterior en vez
+   * de la captura entera. Es el caso de escribir de corrido, que es como se usa: en cien mil
+   * paquetes, la primera tecla cuesta una pasada y las siguientes, lo que quedó vivo.
+   */
+  filtered() {
+    if (!this.filter) {
+      this.matching = null;
+      this.searched = '';
+      return this.packets;
+    }
+
+    if (!this.haystacks) this.haystacks = haystacksFor(this.packets);
+
+    const needle = this.filter;
+    const previous = this.matching && this.searched && needle.includes(this.searched) ? this.matching : null;
+    const matching = [];
+
+    const haystacks = this.haystacks;
+    const hit = (index) => {
+      const at = index * SEARCHED.length;
+      for (let field = 0; field < SEARCHED.length; field++) {
+        if (haystacks[at + field].includes(needle)) return true;
+      }
+      return false;
+    };
+
+    if (previous) {
+      for (const index of previous) if (hit(index)) matching.push(index);
+    } else {
+      for (let index = 0; index < this.packets.length; index++) if (hit(index)) matching.push(index);
+    }
+
+    this.matching = matching;
+    this.searched = needle;
+    return matching.map((index) => this.packets[index]);
+  }
+
+  /**
    * Filtra y ordena, en ese orden, y vuelve a dibujar. Las dos cosas salen siempre de la
    * misma pasada: hacerlas por separado dejaba una tabla ordenada que al filtrar volvía al
    * orden de la captura, o al revés.
    */
   refresh() {
-    const filtered = this.filter
-      ? this.packets.filter((packet) =>
-          SEARCHED.some((field) => String(packet[field] ?? '').toLowerCase().includes(this.filter)))
-      : this.packets;
+    const filtered = this.filtered();
 
     this.visible = this.sort ? this.sorted(filtered) : filtered;
     this.rendered = 0;

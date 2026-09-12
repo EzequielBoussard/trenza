@@ -83,6 +83,25 @@ const LINK_TYPES = {
 
 const hex2 = (value) => value.toString(16).padStart(2, '0');
 
+// Los enteros de dos bytes se leen a mano en vez de con una `DataView`. Los encabezados de
+// red y de transporte piden dos o tres cada uno, y una vista por paquete son cien mil
+// objetos para leer seis números que están ahí al lado. La vista sigue usándose donde no
+// duele: dentro de los campos, que se arman sólo para el paquete que se está mirando.
+const uint16 = (bytes, offset) => (bytes[offset] << 8) | bytes[offset + 1];
+
+// Los ocho bits de banderas dan 256 combinaciones posibles y en una captura se ven cuatro o
+// cinco. Armarlas es filtrar un arreglo y unirlo, una vez por paquete TCP.
+const TCP_FLAG_TEXT = [];
+
+function tcpFlags(bits) {
+  let text = TCP_FLAG_TEXT[bits];
+  if (text === undefined) {
+    text = TCP_FLAG_NAMES.filter((_, bit) => bits & (1 << bit)).join(', ');
+    TCP_FLAG_TEXT[bits] = text;
+  }
+  return text;
+}
+
 function formatMac(bytes, offset) {
   return Array.from(bytes.subarray(offset, offset + 6)).map(hex2).join(':');
 }
@@ -110,38 +129,38 @@ function describePort(port) {
 }
 
 function dissectTcp(bytes, offset, length) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const source = view.getUint16(offset, false);
-  const destination = view.getUint16(offset + 2, false);
+  const source = uint16(bytes, offset);
+  const destination = uint16(bytes, offset + 2);
   const dataOffset = (bytes[offset + 12] >> 4) * 4;
-  const flagBits = bytes[offset + 13];
-  const flags = TCP_FLAG_NAMES.filter((_, bit) => flagBits & (1 << bit));
+  const flags = tcpFlags(bytes[offset + 13]);
 
   return {
     name: 'TCP',
-    fields: () => [
-      [t('field.sourcePort'), describePort(source)],
-      [t('field.destinationPort'), describePort(destination)],
-      [t('field.sequence'), view.getUint32(offset + 4, false)],
-      [t('field.acknowledgement'), view.getUint32(offset + 8, false)],
-      [t('field.flags'), flags.join(', ') || t('field.noFlags')],
-      [t('field.window'), view.getUint16(offset + 14, false)],
-    ],
+    fields: () => {
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      return [
+        [t('field.sourcePort'), describePort(source)],
+        [t('field.destinationPort'), describePort(destination)],
+        [t('field.sequence'), view.getUint32(offset + 4, false)],
+        [t('field.acknowledgement'), view.getUint32(offset + 8, false)],
+        [t('field.flags'), flags || t('field.noFlags')],
+        [t('field.window'), uint16(bytes, offset + 14)],
+      ];
+    },
     service: serviceName(destination) || serviceName(source),
     summary: t('packet.tcp', {
       source,
       destination,
-      flags: flags.join(', '),
+      flags,
       length: Math.max(0, length - dataOffset),
     }),
   };
 }
 
 function dissectUdp(bytes, offset) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const source = view.getUint16(offset, false);
-  const destination = view.getUint16(offset + 2, false);
-  const length = view.getUint16(offset + 4, false);
+  const source = uint16(bytes, offset);
+  const destination = uint16(bytes, offset + 2);
+  const length = uint16(bytes, offset + 4);
 
   return {
     name: 'UDP',
@@ -172,7 +191,7 @@ function dissectIcmp(bytes, offset, version) {
 }
 
 function dissectArp(bytes, offset) {
-  const operation = (bytes[offset + 6] << 8) | bytes[offset + 7];
+  const operation = uint16(bytes, offset + 6);
   const senderMac = formatMac(bytes, offset + 8);
   const senderIp = formatIPv4(bytes, offset + 14);
   const targetIp = formatIPv4(bytes, offset + 24);
@@ -195,9 +214,8 @@ function dissectArp(bytes, offset) {
 }
 
 function dissectIPv4(bytes, offset) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const headerLength = (bytes[offset] & 0x0f) * 4;
-  const totalLength = view.getUint16(offset + 2, false);
+  const totalLength = uint16(bytes, offset + 2);
   const protocol = bytes[offset + 9];
   const source = formatIPv4(bytes, offset + 12);
   const destination = formatIPv4(bytes, offset + 16);
@@ -222,8 +240,7 @@ function dissectIPv4(bytes, offset) {
 }
 
 function dissectIPv6(bytes, offset) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const payloadLength = view.getUint16(offset + 4, false);
+  const payloadLength = uint16(bytes, offset + 4);
   const protocol = bytes[offset + 6];
   const source = formatIPv6(bytes, offset + 8);
   const destination = formatIPv6(bytes, offset + 24);
@@ -384,8 +401,11 @@ export function dissectPacket(packet) {
       source = network.layer.source;
       destination = network.layer.destination;
       protocol = IP_PROTOCOLS[network.protocol] || `IP/${network.protocol}`;
-      summary = t('packet.ipSummary', { protocol, bytes: network.payloadLength });
 
+      // El resumen de la capa de red es el de reserva y va en la última rama, no antes: en
+      // TCP, UDP e ICMP —que son casi todo el tráfico— lo pisaba el de la capa de arriba, y
+      // era una traducción interpolada por paquete tirada a la basura. En cien mil paquetes,
+      // 53 ms.
       if (network.protocol === 6) {
         const tcp = dissectTcp(bytes, network.next, network.payloadLength);
         layers.push(tcp);
@@ -401,6 +421,8 @@ export function dissectPacket(packet) {
         layers.push(icmp);
         protocol = icmp.name;
         summary = icmp.summary;
+      } else {
+        summary = t('packet.ipSummary', { protocol, bytes: network.payloadLength });
       }
     }
   } catch {
