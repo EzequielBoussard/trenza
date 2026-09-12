@@ -4,15 +4,23 @@ Un visor de sólo lectura para archivos `.pkt` y `.pka` de Cisco Packet Tracer y
 
 ## Qué muestra
 
-De Packet Tracer: la topología lógica con las posiciones originales, el inventario de equipos, las interfaces con sus direcciones, las VLAN, las rutas estáticas, y el `running-config` de cada dispositivo que lo tenga.
+De Packet Tracer: la topología lógica con las posiciones originales, el inventario de equipos, las interfaces con sus direcciones, las VLAN, las rutas estáticas, los protocolos de enrutamiento, las listas de acceso, y el `running-config` de cada dispositivo que lo tenga.
 
-Las rutas salen de leer la configuración, que es texto de Cisco IOS y vive en `src/pkt/config.js`, aparte del resto: así se prueba sin navegador y `model.js` se queda con una sola tarea, traducir el árbol del archivo. Sólo están las escritas a mano; las que aprende un protocolo no viven en la configuración.
+Todo eso sale de leer la configuración, que es texto de Cisco IOS y vive en `src/pkt/config.js`, aparte del resto: así se prueba sin navegador y `model.js` se queda con una sola tarea, traducir el árbol del archivo. De las rutas sólo están las escritas a mano; las que aprende un protocolo no viven en la configuración.
+
+De los protocolos —RIP, OSPF, EIGRP— se lee qué redes anuncia cada uno y qué interfaces quedaron pasivas. Las redes se muestran tal como están escritas, `10.0.0.0 0.0.0.255 area 0`, en vez de despiezarlas: cada protocolo le da su propia forma a esa línea y volver a armarla no agrega nada que el original no diga. Un bloque vacío igual aparece, porque «este equipo tiene RIP activado y no anuncia nada» es justamente lo que hay que ver; es además lo que escribe Packet Tracer cuando alguien entra a `router rip` y sale sin más, y pasa en tres de los archivos de prueba.
+
+De las listas de acceso se leen las reglas en orden y dónde está aplicada cada una, que son las dos mitades del dato: en una lista de acceso el orden es la regla, porque se evalúa de arriba abajo y la primera que coincide decide; y una lista escrita y no aplicada no filtra nada. Al revés también: una interfaz con `ip access-group` de una lista que no existe deja pasar todo, así que esa lista aparece igual, vacía y con su interfaz al lado. Las numeradas van en una línea cada una y las nombradas abren un bloque; las dos terminan en la misma tabla.
 
 Las VLAN hay que cruzarlas de dos lados del archivo, porque cada lado guarda la mitad. El árbol XML del dispositivo trae la base con el número y el nombre, y es la única fuente cuando el switch se configuró desde la interfaz de Packet Tracer, que no escribe nada de esto en la configuración; la configuración, a su vez, dice qué puerto pertenece a cuál, que el XML no guarda. Un tronco declarado sin lista de permitidas las lleva todas, que es lo que hace Cisco por omisión. Y las que Packet Tracer crea solo en cada switch —la 1 y las 1002 a 1005— no se listan salvo que algún puerto las nombre, porque aparecen siempre y serían una fila de ruido por dispositivo.
 
 Se agrupan por VLAN y no por puerto porque la pregunta es «qué VLAN hay y por dónde pasa», y un switch de veinticuatro bocas contestada al revés son veinticuatro renglones para leer de a uno. Nada de esto aparece cuando no hay: la red del showcase es plana y no muestra ninguna de las dos secciones.
 
+En un router en un palo la VLAN no pasa por un puerto de acceso sino por una subinterfaz con `encapsulation dot1Q`, que es su puerta de enlace. Esas van en su propia columna, y la columna sólo existe cuando hay alguna: en un switch sería una columna de guiones.
+
 De una captura: la lista de paquetes con tiempo relativo, direcciones y protocolo, el desglose por capas y el volcado hexadecimal.
+
+El tipo de enlace no lo dice el paquete sino la captura, y de él depende dónde empieza todo lo demás: leer un «Linux cooked» como si fuera Ethernet corre las direcciones dos bytes y el desglose sale entero pero mal. Se leen Ethernet con sus VLAN apiladas, IP en crudo, el bucle local de BSD y macOS, PPP, Cisco HDLC —que es lo que sale de un enlace serie entre routers— y las dos formas del encabezado que pone Linux al capturar de todas las interfaces a la vez. El del bucle local se resuelve por el nibble de versión del paquete que sigue y no por la familia de direcciones, que vale distinto según el sistema y viene en el orden de bytes del equipo que capturó. El que no se conoce se nombra por su número en vez de quedar en blanco, y el resumen del archivo dice siempre de qué enlace salió.
 
 ## El formato de los archivos de Packet Tracer
 
@@ -127,6 +135,8 @@ Las dos entradas de la leyenda son botones: tocar una deja encendidos sólo los 
 
 Un clic en el vacío del diagrama, o la tecla `Escape`, deselecciona lo que haya, sea un dispositivo o un tipo de cable. Arrastrar para desplazarse no cuenta como clic: el umbral es de cinco píxeles.
 
+La leyenda va debajo del diagrama y no flotando sobre el rincón de abajo a la izquierda. Flotando tapaba equipos, y no sólo en un teléfono: el reparto usa el lienzo entero porque nada le dice que un rincón esté ocupado, así que basta una red rala —cinco equipos repartidos hasta los bordes— y un panel ancho y bajo para que uno quede debajo. Medido, pasaba entre 700 y 800 px de ancho y no pasaba ni a 640 ni a 900, que es lo que tiene depender de dónde cayó cada equipo: ningún punto de corte por ancho lo arregla. Reservarle el hueco en el reparto sería lienzo perdido en todas las pantallas; como franja al pie cuesta unos treinta píxeles de alto y no hay ancho en el que tape nada. Sin enlaces no hay leyenda, que una franja vacía no dice nada.
+
 Los símbolos de cada dispositivo son propios y no los de Cisco, que es el juego que la industria da por estándar pero que el proyecto no distribuye. Siguen su convención igual donde ésta dice algo: el router lleva las cuatro flechas de «elige por dónde sale» y el switch, dos opuestas de «cruza tráfico entre bocas». Sin flechas, dos rieles con topes se leen como el control de un ecualizador, que es de lo más común en cualquier interfaz. El resto son símbolos que se entienden fuera de las redes también —el arco del wifi, el monitor, la nube, las unidades apiladas del servidor, el chip, el bastidor—, y ahí gana el que reconoce cualquiera. La seguridad va con un escudo y no con el muro de ladrillos del cortafuegos de Cisco, porque a diez píxeles el muro se vuelve una mancha y el escudo conserva su silueta; ese tamaño es el que manda, porque es el que se ve con la red entera en pantalla.
 
 Al elegir un dispositivo, el diagrama queda en tres niveles: el elegido con aro y halo naranjas y el nombre en negrita y subrayado en el color de acento, los que cuelgan de él con halo punteado, y el resto apagado. Sin el nivel del medio, el que tocaste se confunde con sus vecinos.
@@ -203,8 +213,10 @@ Un servidor estático cualquiera sirve para desarrollar, pero no manda esas cabe
 
 ## Estado
 
-Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1, 8.2.1 y 9.0.1** —catorce redes, de tres a setenta y dos equipos, con VLAN, troncos y rutas estáticas—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.
+Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1, 8.2.1 y 9.0.1** —catorce redes, de tres a setenta y dos equipos, con VLAN, troncos, rutas estáticas y RIP—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.
 
 La tubería no cambió en todo ese rango. Comparando la misma red guardada con 8.2.1 y con 9.0.1, la versión nueva suma treinta y seis etiquetas al XML —listas de acceso, PTP, NTP, licencias, medidas de las ventanas— y no saca ninguna: todo lo que el visor lee sigue donde estaba. Las posiciones bailan un píxel, que es cómo redondea cada versión.
 
-Sin verificar todavía: pcapng con varias interfaces y enlaces distintos de Ethernet.
+Un pcapng puede ser la concatenación de varias capturas, y cada sección abre con su propia cabecera: la numeración de interfaces vuelve a empezar y el orden de bytes puede ser otro. Sin reiniciar la lista en cada cabecera, los paquetes de la segunda sección se leían con el tipo de enlace y la resolución de tiempo de la primera.
+
+Ninguna lista de acceso salió de un archivo real: no hay una sola configurada en los catorce, así que esa parte está probada contra configuraciones armadas a mano y contra un `.pkt` de prueba con OSPF, listas y un router en un palo. Lo que el XML de 9.0.1 guarda en `ACL_IN_ID` y `ACL_OUT_ID` no se lee, y no por olvido: viene vacío en los catorce archivos, el puerto que lo lleva no guarda su nombre, y un número suelto sin interfaz al lado no nombra nada. La configuración sí dice las dos cosas.
