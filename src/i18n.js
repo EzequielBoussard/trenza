@@ -546,6 +546,43 @@ export function withLanguage(language, write) {
   }
 }
 
+// Las reglas de plural son un objeto caro de construir y no dependen más que del idioma.
+const pluralRules = new Map();
+
+function pluralFor(locale, count) {
+  let rules = pluralRules.get(locale);
+  if (!rules) {
+    rules = new Intl.PluralRules(locale);
+    pluralRules.set(locale, rules);
+  }
+  return rules.select(count);
+}
+
+/**
+ * Las plantillas partidas en literales y nombres, `['', 'source', ' → ', 'destination', '']`.
+ * Interpolar con una expresión regular y una función de reemplazo cuesta lo suyo, y son
+ * siempre las mismas cinco o seis plantillas: en una captura de cien mil paquetes eran cien
+ * mil pasadas de la misma expresión sobre el mismo texto, 53 ms por cada línea de resumen.
+ * Hay una entrada por cadena del diccionario que lleve marcadores, así que el mapa no crece.
+ */
+const templates = new Map();
+
+function fill(text, values) {
+  let parts = templates.get(text);
+  if (parts === undefined) {
+    parts = text.includes('{') ? text.split(/\{(\w+)\}/) : null;
+    templates.set(text, parts);
+  }
+  if (parts === null) return text;
+
+  let filled = parts[0];
+  for (let i = 1; i < parts.length; i += 2) {
+    const name = parts[i];
+    filled += (name in values ? String(values[name]) : `{${name}}`) + parts[i + 1];
+  }
+  return filled;
+}
+
 /**
  * Traduce una clave. Si se pasa `count`, primero se busca la variante de plural que
  * corresponde al idioma, para no terminar escribiendo «1 paquetes».
@@ -555,14 +592,13 @@ export function t(key, values) {
   let resolved = key;
 
   if (values && typeof values.count === 'number') {
-    const plural = new Intl.PluralRules(LANGUAGES[current].locale).select(values.count);
+    const plural = pluralFor(LANGUAGES[current].locale, values.count);
     if (`${key}#${plural}` in dictionary) resolved = `${key}#${plural}`;
     else if (`${key}#other` in dictionary) resolved = `${key}#other`;
   }
 
   const text = dictionary[resolved] ?? DICTIONARIES[DEFAULT_LANGUAGE][resolved] ?? key;
-  if (!values) return text;
-  return text.replace(/\{(\w+)\}/g, (match, name) => (name in values ? String(values[name]) : match));
+  return values ? fill(text, values) : text;
 }
 
 export function countOf(unit, count) {
