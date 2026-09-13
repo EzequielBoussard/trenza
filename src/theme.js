@@ -8,7 +8,7 @@ const SWAP_AT = 0.65;
 
 let sweepTimers = [];
 
-/** Sin elección guardada manda el sistema, que es lo que la hoja de estilos ya hace. */
+/** La elección guardada, si la hay. Sin ella no se pone atributo y queda el oscuro. */
 export function getTheme() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
