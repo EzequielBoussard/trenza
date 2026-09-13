@@ -601,8 +601,15 @@ body:not([data-loaded]) .workspace {
 .rail { border-right: 1px solid var(--line); }
 .panel { border-left: 1px solid var(--line); }
 
+/* La leyenda es una franja al pie del diagrama, pero cuelga de la escena y no del recuadro
+   del dibujo: el visor mide ese recuadro para saber qué forma darle al lienzo, y midiendo
+   de más se lo calculaba más alto de lo que iba a tener. El dibujo entraba entonces por el
+   alto y dejaba franjas vacías a los costados: en un teléfono, un 14 % más chico de lo que
+   daba el lugar. */
 .stage {
   position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   background:
@@ -610,11 +617,14 @@ body:not([data-loaded]) .workspace {
     var(--ground);
 }
 
+/* Se estiran por ser celdas de la escena, no por un cien por ciento: contra una fila
+   `1fr` el porcentaje no tiene contra qué resolver en la primera pasada y el recuadro
+   mide cero, que es justo cuando el visor lo mide para darle forma al lienzo. */
 .stage__canvas,
 .stage__table {
   position: relative;
-  width: 100%;
-  height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .zoom {
@@ -667,11 +677,6 @@ body:not([data-loaded]) .workspace {
 
    Columnas de ancho uniforme: así las entradas quedan alineadas entre sí en vez de
    correrse según lo largo que sea cada texto. */
-.stage__canvas {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-}
-
 .legend {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, max-content));
@@ -1431,13 +1436,40 @@ body[data-dragging] .dropveil { display: grid; }
 }
 
 @media (max-width: 1180px) {
-  .workspace {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(24rem, 1fr) auto;
+  /* Apiladas, las tres zonas no entran en un alto de pantalla, y forzarlas era el peor de
+     los repartos: con el diagrama pidiendo veinticuatro rem de mínimo, en un teléfono de
+     844 de alto a la lista y al detalle les quedaban ciento veintiséis píxeles cada uno
+     —menos de lo que mide el campo de búsqueda, que salía cortado por el borde—. Así que
+     acá la página se desplaza, que es lo que se espera de algo apilado: el diagrama toma
+     un alto propio, la lista se desplaza por dentro porque puede tener setenta renglones,
+     y el detalle se estira con lo que tenga y empuja la página. */
+  html, body {
+    height: auto;
+    min-height: 100%;
   }
 
-  .rail, .panel {
-    max-height: 20rem;
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .stage { height: min(60vh, 30rem); }
+
+  .rail {
+    max-height: 22rem;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* `min-width: 0` no es de adorno: sin desplazamiento propio, el mínimo automático de una
+     celda de grilla es el de su contenido, y el volcado hexadecimal de un paquete mide
+     quinientos y pico. Sin esto, ese ancho lo hereda el panel entero y se lleva de costado
+     a toda la página. Con esto, el panel mide lo que la columna y el volcado se desplaza
+     por dentro, que es lo que ya sabe hacer. */
+  .panel {
+    max-height: none;
+    min-width: 0;
+    overflow-y: visible;
     border: 0;
     border-bottom: 1px solid var(--line);
   }

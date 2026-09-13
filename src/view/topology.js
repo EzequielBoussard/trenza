@@ -36,12 +36,17 @@ const VIEW_STEP = 50;
 
 // El lienzo toma la proporción del panel donde va a entrar. Con una fija sobraba: un
 // lienzo apaisado dentro de un panel casi cuadrado entraba por el ancho y dejaba 312 px
-// de los 812 en blanco, y el dibujo se achicaba para caber en la parte que sí usaba. Los
-// topes son por si el panel queda con una forma imposible, que ahí estirar la red no
-// arregla nada. Sin panel medido —oculto o recién creado— vale la proporción de siempre.
+// de los 812 en blanco, y el dibujo se achicaba para caber en la parte que sí usaba.
+//
+// Los topes son por si el panel queda con una forma imposible, pero el de arriba estaba
+// corto: un teléfono apaisado deja un recuadro de 640 × 156, proporción 4,09, y recortarlo
+// a 2,6 dejaba 233 píxeles de banda vacía a los costados —el 36 % del área— con el dibujo
+// un 23 % más chico de lo que daba el lugar. Una proporción extrema no rompe el reparto:
+// el lienzo se achica de alto, las etiquetas se rozan, y la búsqueda del ancho lo
+// resuelve sola ensanchándolo. Sin panel medido —oculto o recién creado— vale la de siempre.
 const FALLBACK_ASPECT = 1.6;
 const MIN_VIEW_ASPECT = 0.6;
-const MAX_VIEW_ASPECT = 2.6;
+const MAX_VIEW_ASPECT = 4.5;
 
 // Cuánto tiene que cambiar la forma del panel para que valga la pena rehacer el reparto,
 // medido en logaritmo para que ensanchar y angostar pesen igual. 0,12 son un 13 %.
@@ -117,8 +122,9 @@ function control(label, title, action) {
 }
 
 export class TopologyView {
-  constructor(container, { onSelect, onClear }) {
+  constructor(container, { onSelect, onClear, legendHost }) {
     this.container = container;
+    this.legendHost = legendHost || container;
     this.onSelect = onSelect;
     this.onClear = onClear;
     this.transform = { x: 0, y: 0, scale: 1 };
@@ -172,12 +178,41 @@ export class TopologyView {
     this.shapeWatcher.observe(this.container);
   }
 
+  /**
+   * Deja de escuchar. Hace falta porque la leyenda cuelga de la escena y no del recuadro
+   * propio: una vista a la que ya reemplazaron sigue teniendo su observador de forma vivo,
+   * y al quedar su recuadro fuera del documento el observador avisa de un cambio a cero y
+   * la vista muerta vuelve a dibujar su leyenda en la escena que ahora es de otra.
+   */
+  destroy() {
+    this.shapeWatcher.disconnect();
+    if (this.legend) this.legend.remove();
+    this.legend = null;
+    this.last = null;
+  }
+
   render(model, { showInfrastructure }) {
+    // Nadie dibuja desde fuera del documento: un aviso tardío —del observador de forma o de
+    // las tipografías— puede llegar cuando esta vista ya fue reemplazada.
+    if (!this.container.isConnected) return;
+
     this.last = { model, showInfrastructure };
     const { devices: visible, links } = selectVisible(model, showInfrastructure);
 
     this.container.replaceChildren();
+    // La leyenda cuelga de la escena y no del recuadro del dibujo, así que vaciar el
+    // recuadro no se la lleva: hay que sacarla a mano o se apila una por cada reparto.
+    if (this.legend) this.legend.remove();
+    this.legend = null;
     if (visible.length === 0) return;
+
+    // Y se pone antes de medir, no después. La franja le saca alto al recuadro, así que
+    // midiendo sin ella el lienzo sale con la forma de un espacio más alto del que va a
+    // tener y el dibujo entra por el alto, dejando franjas vacías a los costados: en un
+    // teléfono, un 12 % del ancho desperdiciado. Su contenido sale de los enlaces, que ya
+    // están, así que no hay nada que esperar.
+    this.legend = this.buildLegend(links);
+    if (this.legend) this.legendHost.append(this.legend);
 
     // Los apartados van a una bandeja al pie: si entraran al encuadre general, uno
     // solo tirado en un rincón del espacio de trabajo aplastaría toda la red.
@@ -304,10 +339,7 @@ export class TopologyView {
 
     scene.append(linkLayer, nodeLayer);
     svg.append(scene);
-    const legend = this.buildLegend(links);
     this.container.append(svg, this.buildControls());
-    // Sin enlaces no hay leyenda: una franja vacía al pie del diagrama no dice nada.
-    if (legend) this.container.append(legend);
 
     this.svg = svg;
     this.scene = scene;

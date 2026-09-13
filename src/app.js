@@ -185,12 +185,27 @@ function showNetworkSummary() {
   });
 }
 
-function paintNetwork() {
+/**
+ * Vacía la escena. El visor de topología se da de baja antes: sigue escuchando el tamaño
+ * de su recuadro, y si se lo sacan de debajo sin avisarle vuelve a dibujar sobre lo que
+ * haya quedado en su lugar.
+ */
+function clearStage() {
+  if (state.topology) state.topology.destroy();
+  state.topology = null;
   elements.stage.replaceChildren();
+}
+
+function paintNetwork() {
+  clearStage();
   const canvas = createElement('div', 'stage__canvas');
   elements.stage.append(canvas);
 
-  state.topology = new TopologyView(canvas, { onSelect: selectDevice, onClear: clearSelection });
+  state.topology = new TopologyView(canvas, {
+    onSelect: selectDevice,
+    onClear: clearSelection,
+    legendHost: elements.stage,
+  });
   state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
 
   renderDeviceList();
@@ -222,7 +237,7 @@ async function showNetwork(bytes) {
 function paintCapture() {
   state.packets = state.capture.packets.map(dissectPacket);
 
-  elements.stage.replaceChildren();
+  clearStage();
   const table = createElement('div', 'stage__table');
   elements.stage.append(table);
 
@@ -315,7 +330,8 @@ function showFailure(message) {
   state.status = { key: null, tone: 'error' };
   elements.status.textContent = message;
   elements.status.dataset.tone = 'error';
-  elements.stage.replaceChildren(createElement('p', 'empty-note', message));
+  clearStage();
+  elements.stage.append(createElement('p', 'empty-note', message));
   elements.panel.replaceChildren();
   elements.rail.replaceChildren();
 }
@@ -398,7 +414,7 @@ function wireActions() {
     delete document.body.dataset.loaded;
     delete document.body.dataset.view;
     elements.fileName.textContent = '';
-    elements.stage.replaceChildren();
+    clearStage();
     elements.rail.replaceChildren();
     elements.panel.replaceChildren();
     elements.fileInput.value = '';
