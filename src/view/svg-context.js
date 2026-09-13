@@ -85,15 +85,24 @@ export class SvgContext {
     this.path = [];
   }
 
+  // La transparencia del relleno se escribe aparte del color, como la del trazo: hoy todo
+  // lo que se rellena va opaco, pero si mañana no lo fuera, el SVG lo ignoraría en silencio
+  // y saldría distinto del lienzo. Los dos dibujos no pueden separarse.
+  fillAttributes() {
+    const { fillStyle, globalAlpha } = this.state;
+    return `fill="${fillStyle}"${globalAlpha < 1 ? ` fill-opacity="${round(globalAlpha)}"` : ''}`;
+  }
+
   fillRect(x, y, width, height) {
-    this.elements.push(`<rect x="${round(x)}" y="${round(y)}" width="${round(width)}"`
-      + ` height="${round(height)}" fill="${this.state.fillStyle}"/>`);
+    const { offsetX, offsetY } = this.state;
+    this.elements.push(`<rect x="${round(x + offsetX)}" y="${round(y + offsetY)}"`
+      + ` width="${round(width)}" height="${round(height)}" ${this.fillAttributes()}/>`);
   }
 
   fill() {
     if (!this.circle) return;
     this.elements.push(`<circle cx="${round(this.circle.x)}" cy="${round(this.circle.y)}"`
-      + ` r="${round(this.circle.radius)}" fill="${this.state.fillStyle}"/>`);
+      + ` r="${round(this.circle.radius)}" ${this.fillAttributes()}/>`);
   }
 
   stroke() {
@@ -117,7 +126,7 @@ export class SvgContext {
     const { weight, size, family } = parseFont(this.state.font);
     const { strokeStyle, lineWidth, lineJoin } = this.state;
     this.elements.push(`<text x="${round(x + this.state.offsetX)}" y="${round(y + this.state.offsetY)}"`
-      + ` fill="${this.state.fillStyle}" font-family="${escape(family)}" font-size="${round(size)}"`
+      + ` ${this.fillAttributes()} font-family="${escape(family)}" font-size="${round(size)}"`
       + ` font-weight="${weight}" text-anchor="${ANCHORS[this.state.textAlign] || 'start'}"`
       + (halo ? ` paint-order="stroke" stroke="${strokeStyle}" stroke-width="${round(lineWidth)}"`
         + ` stroke-linejoin="${lineJoin}"` : '')
