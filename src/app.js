@@ -45,9 +45,9 @@ const elements = {
 const EXAMPLE_FILE = '/showcase/red-supermercado-2023.pkt';
 const EXAMPLE_NAME = 'red-supermercado-2023.pkt';
 
-// El servidor sirve el visor en /demo (ver `_redirects`). Ahí no hay parámetro que leer:
-// la ruta sola vale como pedido de la red del showcase, y la dirección corta se queda
-// entera en la barra en vez de convertirse en la ruta del archivo.
+// Una ruta que no existe devuelve el index, así que el visor se sirve también en /demo.
+// Ahí no hay parámetro que leer: la ruta sola vale como pedido de la red del showcase, y
+// la dirección corta se queda entera en la barra en vez de convertirse en la del archivo.
 const DEMO_PATH = /^\/demo\/?$/;
 
 const state = {
