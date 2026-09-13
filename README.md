@@ -41,6 +41,8 @@ La interfaz está en inglés y en español. El selector vive en la cabecera y la
 
 Los textos están en `src/i18n.js`, un diccionario por idioma. Agregar uno es copiar el bloque y traducir las claves.
 
+Dos reglas que se revisan enfrentando los dos diccionarios: los marcadores tienen que ser los mismos en las dos cadenas, y **lo que va a la barra de estado no termina en punto**, sea un aviso o un error. Es una barra, no un párrafo, y tenerla mitad con punto y mitad sin él delata que las cadenas se escribieron de a una sin mirar el conjunto. Los párrafos de la pantalla inicial, las notas del diálogo y los avisos de lista vacía sí llevan punto, que ahí sí son prosa. Lo que queda igual en los dos idiomas está porque tiene que estarlo: `Router`, `Switch`, `IoT`, `EtherType`, `Bytes` y las cadenas que sólo son marcadores y unidades.
+
 ## De dónde salen las posiciones
 
 Del archivo. Cada dispositivo trae su X y su Y en `WORKSPACE/LOGICAL`, que son las que Packet Tracer guardó cuando alguien lo arrastró hasta ahí. El visor no reordena nada: sólo lleva ese rectángulo al que tenga a mano, con un estiramiento acotado para cuando las proporciones no coinciden.
@@ -113,7 +115,7 @@ El lienzo tiene un techo de dieciséis millones y pico de píxeles, que es lo qu
 
 ## Tema claro y oscuro
 
-Los colores viven en variables CSS y el tema claro reescribe los mismos nombres, así que el diagrama en pantalla y las exportaciones lo siguen sin enterarse. Cambiar de tema lanza un barrido de 880 ms: una franja inclinada con líneas de barrido entra desde un costado frenando, queda quieta un instante tapando la pantalla entera —ahí cambian los colores, sin que se vea el corte— y sale por el otro acelerando. Cada tramo lleva su curva; una sola para todo haría notar el frenado y el arranque como un tirón. El sobrante lateral se mide en `vmax` porque el sesgo corre los bordes tanto como la mitad del alto de la franja, y con un porcentaje del ancho una pantalla alta y angosta dejaría los vértices al descubierto.
+Los colores viven en variables CSS y el tema claro reescribe los mismos nombres, así que el diagrama en pantalla y las exportaciones lo siguen sin enterarse. Cambiar de tema lanza un barrido de 900 ms: una franja inclinada con líneas de barrido entra desde un costado frenando, queda quieta un instante tapando la pantalla entera —ahí cambian los colores, sin que se vea el corte— y sale por el otro acelerando. Cada tramo lleva su curva; una sola para todo haría notar el frenado y el arranque como un tirón. El sobrante lateral se mide en `vmax` porque el sesgo corre los bordes tanto como la mitad del alto de la franja, y con un porcentaje del ancho una pantalla alta y angosta dejaría los vértices al descubierto.
 
 El icono del botón espera a que la franja lo destape antes de transformarse: cambia justo cuando el barrido tapa la cabecera, y sin esa espera el sol y la luna se transformaban a la vista. El icono se dibuja desde esas mismas variables —el radio del disco, la posición del mordisco, la presencia de los rayos—, así que pasa de luna a sol animándose por el mismo camino que los colores, sin una sola regla que sepa qué tema está puesto. El oscuro es el de por omisión; el botón de la cabecera fija el otro y lo recuerda. Un guion en la cabecera aplica el tema y el idioma guardados antes del primer pintado, para que la página no arranque con lo predeterminado y salte al rato; va con hash en la política de seguridad, no con `unsafe-inline`. Los hilos del código T568B se oscurecen sobre fondo claro: un naranja pálido que funciona contra grafito desaparecería contra papel.
 
@@ -128,6 +130,8 @@ El visor reparte la red en un lienzo propio: el más chico donde todas las etiqu
 Es el mismo dibujo que la exportación, a menos píxeles: mismo reparto, mismos renglones, misma prueba de choque, los mismos cuerpos de letra. Lo único que no se puede igualar es el presupuesto, un panel de 800 px contra una imagen de 3840.
 
 Y los mismos márgenes, que hasta hace poco no. Abajo hay que reservar lo que el bloque de nombre y dirección alcanza cuando le toca el último renglón, y a los costados, la mitad de la etiqueta más ancha, medida y no supuesta. El visor tenía dos números fijos —noventa abajo, ciento veinte al costado— mientras la exportación reservaba lo que hacía falta, y con eso la dirección de los equipos de la fila de abajo se dibujaba fuera del lienzo: el SVG la recortaba, cinco píxeles en un panel de 768 × 349. Ahora los dos reservan lo mismo porque lo sacan del mismo lugar.
+
+Lo que mide cada etiqueta se guarda, porque la búsqueda del ancho lo pregunta una vez por candidato, pero se guarda **por medidor y no en un mapa suelto del módulo**. La diferencia no es cosmética: las tipografías llegan por la red y el primer dibujado del visor puede caer antes, midiendo con la alternativa. La condensada de IBM es hasta un 19 % más ancha que Arial Narrow en una dirección, así que esa medida vieja repartía la red para una letra que no es la que se ve. Compartiendo el mapa se le colaba además al exporte, que sí espera a que carguen: la red del showcase salía en 2722 unidades en vez de 3097, con una etiqueta rozando a otra. Y cuando las tipografías llegan, el visor mide de nuevo y rehace el reparto, con la misma prudencia que el observador de forma: sólo si nadie tocó la vista todavía.
 
 La prueba de choque de las etiquetas recorre los equipos de arriba abajo y compara cada uno sólo contra los que tiene cerca en vertical, no contra todos. Dos equipos separados por más de lo que alcanza un bloque más el radio del disco no pueden tocarse pase lo que pase, y ése es el corte. Importa porque la búsqueda del ancho repite esa prueba una vez por candidato, unas treinta veces: en una red de trescientos equipos la pasada bajó de 0,585 ms a 0,207. Lo que cada etiqueta mide, que no depende de dónde caiga, se calcula una sola vez por dispositivo en vez de una vez por candidato.
 
@@ -218,6 +222,8 @@ Sin dependencias ni paso de compilación. Para probarlo en local alcanza con ser
 ## Despliegue en Cloudflare Pages
 
 Sin comando de compilación, con la raíz del repositorio como directorio de salida. `_headers` define la política de seguridad de contenido: permite las fuentes de Google y bloquea todo lo demás.
+
+Lleva también `form-action 'none'`: el único formulario del sitio es el del diálogo de exportación, que nunca se envía a ningún lado —se atiende en el código y se cancela—, así que prohibirlo no cuesta nada y cierra la puerta.
 
 Esa política no lleva `unsafe-inline`, y eso alcanza a los atributos `style`: escribir uno desde el código se descarta en silencio. El retraso de entrada de cada dispositivo se escribe como propiedad, `node.style.setProperty`, que no pasa por esa puerta. El guion de la cabecera va con hash, así que **tocarlo obliga a recalcularlo**: es el `sha256-` del `script-src`.
 

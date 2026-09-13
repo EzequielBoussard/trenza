@@ -285,15 +285,24 @@ export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3
 
 /**
  * Lo que mide la etiqueta de un dispositivo no depende de dónde caiga: sale de su nombre,
- * de su primera dirección y del cuerpo de letra, que son fijos. La búsqueda del ancho llama
- * a `planLabels` una vez por candidato —treinta veces en una red típica—, así que sin esto
- * cada dispositivo aplana sus interfaces treinta veces para sacar siempre la misma
- * dirección. Los dispositivos salen de leer el archivo y nadie los toca después.
+ * de su primera dirección y del cuerpo de letra. La búsqueda del ancho llama a `planLabels`
+ * una vez por candidato —treinta veces en una red típica—, así que sin guardarlo cada
+ * dispositivo aplana sus interfaces treinta veces para sacar siempre la misma dirección.
+ *
+ * Lo guardado cuelga del medidor y no de un mapa suelto del módulo, y la diferencia no es
+ * cosmética: las tipografías llegan por la red, y un medidor creado antes de que lleguen
+ * mide con la alternativa. Compartiendo el mapa, esa medida vieja se le colaba al exporte,
+ * que sí espera a que carguen: la red del showcase salía repartida en 2722 unidades en vez
+ * de 3097, con una etiqueta rozando a otra. Cada medidor guarda lo suyo.
  */
-const labelBoxes = new WeakMap();
+function labelBox(device, measure) {
+  let boxes = measure.boxes;
+  if (!boxes) {
+    boxes = new WeakMap();
+    measure.boxes = boxes;
+  }
 
-function labelBox(device, { nameWidth, addressWidth }) {
-  let box = labelBoxes.get(device);
+  let box = boxes.get(device);
   if (box) return box;
 
   let address = '';
@@ -302,10 +311,10 @@ function labelBox(device, { nameWidth, addressWidth }) {
   }
 
   box = {
-    half: Math.max(nameWidth(device.name), address ? addressWidth(address) : 0) / 2,
+    half: Math.max(measure.nameWidth(device.name), address ? measure.addressWidth(address) : 0) / 2,
     bottom: address ? LABEL_GEOMETRY.addressBottom : LABEL_GEOMETRY.nameBottom,
   };
-  labelBoxes.set(device, box);
+  boxes.set(device, box);
   return box;
 }
 

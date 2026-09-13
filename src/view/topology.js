@@ -127,6 +127,27 @@ export class TopologyView {
     this.thread = null;
     this.measure = labelMeasurer();
     this.watchPanelShape();
+    this.watchFonts();
+  }
+
+  /**
+   * Las tipografías llegan por la red y el primer dibujado puede caer antes. Medir con la
+   * alternativa reparte la red para una letra que después no es la que se ve: la condensada
+   * de IBM es hasta un 19 % más ancha que Arial Narrow en una dirección, así que las
+   * etiquetas quedan más juntas de lo que necesitan y alguna termina rozando a su vecina.
+   * Cuando llegan se mide de nuevo, con la misma prudencia que el observador de forma:
+   * sólo si nadie tocó la vista todavía, que rehacer el reparto la mueve entera.
+   */
+  watchFonts() {
+    if (document.fonts.status === 'loaded') return;
+
+    document.fonts.ready.then(() => {
+      if (!this.last) return;
+      const { x, y, scale } = this.target;
+      if (x !== 0 || y !== 0 || scale !== 1) return;
+      this.measure = labelMeasurer();
+      this.render(this.last.model, { showInfrastructure: this.last.showInfrastructure });
+    });
   }
 
   /**
