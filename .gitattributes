@@ -1,0 +1,11 @@
+# Todo el texto se guarda y se saca con saltos de línea de Unix. No es cosmético: si
+# `_headers` llegara con retornos de carro, cada valor de cabecera terminaría con uno
+# pegado y la política de seguridad se rompería sin que nada lo avise.
+* text=auto eol=lf
+
+*.pkt binary
+*.pka binary
+*.pcap binary
+*.pcapng binary
+*.png binary
+*.ico binary
