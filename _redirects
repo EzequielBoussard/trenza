@@ -1,4 +1,8 @@
 # Una dirección corta y fija para la red del showcase, pensada para pegar en un currículum
-# o en un portafolio: abre el visor con esa red ya cargada. El nombre del archivo puede
-# cambiar sin que el enlace se rompa, que es justamente para lo que está el desvío.
-/demo  /?src=/showcase/Entrega%20Redes%20Ansian.pkt  302
+# o en un portafolio: abre el visor con esa red ya cargada.
+#
+# Va como reescritura (200) y no como desvío (302) para que la barra de direcciones se
+# quede con lo que la persona escribió. Con el desvío terminaba en /?src=/showcase/... con
+# el nombre del archivo escapado, que es la dirección que después queda en el historial y
+# en lo que se comparte. El visor reconoce la ruta y abre la red sin parámetro ninguno.
+/demo  /index.html  200

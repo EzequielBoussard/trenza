@@ -201,7 +201,7 @@ Para publicar una red, dejás el `.pkt` en una dirección accesible y compartís
 
 El visor no empaqueta archivos dentro del enlace. Un `.pkt` ya viene comprimido por dentro, así que codificado ocupa más de lo que aceptan los navegadores y la mensajería, y el resultado sería un enlace roto según por dónde se pegue. Para pasarle el archivo a alguien, se le pasa el archivo.
 
-**[`trenza.pages.dev/demo`](https://trenza.pages.dev/demo)** abre la red del showcase sin que haya que escribir el parámetro. Es un desvío de `_redirects`, que es lo que entiende Cloudflare Pages, y existe para tener una dirección corta y estable que pegar en un currículum o en un portafolio: si el archivo cambia de nombre, se cambia el desvío y el enlace sigue valiendo.
+**[`trenza.pages.dev/demo`](https://trenza.pages.dev/demo)** abre la red del showcase sin que haya que escribir el parámetro. Existe para tener una dirección corta y estable que pegar en un currículum o en un portafolio, y por eso es una reescritura de `_redirects` y no un desvío: Cloudflare Pages sirve el visor en esa ruta con código 200, la barra de direcciones se queda con lo que la persona escribió, y el visor reconoce la ruta y carga la red. Un desvío terminaba en `/?src=/showcase/…` con el nombre del archivo escapado, que es la dirección que después queda en el historial y en lo que se comparte. Si el archivo cambia de nombre se cambia la constante del visor y el enlace sigue valiendo.
 
 ## Marca e iconos
 

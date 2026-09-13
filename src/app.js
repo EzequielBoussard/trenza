@@ -42,8 +42,13 @@ const elements = {
   previewLensCanvas: document.querySelector('[data-preview-lens-canvas]'),
 };
 
-const EXAMPLE_FILE = './showcase/Entrega Redes Ansian.pkt';
-const EXAMPLE_NAME = 'Entrega Redes Ansian.pkt';
+const EXAMPLE_FILE = '/showcase/red-supermercado-2023.pkt';
+const EXAMPLE_NAME = 'red-supermercado-2023.pkt';
+
+// El servidor sirve el visor en /demo (ver `_redirects`). Ahí no hay parámetro que leer:
+// la ruta sola vale como pedido de la red del showcase, y la dirección corta se queda
+// entera en la barra en vez de convertirse en la ruta del archivo.
+const DEMO_PATH = /^\/demo\/?$/;
 
 const state = {
   file: null,
@@ -372,16 +377,18 @@ function wireFileInput() {
   elements.open.addEventListener('click', chooseFile);
   elements.openCopy.addEventListener('click', chooseFile);
 
-  elements.example.addEventListener('click', async () => {
-    setStatus('status.reading');
-    try {
-      const response = await fetch(EXAMPLE_FILE);
-      if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
-      await open(EXAMPLE_NAME, new Uint8Array(await response.arrayBuffer()));
-    } catch (error) {
-      showFailure(error.message);
-    }
-  });
+  elements.example.addEventListener('click', openExample);
+}
+
+async function openExample() {
+  setStatus('status.reading');
+  try {
+    const response = await fetch(EXAMPLE_FILE);
+    if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
+    await open(EXAMPLE_NAME, new Uint8Array(await response.arrayBuffer()));
+  } catch (error) {
+    showFailure(error.message);
+  }
 }
 
 function wireTheme() {
@@ -436,12 +443,16 @@ async function start() {
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 
+  let source = null;
   try {
-    const source = await readSourceFromLocation();
+    source = await readSourceFromLocation();
     if (source) await open(source.name, source.bytes);
   } catch (error) {
     setStatus('status.linkFailed', { reason: error.message }, 'error');
+    return;
   }
+  // Un `?src=` explícito manda: la ruta sólo abre el ejemplo cuando no se pidió otra cosa.
+  if (!source && DEMO_PATH.test(location.pathname)) await openExample();
 }
 
 start();
