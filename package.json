@@ -2,6 +2,7 @@
   "name": "trenza",
   "private": true,
   "description": "Visor de sólo lectura para archivos .pkt y .pka de Cisco Packet Tracer y para capturas .pcap y .pcapng. Todo se procesa en el navegador.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EzequielBoussard/trenza.git"

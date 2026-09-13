@@ -242,3 +242,9 @@ La tubería no cambió en todo ese rango. Comparando la misma red guardada con 8
 Un pcapng puede ser la concatenación de varias capturas, y cada sección abre con su propia cabecera: la numeración de interfaces vuelve a empezar y el orden de bytes puede ser otro. Sin reiniciar la lista en cada cabecera, los paquetes de la segunda sección se leían con el tipo de enlace y la resolución de tiempo de la primera.
 
 Ninguna lista de acceso salió de un archivo real: no hay una sola configurada en los catorce, así que esa parte está probada contra configuraciones armadas a mano y contra un `.pkt` de prueba con OSPF, listas y un router en un palo. Lo que el XML de 9.0.1 guarda en `ACL_IN_ID` y `ACL_OUT_ID` no se lee, y no por olvido: viene vacío en los catorce archivos, el puerto que lo lleva no guarda su nombre, y un número suelto sin interfaz al lado no nombra nada. La configuración sí dice las dos cosas.
+
+## Licencia
+
+MIT: está en `LICENSE`. Se puede usar, modificar y redistribuir, también en algo comercial, conservando el aviso de copyright.
+
+Eso alcanza al código de este repositorio y a nada más. El formato `.pkt`, los nombres de los equipos y la iconografía de Cisco son de Cisco; el proyecto no los distribuye, no reimplementa el simulador y sólo lee. La red de `showcase/` es un trabajo propio de curso, y está para que el botón de ejemplo tenga qué abrir.
