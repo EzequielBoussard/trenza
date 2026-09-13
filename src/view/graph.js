@@ -248,6 +248,23 @@ const CONDENSED = "'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-se
 export const LABEL_FONT = `600 ${LABEL_TYPE.nameSize}px ${CONDENSED}`;
 export const ADDRESS_FONT = `500 ${LABEL_TYPE.addressSize}px ${CONDENSED}`;
 
+/**
+ * `document.fonts.ready` promete que terminó lo que estaba cargando, no que esté cargada
+ * una familia que todavía nadie pidió. La condensada la usa el diagrama y nada más, así
+ * que un exporte lanzado antes de haber dibujado uno medía con la alternativa y repartía
+ * la red en 2722 unidades en vez de 3097, con una etiqueta rozando a otra. Pedirlas por
+ * nombre sí lo garantiza, y no cuesta nada cuando ya están. Si no llegan —sin red, o con
+ * la hoja de fuentes bloqueada— se mide con la alternativa, que es la que se va a ver.
+ */
+export async function labelFontsReady() {
+  if (!document.fonts) return;
+  try {
+    await Promise.all([document.fonts.load(LABEL_FONT), document.fonts.load(ADDRESS_FONT)]);
+  } catch {
+    // Sin la tipografía preferida se dibuja con la alternativa; medirla es lo correcto.
+  }
+}
+
 // Nombre y dirección son una sola pieza y se corren juntos: separarlos dejaba la dirección
 // flotando lejos de su nombre, sin que se supiera de quién era. Cuando el lugar de siempre
 // está ocupado, el bloque entero baja un renglón, lo justo para pasar por debajo del que ya

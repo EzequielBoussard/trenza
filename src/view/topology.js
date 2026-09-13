@@ -7,6 +7,7 @@ import {
   LABEL_TYPE,
   LEGEND_ENTRIES,
   halfLabelWidth,
+  labelFontsReady,
   partitionDevices,
   planLabels,
   LAYOUT_STRETCH,
@@ -139,9 +140,10 @@ export class TopologyView {
    * sólo si nadie tocó la vista todavía, que rehacer el reparto la mueve entera.
    */
   watchFonts() {
-    if (document.fonts.status === 'loaded') return;
-
-    document.fonts.ready.then(() => {
+    labelFontsReady().then(() => {
+      // Con las tipografías ya cargadas esto resuelve como microtarea, antes del primer
+      // dibujado —el constructor y `render` corren seguidos—, así que no hay nada que
+      // rehacer y se sale por acá. Sólo llega al final el caso que importa: llegaron tarde.
       if (!this.last) return;
       const { x, y, scale } = this.target;
       if (x !== 0 || y !== 0 || scale !== 1) return;

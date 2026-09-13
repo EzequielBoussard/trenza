@@ -12,6 +12,7 @@ import {
   LEGEND_ENTRIES,
   frameForNetwork,
   halfLabelWidth,
+  labelFontsReady,
   measureBounds,
   partitionDevices,
   planLabels,
@@ -551,7 +552,7 @@ function canvasSizeFor(format, size) {
  * diagrama se reparte en lo que queda y el marco se apoya en los bordes.
  */
 async function renderNetworkToCanvas(model, { showInfrastructure, format, size, transparent, title, palette, language, budget }) {
-  await document.fonts.ready;
+  await labelFontsReady();
 
   // Todo el dibujo va dentro de `withLanguage`: la leyenda y el pie se escriben en el
   // idioma pedido, y además su ancho entra en el cálculo del encuadre.
@@ -716,7 +717,7 @@ async function buildPdf(canvas, pointsPerPixel) {
 
 /** El SVG sale del tamaño natural del diagrama: escalarlo es tarea de quien lo abra. */
 async function buildSvg(model, { showInfrastructure, transparent, title, palette, language }) {
-  await document.fonts.ready;
+  await labelFontsReady();
 
   return withLanguage(language, () => {
     const plan = planExport(model, { showInfrastructure, pixels: null });
