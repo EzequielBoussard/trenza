@@ -315,6 +315,7 @@ async function open(name, bytes) {
   state.capture = null;
   delete document.body.dataset.view;
   elements.fileName.textContent = name;
+  refreshTitle();
   document.body.dataset.loaded = 'true';
   setStatus('status.reading');
 
@@ -322,6 +323,10 @@ async function open(name, bytes) {
     if (looksLikeCapture(name, bytes)) {
       showCapture(bytes);
     } else {
+      // Un `.pkt` sin `DecompressionStream` no se abre de ninguna manera, y lo que dice el
+      // navegador viejo —«Can't find variable»— no le sirve a nadie. Las capturas no lo
+      // necesitan, así que el aviso va acá adentro y no al arrancar.
+      if (typeof DecompressionStream !== 'function') throw new Error(t('error.oldBrowser'));
       await showNetwork(bytes);
     }
   } catch (error) {
@@ -399,11 +404,19 @@ function wireTheme() {
   });
 }
 
+// El nombre del archivo va primero en el título de la pestaña: con varias abiertas, y con
+// el enlace corto pegado en algún lado, «Trenza» a secas no distingue una solapa de otra.
+// `translateDocument` reescribe el título, así que esto se llama después de traducir.
+function refreshTitle() {
+  document.title = state.file ? `${state.file.name} · Trenza` : t('app.title');
+}
+
 function wireLanguage() {
   elements.language.value = getLanguage();
   elements.language.addEventListener('change', () => {
     setLanguage(elements.language.value);
     translateDocument();
+    refreshTitle();
 
     if (state.status.key) setStatus(state.status.key, state.status.values, state.status.tone);
     if (state.kind === 'network') paintNetwork();
@@ -425,7 +438,10 @@ function wireActions() {
     elements.rail.replaceChildren();
     elements.panel.replaceChildren();
     elements.fileInput.value = '';
-    history.replaceState(null, '', location.pathname);
+    // A la raíz y no a la ruta actual: en /demo, conservarla dejaba una dirección que al
+    // recargarse vuelve a abrir la red que se acaba de cerrar.
+    history.replaceState(null, '', '/');
+    refreshTitle();
     setStatus('status.idle');
   });
 

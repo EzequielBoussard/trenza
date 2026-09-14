@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-PRG2G5HdQCgydoZeoPjeABcVUK5Ot7c7BhRTXDOf2AE='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src *; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-PRG2G5HdQCgydoZeoPjeABcVUK5Ot7c7BhRTXDOf2AE='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   Cross-Origin-Opener-Policy: same-origin
@@ -8,6 +8,8 @@
 # El sitio no lleva huella en los nombres de archivo, así que el navegador tiene que
 # preguntar antes de reusar lo que guardó: si no, un despliegue nuevo tarda en verse.
 /
+  Cache-Control: no-cache
+/demo
   Cache-Control: no-cache
 /*.html
   Cache-Control: no-cache
