@@ -201,9 +201,13 @@ Para publicar una red, dejás el `.pkt` en una dirección accesible y compartís
 
 El visor no empaqueta archivos dentro del enlace. Un `.pkt` ya viene comprimido por dentro, así que codificado ocupa más de lo que aceptan los navegadores y la mensajería, y el resultado sería un enlace roto según por dónde se pegue. Para pasarle el archivo a alguien, se le pasa el archivo.
 
+**[`trenza.pages.dev/demo`](https://trenza.pages.dev/demo)** abre la red del showcase sin que haya que escribir el parámetro. Es un desvío de `_redirects`, que es lo que entiende Cloudflare Pages, y existe para tener una dirección corta y estable que pegar en un currículum o en un portafolio: si el archivo cambia de nombre, se cambia el desvío y el enlace sigue valiendo.
+
 ## Marca e iconos
 
 `logo.svg` es el original: una trenza sobre fondo oscuro, de 512 × 512, con el dibujo dentro de la zona segura. De ahí salió el juego de iconos de la raíz —`favicon.ico`, `favicon.svg`, `favicon-96x96.png`, `apple-touch-icon.png` y los dos del manifiesto—, generado con [realfavicongenerator.net](https://realfavicongenerator.net). Para rehacerlo, subí de nuevo `logo.svg` y reemplazá los archivos.
+
+Las direcciones de Open Graph van absolutas y no relativas. Quien lee esas etiquetas no es el navegador sino el robot de LinkedIn, de WhatsApp o de Slack, que no resuelve una ruta contra la página: con `/og-image.png` la tarjeta salía sin imagen, que es justo lo que se ve cuando alguien pega el enlace en un currículum. El manifiesto declara sus iconos como `any` y no como `any maskable`: los que hay tienen las esquinas ya redondeadas y un margen transparente, así que pedirle a Android que les aplique su propia máscara les recorta las esquinas dos veces.
 
 `og-image.png` es la tarjeta que se ve al compartir un enlace: 1200 × 630, que es la medida que esperan todas las redes, y con `summary_large_image` para que no la recorten a un cuadradito. Lleva sólo la marca —la trenza con sus dos hilos, el nombre, qué es y la dirección— sobre el fondo del tema oscuro, con los colores leídos de las mismas variables CSS que el resto. Antes apuntaba al icono cuadrado de 512, que en una tarjeta ancha sale recortado o con franjas.
 
