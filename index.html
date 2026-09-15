@@ -227,6 +227,30 @@
 <div class="dropveil" data-dropveil aria-hidden="true"><span data-i18n="intro.drop"></span></div>
 <div class="theme-sweep" data-theme-sweep aria-hidden="true"></div>
 
+<!-- Los veinte módulos que importa `app.js` se descubren recién cuando el navegador lee el
+     que los importa, así que se pedían en cascada: cuatro niveles de profundidad, un viaje de
+     ida y vuelta cada uno. Declarados acá se piden todos juntos desde la primera línea del
+     documento. Si alguno deja de importarse, sacarlo de esta lista. -->
+<link rel="modulepreload" href="/src/i18n.js">
+<link rel="modulepreload" href="/src/theme.js">
+<link rel="modulepreload" href="/src/download.js">
+<link rel="modulepreload" href="/src/share.js">
+<link rel="modulepreload" href="/src/pkt/decode.js">
+<link rel="modulepreload" href="/src/pkt/model.js">
+<link rel="modulepreload" href="/src/pkt/config.js">
+<link rel="modulepreload" href="/src/pkt/twofish.js">
+<link rel="modulepreload" href="/src/pkt/eax.js">
+<link rel="modulepreload" href="/src/pcap/decode.js">
+<link rel="modulepreload" href="/src/pcap/dissect.js">
+<link rel="modulepreload" href="/src/pcap/encode.js">
+<link rel="modulepreload" href="/src/view/topology.js">
+<link rel="modulepreload" href="/src/view/graph.js">
+<link rel="modulepreload" href="/src/view/inspector.js">
+<link rel="modulepreload" href="/src/view/packets.js">
+<link rel="modulepreload" href="/src/view/export.js">
+<link rel="modulepreload" href="/src/view/export-dialog.js">
+<link rel="modulepreload" href="/src/view/export-preview.js">
+<link rel="modulepreload" href="/src/view/svg-context.js">
 <script type="module" src="/src/app.js"></script>
 </body>
 </html>
