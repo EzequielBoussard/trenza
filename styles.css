@@ -94,6 +94,27 @@ body {
   outline-offset: 2px;
 }
 
+/* El primer tabulador salta la cabecera entera —abrir, exportar, cerrar, tema, idioma— y
+   cae en el visor. Está fuera de la pantalla hasta que recibe el foco: sólo le sirve a
+   quien navega con el teclado, y a ése le tiene que aparecer. */
+.skip {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  transform: translateY(-200%);
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  background: var(--orange);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip:focus { transform: translateY(0); }
+
+.workspace:focus { outline: none; }
+
 /* Cabecera */
 
 /* Mientras el guion de arranque no confirmó el idioma, el texto traducible espera
@@ -1096,9 +1117,14 @@ body[data-dragging] .dropveil { display: grid; }
    y el aviso para el teclado se dibuja dentro del diagrama. */
 .node:focus { outline: none; }
 .node:focus-visible .node__halo {
-  stroke: var(--text);
-  stroke-width: 2;
+  stroke: var(--orange);
+  stroke-width: 3;
 }
+
+/* Con una selección puesta, el resto de la red queda al 22 %. El equipo que tiene el foco
+   del teclado se muestra entero igual: si no, recorrer con las flechas es seguir un aro
+   naranja sobre un icono que casi no se ve. */
+.node:focus-visible.is-dimmed { opacity: 1; }
 
 .tray__rule {
   stroke: var(--line);

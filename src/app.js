@@ -469,6 +469,20 @@ async function start() {
   }
   // Un `?src=` explícito manda: la ruta sólo abre el ejemplo cuando no se pidió otra cosa.
   if (!source && DEMO_PATH.test(location.pathname)) await openExample();
+
+  keepOffline();
+}
+
+/**
+ * Guarda el visor para poder abrirlo sin conexión. Va al final de todo y no al principio:
+ * registrar el trabajador pone a bajar los veintitantos archivos otra vez, y hacerlo
+ * mientras la página todavía se está dibujando le saca ancho de banda a lo que se está
+ * mirando. Sin servicio de trabajadores —o en un origen inseguro— no pasa nada y el visor
+ * sigue andando igual, sólo que hace falta conexión.
+ */
+function keepOffline() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
 start();

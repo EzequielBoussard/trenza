@@ -17,6 +17,7 @@ const DICTIONARIES = {
     'action.cancel': 'Cancel',
     'action.language': 'Language',
     'action.theme': 'Switch theme',
+    'action.skip': 'Skip to the viewer',
     'theme.dark': 'Dark',
     'theme.light': 'Light',
 
@@ -264,6 +265,7 @@ const DICTIONARIES = {
     'action.cancel': 'Cancelar',
     'action.language': 'Idioma',
     'action.theme': 'Cambiar de tema',
+    'action.skip': 'Ir al visor',
     'theme.dark': 'Oscuro',
     'theme.light': 'Claro',
 

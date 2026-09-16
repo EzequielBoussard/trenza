@@ -52,6 +52,22 @@ const MAX_VIEW_ASPECT = 4.5;
 // medido en logaritmo para que ensanchar y angostar pesen igual. 0,12 son un 13 %.
 const RESHAPE_THRESHOLD = 0.12;
 
+// Las teclas que mueven el foco entre equipos, y cuánto se corre cada una en el recorrido.
+// Las cuatro flechas hacen lo mismo de a uno porque el orden es una fila: una red no tiene
+// filas ni columnas, así que «abajo» no significa nada distinto de «el siguiente».
+const ARROW_STEPS = {
+  ArrowRight: 1,
+  ArrowDown: 1,
+  ArrowLeft: -1,
+  ArrowUp: -1,
+  Home: -Infinity,
+  End: Infinity,
+};
+
+// Cuánto se deja libre entre el equipo enfocado y el borde del recuadro al traerlo a la
+// vista. Es lo que ocupa su etiqueta, para que no llegue pegada al filo ni cortada.
+const FOCUS_MARGIN = 80;
+
 // Márgenes del área de dibujo. Arriba alcanza con el halo del nodo. Abajo tiene que caber el
 // bloque de nombre y dirección en el último renglón al que puede bajar, que es lo que mide
 // `LABEL_REACH_BELOW`: con noventa, la etiqueta de un equipo de la fila de abajo se dibujaba
@@ -132,6 +148,8 @@ export class TopologyView {
     this.gliding = 0;
     this.selectedId = null;
     this.thread = null;
+    this.nodes = new Map();
+    this.order = [];
     this.measure = labelMeasurer();
     this.watchPanelShape();
     this.watchFonts();
@@ -221,10 +239,13 @@ export class TopologyView {
     this.aspect = this.panelAspect();
     const { width, height, positions, plan, tray, trayTop, side } = this.layoutFor(placed, stray, this.aspect);
 
+    // `group` y no `img`: un `img` se anuncia como una sola imagen y deja fuera del alcance
+    // del lector todo lo que tiene adentro, que acá son los equipos, uno por uno. La imagen
+    // exportada sí es `img`, porque ahí de verdad no hay nada que recorrer.
     const svg = element('svg', {
       viewBox: `0 0 ${width} ${height}`,
       class: 'topology',
-      role: 'img',
+      role: 'group',
       'aria-label': t('export.caption', {
         devices: countOf('devices', devices.length),
         links: countOf('links', links.length),
@@ -278,15 +299,23 @@ export class TopologyView {
       linkLayer.append(group);
     }
 
+    const nodes = new Map();
     devices.forEach((device, order) => {
       const position = positions.get(device.id);
+      const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
       const node = element('g', {
         class: `node node--${device.category}`,
         transform: `translate(${position.x} ${position.y})`,
         'data-id': device.id,
-        tabindex: '0',
+        // Un solo equipo entra en el recorrido del tabulador y las flechas mueven entre
+        // ellos: con setenta y uno, uno por parada son setenta y una pulsaciones para
+        // pasar de largo el diagrama y llegar al panel de al lado.
+        tabindex: '-1',
         role: 'button',
-        'aria-label': `${device.name}, ${t(`category.${device.category}`)}`,
+        'aria-pressed': 'false',
+        'aria-label': address
+          ? `${device.name}, ${t(`category.${device.category}`)}, ${address.address}`
+          : `${device.name}, ${t(`category.${device.category}`)}`,
       });
 
       // El retraso va por CSSOM y no como atributo `style`: la política de seguridad de
@@ -317,7 +346,6 @@ export class TopologyView {
       label.textContent = device.name;
       labels.append(label);
 
-      const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
       if (address) {
         const addressLabel = element('text', { class: 'node__address', y: LABEL_TYPE.addressBaseline, 'text-anchor': 'middle' });
         addressLabel.textContent = address.address;
@@ -331,11 +359,27 @@ export class TopologyView {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           select();
+          return;
         }
+        const step = ARROW_STEPS[event.key];
+        if (step === undefined) return;
+        event.preventDefault();
+        this.moveFocus(device.id, step);
       });
 
+      nodes.set(device.id, node);
       nodeLayer.append(node);
     });
+    this.nodes = nodes;
+
+    // El recorrido de las flechas es el de lectura: de arriba abajo y, a igual altura, de
+    // izquierda a derecha. El orden en que se dibujan es otro —primero los enlazados, después
+    // los apartados— y saltaría de un rincón al otro de la pantalla.
+    this.order = devices
+      .map((device) => ({ id: device.id, ...positions.get(device.id) }))
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+      .map((entry) => entry.id);
+    this.setTabStop(this.selectedId && this.order.includes(this.selectedId) ? this.selectedId : this.order[0]);
 
     scene.append(linkLayer, nodeLayer);
     svg.append(scene);
@@ -654,6 +698,52 @@ export class TopologyView {
     this.settle();
   }
 
+  /**
+   * Cuál de los equipos es la parada del tabulador. Uno solo la tiene; el resto se alcanza
+   * con las flechas. Sigue a la selección para que volver al diagrama desde otro control
+   * caiga sobre el equipo que se está mirando y no sobre el primero de la lista.
+   */
+  setTabStop(id) {
+    if (!this.nodes || !this.nodes.has(id)) return;
+    for (const [own, node] of this.nodes) node.setAttribute('tabindex', own === id ? '0' : '-1');
+  }
+
+  moveFocus(from, step) {
+    const at = this.order.indexOf(from);
+    if (at < 0) return;
+    const last = this.order.length - 1;
+    const to = step === Infinity ? last : step === -Infinity ? 0 : Math.min(last, Math.max(0, at + step));
+    const id = this.order[to];
+    this.setTabStop(id);
+    this.nodes.get(id).focus();
+    this.bringIntoView(id);
+  }
+
+  /**
+   * Con el diagrama acercado, el equipo que recibe el foco puede quedar fuera de lo que se
+   * ve. Acá no hay barra de desplazamiento que el navegador pueda mover —el zoom es una
+   * transformación— así que el encuadre se corre a mano, lo mínimo y sólo si hacía falta.
+   */
+  bringIntoView(id) {
+    const position = this.positions.get(id);
+    if (!position || !this.frame) return;
+
+    const { x, y, scale } = this.target;
+    const at = { x: position.x * scale + x, y: position.y * scale + y };
+    const shift = (value, limit) => {
+      if (value < FOCUS_MARGIN) return FOCUS_MARGIN - value;
+      if (value > limit - FOCUS_MARGIN) return limit - FOCUS_MARGIN - value;
+      return 0;
+    };
+
+    const dx = shift(at.x, this.frame.width);
+    const dy = shift(at.y, this.frame.height);
+    if (dx === 0 && dy === 0) return;
+
+    this.target = { x: x + dx, y: y + dy, scale };
+    this.glide();
+  }
+
   /** Selección hecha desde el diagrama: avisa al resto de la interfaz. */
   select(id) {
     this.focus(id);
@@ -684,9 +774,11 @@ export class TopologyView {
     for (const node of this.svg.querySelectorAll('.node')) {
       const own = node.dataset.id === id;
       node.classList.toggle('is-selected', own);
+      node.setAttribute('aria-pressed', String(own));
       node.classList.toggle('is-neighbour', !own && neighbours.has(node.dataset.id));
       node.classList.toggle('is-dimmed', !neighbours.has(node.dataset.id));
     }
+    this.setTabStop(id);
     this.svg.classList.add('has-selection');
   }
 
@@ -698,6 +790,7 @@ export class TopologyView {
     this.paintThread();
     for (const node of this.svg.querySelectorAll('.node')) {
       node.classList.remove('is-selected', 'is-neighbour', 'is-dimmed');
+      node.setAttribute('aria-pressed', 'false');
     }
   }
 }

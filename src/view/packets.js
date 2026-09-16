@@ -3,6 +3,18 @@ import { getLocale, t } from '../i18n.js';
 
 const PAGE_SIZE = 300;
 
+// Cuánto mueve cada tecla en la tabla. El salto de página es de veinte filas y no de la
+// tanda entera: con trescientas, `RePág` deja la fila enfocada donde ya no se ve de dónde
+// venía, que es lo mismo que perderse.
+const ROW_STEPS = {
+  ArrowDown: 1,
+  ArrowUp: -1,
+  PageDown: 20,
+  PageUp: -20,
+  Home: -Infinity,
+  End: Infinity,
+};
+
 /**
  * Las columnas de la tabla, en orden, con de dónde sale el valor por el que se ordena.
  * `text` marca las que se comparan como texto; el resto, como número.
@@ -103,6 +115,7 @@ export class PacketTableView {
     this.selected = new Set();
     this.anchor = null;
     this.sort = null;
+    this.rowPackets = new WeakMap();
     this.haystacks = null;
     this.matching = null;
     this.searched = '';
@@ -147,7 +160,9 @@ export class PacketTableView {
   paintSelection() {
     if (!this.body) return;
     for (const row of this.body.children) {
-      row.classList.toggle('is-selected', this.selected.has(Number(row.dataset.index)));
+      const chosen = this.selected.has(Number(row.dataset.index));
+      row.classList.toggle('is-selected', chosen);
+      row.setAttribute('aria-selected', String(chosen));
     }
   }
 
@@ -281,6 +296,7 @@ export class PacketTableView {
     });
     head.append(headRow);
     this.body = createElement('tbody');
+    this.body.addEventListener('keydown', (event) => this.navigate(event));
     table.append(head, this.body);
 
     const scroller = createElement('div', 'packet-scroller');
@@ -307,7 +323,12 @@ export class PacketTableView {
     for (const packet of slice) {
       const row = createElement('tr', 'packet-row');
       row.dataset.index = String(packet.index);
+      // Una sola fila entra en el recorrido del tabulador y las flechas mueven entre ellas.
+      // Con cien mil paquetes, una parada por fila deja la tabla sin salida.
+      row.tabIndex = -1;
       row.classList.toggle('is-selected', this.selected.has(packet.index));
+      row.setAttribute('aria-selected', String(this.selected.has(packet.index)));
+      this.rowPackets.set(row, packet);
       row.append(
         createElement('td', 'table__mono', String(packet.index)),
         createElement('td', 'table__mono', formatTime(packet.timestamp, this.origin)),
@@ -328,6 +349,51 @@ export class PacketTableView {
 
     this.body.append(fragment);
     this.rendered += slice.length;
+    if (!this.body.querySelector('[tabindex="0"]')) this.body.firstElementChild.tabIndex = 0;
+  }
+
+  /**
+   * El teclado en la tabla: las flechas mueven de fila, Entrar elige. Con Mayúsculas o
+   * Control, Entrar hace lo mismo que el clic —tomar el tramo, o sumar y quitar de a uno—
+   * porque `choose` lee esas teclas del evento y a un evento de teclado le sobran.
+   */
+  navigate(event) {
+    const row = event.target.closest('.packet-row');
+    if (!row) return;
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      const packet = this.rowPackets.get(row);
+      if (packet) this.choose(packet, event);
+      return;
+    }
+
+    const step = ROW_STEPS[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    this.moveRow(row, step);
+  }
+
+  moveRow(row, step) {
+    const rows = this.body.children;
+    let to = step === Infinity ? rows.length - 1
+      : step === -Infinity ? 0
+      : row.sectionRowIndex + step;
+
+    // Las filas se dibujan de a tandas al desplazarse; bajando con el teclado, la siguiente
+    // puede no existir todavía. `End` va a la última dibujada por la misma razón: armar
+    // cien mil filas de una para llegar al final congelaría la pantalla.
+    if (to >= rows.length) {
+      this.appendRows();
+      to = Math.min(to, rows.length - 1);
+    }
+
+    const next = rows[Math.max(0, to)];
+    if (!next || next === row) return;
+    row.tabIndex = -1;
+    next.tabIndex = 0;
+    next.focus();
+    next.scrollIntoView({ block: 'nearest' });
   }
 }
 
