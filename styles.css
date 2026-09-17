@@ -520,13 +520,18 @@ body[data-theme-sweep] .theme-icon__rays {
   font-size: 0.85rem;
 }
 
+/* Los formatos se reparten en una fila y bajan a la siguiente si no entran. Sin el salto,
+   en un teléfono de 360 px los cuatro pedían 291 y tenían 277: un botón no puede achicarse
+   por debajo de su propio texto, así que PDF se salía diecisiete píxeles del diálogo y
+   quedaba cortado contra el borde. */
 .choice {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
 }
 
 .choice__option {
-  flex: 1;
+  flex: 1 1 6rem;
   display: flex;
   align-items: center;
   justify-content: center;
