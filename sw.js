@@ -18,6 +18,14 @@ const SHELL = [
   '/favicon.svg',
   '/apple-touch-icon.png',
   '/showcase/red-supermercado-2023.pkt',
+  // Sólo las caras latinas: las extendidas se guardan solas si alguna vez hacen falta, y
+  // sin ellas el visor sin conexión igual se ve con su letra.
+  '/fonts/sans-latin.woff2',
+  '/fonts/condensed-500-latin.woff2',
+  '/fonts/condensed-600-latin.woff2',
+  '/fonts/condensed-700-latin.woff2',
+  '/fonts/mono-400-latin.woff2',
+  '/fonts/mono-500-latin.woff2',
   '/src/app.js',
   '/src/i18n.js',
   '/src/theme.js',

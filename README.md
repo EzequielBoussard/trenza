@@ -235,7 +235,7 @@ Sin dependencias ni paso de compilación. Para probarlo en local alcanza con ser
 
 ## Despliegue en Cloudflare Pages
 
-Sin comando de compilación, con la raíz del repositorio como directorio de salida. `_headers` define la política de seguridad de contenido: permite las fuentes de Google y bloquea todo lo demás.
+Sin comando de compilación, con la raíz del repositorio como directorio de salida. `_headers` define la política de seguridad de contenido: todo tiene que venir del mismo origen y lo demás está bloqueado. Desde que la tipografía se sirve desde acá, el sitio no pide un solo byte a otro dominio.
 
 Lleva también `form-action 'none'`: el único formulario del sitio es el del diálogo de exportación, que nunca se envía a ningún lado —se atiende en el código y se cancela—, así que prohibirlo no cuesta nada y cierra la puerta.
 
@@ -260,3 +260,5 @@ Ninguna lista de acceso salió de un archivo real: no hay una sola configurada e
 MIT: está en `LICENSE`. Se puede usar, modificar y redistribuir, también en algo comercial, conservando el aviso de copyright.
 
 Eso alcanza al código de este repositorio y a nada más. El formato `.pkt`, los nombres de los equipos y la iconografía de Cisco son de Cisco; el proyecto no los distribuye, no reimplementa el simulador y sólo lee. La red de `showcase/` es un trabajo propio de curso, y está para que el botón de ejemplo tenga qué abrir.
+
+La tipografía de `fonts/` es IBM Plex, de IBM, bajo la licencia SIL Open Font 1.1, que permite redistribuirla junto con el proyecto. El texto de esa licencia va al lado de los archivos, en `fonts/LICENSE.txt`.
