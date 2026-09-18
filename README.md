@@ -81,7 +81,7 @@ El diagrama tiene un tamaño natural: aquel donde ninguna etiqueta pisa a otra. 
 
 Con una medida fija, lo único que se elige es en cuántas unidades de diseño se reparte el dibujo. Arrancan en 2200 y son las mismas venga la salida de 1080 o de 4K, así que subir la resolución agranda nombres, direcciones e iconos en vez de sumar píxeles al mismo dibujo diminuto. Si con ese ancho alguna etiqueta se queda sin lugar, el diseño se ensancha hasta que entren todas, con tope en el ancho natural: una dirección a medias no sirve para nada, y el precio es cuerpo de letra, no información.
 
-En la red del showcase el diseño queda en 2686 unidades, que en 4K son nombres de 29 px y direcciones de 16 px, y en 2560 × 1440, de 19 y de 10.
+En la red del showcase el diseño queda en 2700 unidades, con las setenta y una etiquetas alineadas y ninguna rozando a otra, que en 4K son nombres de 28 px y direcciones de 16 px, y en 2560 × 1440, de 19 y de 10. Sin medida fija —el SVG, o «ajustar al diagrama»— el tamaño natural es de 3097 × 1383.
 
 Y como el marco casi nunca tiene la proporción de la red, ésta se estira hasta 1,75 veces en un eje antes que dejar franjas vacías: es un esquema, no un plano. En un 4K los cuatro márgenes quedan en unos 100 px sobre 3840.
 
@@ -125,7 +125,7 @@ Packet Tracer deja arrastrar un equipo a cualquier rincón del espacio de trabaj
 
 ## El diagrama en pantalla
 
-El visor reparte la red en un lienzo propio: el más chico donde todas las etiquetas tienen lugar limpio, entre 900 y 5200 unidades, con la proporción del panel. Después el SVG lo lleva al tamaño del panel y el zoom se mueve por dentro de un dibujo ya resuelto, así que acercarse sólo agranda: no aparece ni desaparece nada, ni se corre de sitio. La red del showcase pide unas 2700 unidades y hay que acercarse para leer las direcciones, pero las setenta y una etiquetas están dibujadas desde el primer cuadro.
+El visor reparte la red en un lienzo propio: el más chico donde todas las etiquetas tienen lugar limpio, entre 900 y 5200 unidades, con la proporción del panel. Después el SVG lo lleva al tamaño del panel y el zoom se mueve por dentro de un dibujo ya resuelto, así que acercarse sólo agranda: no aparece ni desaparece nada, ni se corre de sitio. La red del showcase pide unas 2450 unidades —el número exacto depende de la forma del panel— y hay que acercarse para leer las direcciones, pero las setenta y una etiquetas están dibujadas desde el primer cuadro.
 
 Es el mismo dibujo que la exportación, a menos píxeles: mismo reparto, mismos renglones, misma prueba de choque, los mismos cuerpos de letra. Lo único que no se puede igualar es el presupuesto, un panel de 800 px contra una imagen de 3840.
 
@@ -160,6 +160,18 @@ Al elegir un dispositivo, el diagrama queda en tres niveles: el elegido con aro 
 El aro crece en su lugar, y eso hubo que pedirlo: en SVG el origen de una transformación se resuelve por omisión contra el lienzo entero y no contra el elemento, así que `transform-origin: center` era el medio del diagrama. El aro de un equipo del borde estaba a ciento veintisiete píxeles de su nodo —invisible, porque hasta que se lo elige va en opacidad cero— y al elegirlo entraba volando desde ahí en vez de crecer donde estaba. Lo mismo el disco al aparecer. `transform-box: fill-box` hace que `center` sea el centro del propio círculo.
 
 Cada etiqueta lleva un contorno del color del fondo pintado debajo del relleno —`paint-order: stroke`—, así se lee aunque le pase por encima un cable o el aro del nodo elegido. El nombre del elegido no va en el color de acento justamente porque competiría con esos aros.
+
+## Teclado
+
+El diagrama y la tabla de paquetes se recorren con las flechas y ocupan una sola parada del tabulador cada uno. Es lo contrario de lo que sale por omisión —cada equipo y cada fila son elementos con foco propio—, y por omisión estaba mal: setenta y un equipos, o cien mil filas, a una parada cada uno dejan la región sin salida, y llegar al panel de al lado son setenta y una pulsaciones. Dentro, las flechas mueven de uno en uno en orden de lectura, `Inicio` y `Fin` van a los extremos, y `Entrar` elige. La parada sigue a la selección, así que volver al diagrama desde la lista cae sobre el equipo que se está mirando y no sobre el primero.
+
+En la tabla, `Entrar` con `Mayúsculas` toma el tramo y con `Control` suma o quita uno, igual que el clic: la función que elige lee esas teclas del evento, y un evento de teclado las trae. `RePág` y `AvPág` saltan veinte filas, y bajar más allá de lo dibujado dibuja la tanda siguiente, igual que desplazarse.
+
+Con el diagrama acercado, el equipo que recibe el foco puede quedar fuera de lo que se ve, y ahí no hay barra de desplazamiento que el navegador pueda mover porque el zoom es una transformación: el encuadre se corre a mano, lo mínimo y sólo si hacía falta.
+
+El primer tabulador de la página salta la cabecera entera y cae en el visor. Ese enlace está fuera de la pantalla hasta que recibe el foco.
+
+El SVG del diagrama se anuncia como grupo y no como imagen: un `role="img"` lo presenta como una sola figura y deja fuera del alcance del lector de pantalla los setenta y un equipos que tiene adentro. Cada uno es un botón con su nombre, su categoría y su dirección. La imagen exportada sí es una imagen, porque ahí de verdad no hay nada que recorrer.
 
 ## La cabecera
 
@@ -214,6 +226,24 @@ Las direcciones de Open Graph van absolutas y no relativas. Quien lee esas etiqu
 `og-image.png` es la tarjeta que se ve al compartir un enlace: 1200 × 630, que es la medida que esperan todas las redes, y con `summary_large_image` para que no la recorten a un cuadradito. Lleva sólo la marca —la trenza con sus dos hilos, el nombre, qué es y la dirección— sobre el fondo del tema oscuro, con los colores leídos de las mismas variables CSS que el resto. Antes apuntaba al icono cuadrado de 512, que en una tarjeta ancha sale recortado o con franjas.
 
 Los colores están medidos: el texto a 4,5:1 o más y los trazos a 3:1 o más contra el fondo más desfavorable de cada tema.
+
+## Sin conexión
+
+El visor no le pide nada a ningún servidor salvo sus propios archivos, así que una vez visitado abre sin conexión: `sw.js` guarda el visor entero —los veinte módulos, la hoja de estilo, los iconos, las tipografías latinas y la red del showcase— y responde de lo guardado cuando la red falla.
+
+La estrategia es red primero y caché de respaldo, no al revés. Los archivos no llevan huella en el nombre y el sitio los manda con `no-cache`, así que servir de la caché de entrada dejaría a la gente con una versión vieja y sin forma de enterarse. Así, con conexión siempre se ve lo último; sin conexión, lo último que se vio. Una dirección que no está guardada —`/demo`, por ejemplo— igual abre el visor, que es lo mismo que hace el servidor.
+
+## Tipografía
+
+IBM Plex, servida desde el propio sitio y no desde Google: son las doce caras latinas de la licencia OFL, en `fonts/`, declaradas al principio de `styles.css`. Tres razones. El navegador deja de abrir dos conexiones a otro dominio antes de poder dibujar nada. Sin conexión el diagrama conserva su letra, y con ella sus medidas, que son las que decidieron el reparto. Y nadie que abra el visor le avisa a un tercero que lo abrió.
+
+Son los mismos archivos que servía Google, verificado midiendo: el ancho de un nombre en condensada de 15 da 128,49 unidades en los dos casos, así que el reparto no se movió. IBM Plex Sans viene como tipografía variable —un solo archivo cubre de 400 a 600— y la condensada y la monoespaciada traen uno por peso. Van con caché de un año porque el nombre del archivo lleva la familia, el peso y el subconjunto: ese archivo no cambia nunca.
+
+## Cuánto tarda en abrir
+
+Los veinte módulos se declaran con `modulepreload` en la cabecera. Sin eso el navegador los descubre recién al leer el que los importa, y se piden en cascada: cuatro niveles de profundidad, un viaje de ida y vuelta cada uno. Declarados, se piden todos juntos desde la primera línea del documento, y el DOM queda listo en 464 ms en vez de 1154. Hay un script que compara esa lista contra el grafo real de importaciones, porque una lista que se queda atrás no avisa.
+
+Descifrar el `.pkt` de 110 kB del showcase son 29 ms: las cuatro capas juntas, incluido Twofish escrito a mano.
 
 ## Navegadores
 
