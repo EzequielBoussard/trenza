@@ -199,7 +199,13 @@ export class PacketTableView {
   sortByColumn(index) {
     const same = this.sort && this.sort.column === index;
     this.sort = same && this.sort.descending ? null : { column: index, descending: Boolean(same) };
+
+    // `draw` rehace la tabla entera, encabezados incluidos, así que el botón que se acaba de
+    // pulsar deja de existir y el foco se cae al documento. Con el teclado eso obliga a
+    // volver con el tabulador desde el principio de la página para ordenar dos veces.
+    const focused = this.container.contains(document.activeElement);
     this.refresh();
+    if (focused) this.container.querySelectorAll('thead button')[index].focus();
   }
 
   /**
@@ -273,6 +279,12 @@ export class PacketTableView {
     this.container.replaceChildren();
 
     const table = createElement('table', 'table table--packets');
+    // Rejilla y no tabla común: en una tabla común el renglón no admite `aria-selected` y el
+    // lector de pantalla no lo dice, así que la selección quedaba sólo en el color. Con
+    // `grid`, las celdas pasan solas a `gridcell` y el recorrido con las flechas es el que
+    // el lector espera.
+    table.setAttribute('role', 'grid');
+    table.setAttribute('aria-multiselectable', 'true');
     const head = createElement('thead');
     const headRow = createElement('tr');
 

@@ -49,6 +49,14 @@ const SHELL = [
   '/src/view/svg-context.js',
 ];
 
+// Sólo se guarda lo propio. Lo de afuera es el `.pkt` que alguien abre con `?src=`: es un
+// archivo ajeno, que no tiene por qué quedarse en la máquina de quien lo miró una vez, y que
+// sin conexión no se puede volver a mirar de todos modos. Además llegaría opaco, o sea que
+// un error de red se guardaría igual que un archivo bueno.
+function isOwn(request) {
+  return request.method === 'GET' && new URL(request.url).origin === self.location.origin;
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
@@ -57,23 +65,29 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
+      .then(() => caches.open(CACHE))
+      // El nombre de la caché no lleva versión, así que nada la vacía sola: lo que se guardó
+      // alguna vez sigue ahí para siempre. Quien abrió el visor cuando la tipografía venía de
+      // Google arrastra siete archivos de otro dominio que ya nadie pide. Se van acá.
+      .then((cache) => cache.keys().then((saved) => Promise.all(
+        saved.filter((request) => !isOwn(request)).map((request) => cache.delete(request)),
+      )))
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET') return;
+  if (!isOwn(request)) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Las tipografías vienen de otro dominio y llegan opacas; guardarlas igual es lo que
-        // hace que sin conexión el diagrama no cambie de letra. Lo que no responde bien no
-        // se guarda: una página de error pisaría el archivo bueno que ya estaba.
-        if (response.ok || response.type === 'opaque') {
+        // Se guarda la respuesta entera y buena, nada más: una página de error pisaría el
+        // archivo bueno que ya estaba, y con una parcial `put` tira una excepción.
+        if (response.status === 200) {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {}));
         }
         return response;
       })

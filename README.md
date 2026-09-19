@@ -165,7 +165,9 @@ Cada etiqueta lleva un contorno del color del fondo pintado debajo del relleno �
 
 El diagrama y la tabla de paquetes se recorren con las flechas y ocupan una sola parada del tabulador cada uno. Es lo contrario de lo que sale por omisión —cada equipo y cada fila son elementos con foco propio—, y por omisión estaba mal: setenta y un equipos, o cien mil filas, a una parada cada uno dejan la región sin salida, y llegar al panel de al lado son setenta y una pulsaciones. Dentro, las flechas mueven de uno en uno en orden de lectura, `Inicio` y `Fin` van a los extremos, y `Entrar` elige. La parada sigue a la selección, así que volver al diagrama desde la lista cae sobre el equipo que se está mirando y no sobre el primero.
 
-En la tabla, `Entrar` con `Mayúsculas` toma el tramo y con `Control` suma o quita uno, igual que el clic: la función que elige lee esas teclas del evento, y un evento de teclado las trae. `RePág` y `AvPág` saltan veinte filas, y bajar más allá de lo dibujado dibuja la tanda siguiente, igual que desplazarse.
+En la tabla, `Entrar` con `Mayúsculas` toma el tramo y con `Control` suma o quita uno, igual que el clic: la función que elige lee esas teclas del evento, y un evento de teclado las trae. `RePág` y `AvPág` saltan veinte filas, y bajar más allá de lo dibujado dibuja la tanda siguiente, igual que desplazarse. `Fin` va al final de lo dibujado, que es hasta donde llega también la barra de desplazamiento: en una captura de cien mil paquetes las filas aparecen de a trescientas y no existe un final antes de pedirlo.
+
+La tabla se anuncia como rejilla. En una tabla común el renglón no admite `aria-selected`, así que el lector de pantalla no decía qué estaba elegido y la selección quedaba sólo en el color. Y ordenar por una columna rehace la tabla entera, encabezados incluidos: el botón recién pulsado deja de existir y el foco se caía al documento, lo que con el teclado obliga a volver con el tabulador desde el principio de la página para ordenar dos veces seguidas. Ahora el foco vuelve al encabezado, y sólo si estaba adentro.
 
 Con el diagrama acercado, el equipo que recibe el foco puede quedar fuera de lo que se ve, y ahí no hay barra de desplazamiento que el navegador pueda mover porque el zoom es una transformación: el encuadre se corre a mano, lo mínimo y sólo si hacía falta.
 
@@ -232,6 +234,8 @@ Los colores están medidos: el texto a 4,5:1 o más y los trazos a 3:1 o más co
 El visor no le pide nada a ningún servidor salvo sus propios archivos, así que una vez visitado abre sin conexión: `sw.js` guarda el visor entero —los veinte módulos, la hoja de estilo, los iconos, las tipografías latinas y la red del showcase— y responde de lo guardado cuando la red falla.
 
 La estrategia es red primero y caché de respaldo, no al revés. Los archivos no llevan huella en el nombre y el sitio los manda con `no-cache`, así que servir de la caché de entrada dejaría a la gente con una versión vieja y sin forma de enterarse. Así, con conexión siempre se ve lo último; sin conexión, lo último que se vio. Una dirección que no está guardada —`/demo`, por ejemplo— igual abre el visor, que es lo mismo que hace el servidor.
+
+Sólo se guarda lo del propio sitio. El `.pkt` que alguien abre con `?src=` es un archivo ajeno: no tiene por qué quedarse en la máquina de quien lo miró una vez, y sin conexión no se puede volver a mirar de todos modos. Como el nombre de la caché no lleva versión, nada la vacía sola, así que al activarse el trabajador borra lo que no sea del sitio: quien abrió el visor cuando la tipografía venía de Google arrastraba siete archivos de otro dominio que ya nadie pide.
 
 ## Tipografía
 
