@@ -277,6 +277,10 @@ Esa política no lleva `unsafe-inline`, y eso alcanza a los atributos `style`: e
 
 Un servidor estático cualquiera sirve para desarrollar, pero no manda esas cabeceras, así que lo que dependa de ellas no se ve hasta desplegar. Para probarlo antes hay que servir la carpeta mandando lo que dice `_headers`.
 
+El visor se manda con `no-cache` porque ningún nombre de archivo lleva huella: el navegador tiene que preguntar antes de reusar lo que guardó, o un despliegue nuevo tarda en verse. Las excepciones son las que no cambian. La tipografía va un año, porque el nombre lleva familia, peso y subconjunto. Los iconos y la red del showcase van un día: Pages los manda con `must-revalidate` y sin esto cada visita paga una vuelta al servidor por cada uno para que le contesten 304, con la red del showcase justo en la ruta que está en el currículum.
+
+Sin JavaScript no hay visor —el descifrado, el reparto y el dibujo pasan todos acá— y como el texto lo pone el diccionario, la página salía en blanco con los botones puestos, que parece rota en vez de no soportada. Ahora hay un aviso en los dos idiomas. Está escrito visible y se esconde cuando el guion de la cabecera deja su marca en el documento: al revés, un guion que no corre —que es justo el caso— dejaría el aviso escondido.
+
 ## Estado
 
 Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1, 8.2.1 y 9.0.1** —catorce redes, de tres a setenta y dos equipos, con VLAN, troncos, rutas estáticas y RIP—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.

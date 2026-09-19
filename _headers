@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-PRG2G5HdQCgydoZeoPjeABcVUK5Ot7c7BhRTXDOf2AE='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-gtwiS0xyy1B+Rfd3W6xo1A1GtA6Zm7Mly7fqKU6EKHY='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   Cross-Origin-Opener-Policy: same-origin
@@ -24,3 +24,17 @@
 # subconjunto, así que un archivo dado no cambia nunca. Cambiar de pesos cambia de nombres.
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Los iconos y la red del showcase tampoco llevan huella, pero no cambian de una semana a la
+# otra. Sin esto Pages los manda con `must-revalidate` y cada visita paga una vuelta al
+# servidor por cada uno para que le contesten 304; la red del showcase son 110 kB que además
+# se piden en la ruta del currículum. Un día de desfasaje en un icono no le cuesta nada a
+# nadie, y el visor en sí sigue revalidándose siempre.
+/*.png
+  Cache-Control: public, max-age=86400
+/*.svg
+  Cache-Control: public, max-age=86400
+/*.ico
+  Cache-Control: public, max-age=86400
+/showcase/*
+  Cache-Control: public, max-age=86400

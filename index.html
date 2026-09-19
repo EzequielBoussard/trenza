@@ -39,7 +39,7 @@
      una dirección como /demo/algo buscaría la hoja de estilo y el módulo un nivel adentro
      y se comería el index en su lugar. -->
 <link rel="stylesheet" href="/styles.css">
-<script>try{var d=document.documentElement,t=localStorage.getItem('trenza.theme'),l=localStorage.getItem('trenza.language');if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);}catch(e){}</script>
+<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),l=localStorage.getItem('trenza.language');if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);}catch(e){}</script>
 </head>
 <body>
 
@@ -176,6 +176,15 @@
 </dialog>
 
 <main class="workspace" id="workspace" tabindex="-1">
+
+  <!-- Sin JavaScript el visor no hace nada, y como todo el texto lo pone el diccionario, la
+       página salía en blanco con los botones puestos: parecía rota en vez de no soportada.
+       El guion de la cabecera marca el documento y la hoja de estilo esconde esto en cuanto
+       aparece la marca; escrito al revés, un guion bloqueado dejaría el aviso escondido. -->
+  <section class="nojs">
+    <p lang="en">Trenza runs entirely in the browser, so it needs JavaScript. Nothing is uploaded anywhere: the file is read on your own machine.</p>
+    <p lang="es">Trenza corre entero en el navegador, así que necesita JavaScript. No se sube nada a ningún lado: el archivo se lee en tu propia máquina.</p>
+  </section>
 
   <section class="intro">
     <div class="intro__grid">

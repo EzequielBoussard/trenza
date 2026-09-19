@@ -883,6 +883,26 @@ body:not([data-loaded]) .workspace {
 
 /* Pantalla inicial */
 
+/* El aviso se escribe visible y se esconde cuando el guion de la cabecera deja su marca: si
+   se hiciera al revés, un guion que no corre —que es justo el caso— lo dejaría escondido. */
+.nojs {
+  display: grid;
+  align-content: safe center;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: clamp(1.5rem, 5vw, 4rem);
+  max-width: 44rem;
+  margin: 0 auto;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+[data-js] .nojs,
+html:not([data-js]) .masthead__actions,
+html:not([data-js]) .intro {
+  display: none;
+}
+
 .intro {
   display: grid;
   align-content: safe center;
