@@ -1674,6 +1674,12 @@ body[data-dragging] .dropveil { display: grid; }
     min-height: 44px;
   }
 
+  /* El de icono es cuadrado y sólo le crecía el alto: quedaba en 32 de ancho, por debajo del
+     piso que se le pide a todo lo demás. */
+  .icon-button {
+    min-width: 44px;
+  }
+
   .intro__actions {
     display: grid;
     grid-template-columns: 1fr 1fr;

@@ -460,17 +460,35 @@ async function start() {
   setStatus('status.idle');
 
   let source = null;
+  // Un enlace roto no puede llevarse puesto lo que viene después: con un `return` acá, la
+  // visita que llegaba con un `?src=` caído se quedaba sin trabajador de servicio y sin
+  // poder recibir el archivo con el que la lanzó el sistema.
   try {
     source = await readSourceFromLocation();
     if (source) await open(source.name, source.bytes);
+    // Un `?src=` explícito manda: la ruta sólo abre el ejemplo cuando no se pidió otra cosa.
+    if (!source && DEMO_PATH.test(location.pathname)) await openExample();
   } catch (error) {
     setStatus('status.linkFailed', { reason: error.message }, 'error');
-    return;
   }
-  // Un `?src=` explícito manda: la ruta sólo abre el ejemplo cuando no se pidió otra cosa.
-  if (!source && DEMO_PATH.test(location.pathname)) await openExample();
 
+  acceptLaunchedFiles();
   keepOffline();
+}
+
+/**
+ * Instalado, el visor queda anotado en el sistema para los `.pkt` y las capturas, y abrir uno
+ * desde el escritorio lo lanza con el archivo en la cola. El manifiesto pide reusar la ventana
+ * que ya esté abierta, así que el archivo llega por acá y no por la dirección. Donde no existe
+ * la cola —que es todo lo que no sea Chromium de escritorio— no se instala nada y el visor
+ * abre igual desde el botón.
+ */
+function acceptLaunchedFiles() {
+  if (!('launchQueue' in window)) return;
+  window.launchQueue.setConsumer(async ({ files }) => {
+    const [handle] = files ?? [];
+    if (handle) await openFile(await handle.getFile());
+  });
 }
 
 /**

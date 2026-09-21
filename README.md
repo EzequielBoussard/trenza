@@ -223,7 +223,7 @@ De ahí sale una regla para el resto del sitio: las rutas propias del documento 
 
 `logo.svg` es el original: una trenza sobre fondo oscuro, de 512 × 512, con el dibujo dentro de la zona segura. De ahí salió el juego de iconos de la raíz —`favicon.ico`, `favicon.svg`, `favicon-96x96.png`, `apple-touch-icon.png` y los dos del manifiesto—, generado con [realfavicongenerator.net](https://realfavicongenerator.net). Para rehacerlo, subí de nuevo `logo.svg` y reemplazá los archivos.
 
-Las direcciones de Open Graph van absolutas y no relativas. Quien lee esas etiquetas no es el navegador sino el robot de LinkedIn, de WhatsApp o de Slack, que no resuelve una ruta contra la página: con `/og-image.png` la tarjeta salía sin imagen, que es justo lo que se ve cuando alguien pega el enlace en un currículum. El manifiesto declara sus iconos como `any` y no como `any maskable`: los que hay tienen las esquinas ya redondeadas y un margen transparente, así que pedirle a Android que les aplique su propia máscara les recorta las esquinas dos veces.
+Las direcciones de Open Graph van absolutas y no relativas. Quien lee esas etiquetas no es el navegador sino el robot de LinkedIn, de WhatsApp o de Slack, que no resuelve una ruta contra la página: con `/og-image.png` la tarjeta salía sin imagen, que es justo lo que se ve cuando alguien pega el enlace en un currículum. El manifiesto declara dos juegos. Los de `any` son los redondeados de siempre. Los de `maskable` son los mismos con las cuatro esquinas apoyadas sobre el fondo del propio icono, `#151a22`: una máscara adaptativa recorta el cuadrado con la forma que use el lanzador, así que un icono con las esquinas transparentes se ve con huecos, y declarar los redondeados como `maskable` los recortaría dos veces. El dibujo ya entra en la zona segura —el punto más lejano queda a 186 de los 205 que da el círculo—, así que alcanza con rellenar. El fondo tiene que ser el del icono y no el de la página: con `#0f1218` se veía el contorno del cuadrado redondeado que quedaba debajo.
 
 `og-image.png` es la tarjeta que se ve al compartir un enlace: 1200 × 630, que es la medida que esperan todas las redes, y con `summary_large_image` para que no la recorten a un cuadradito. Lleva sólo la marca —la trenza con sus dos hilos, el nombre, qué es y la dirección— sobre el fondo del tema oscuro, con los colores leídos de las mismas variables CSS que el resto. Antes apuntaba al icono cuadrado de 512, que en una tarjeta ancha sale recortado o con franjas.
 
@@ -236,6 +236,14 @@ El visor no le pide nada a ningún servidor salvo sus propios archivos, así que
 La estrategia es red primero y caché de respaldo, no al revés. Los archivos no llevan huella en el nombre y el sitio los manda con `no-cache`, así que servir de la caché de entrada dejaría a la gente con una versión vieja y sin forma de enterarse. Así, con conexión siempre se ve lo último; sin conexión, lo último que se vio. Una dirección que no está guardada —`/demo`, por ejemplo— igual abre el visor, que es lo mismo que hace el servidor.
 
 Sólo se guarda lo del propio sitio. El `.pkt` que alguien abre con `?src=` es un archivo ajeno: no tiene por qué quedarse en la máquina de quien lo miró una vez, y sin conexión no se puede volver a mirar de todos modos. Como el nombre de la caché no lleva versión, nada la vacía sola, así que al activarse el trabajador borra lo que no sea del sitio: quien abrió el visor cuando la tipografía venía de Google arrastraba siete archivos de otro dominio que ya nadie pide.
+
+## Instalar
+
+Cumple lo que pide un navegador para ofrecer la instalación: HTTPS, manifiesto con nombre, iconos de 192 y 512, `start_url`, `display: standalone`, y un trabajador de servicio que atiende `fetch`. Instalado abre en su propia ventana, con su icono y sin barra de direcciones, y sigue andando sin conexión.
+
+El manifiesto lleva además dos cosas que sólo sirven instalado. Un atajo a `/demo`, que aparece al mantener apretado el icono. Y `file_handlers`, que anota el visor en el sistema para `.pkt`, `.pka`, `.pcap`, `.pcapng` y `.cap`: abrir uno desde el escritorio lo lanza con el archivo en la cola, que `app.js` atiende con `launchQueue`. `launch_handler` pide reusar la ventana abierta, así que el archivo llega por la cola y no por la dirección. Donde no existe la cola no se registra nada y el visor abre igual desde el botón.
+
+Eso último está sin verificar contra una instalación real: hace falta Chromium de escritorio con la aplicación instalada, y el navegador de pruebas no instala nada.
 
 ## Tipografía
 
