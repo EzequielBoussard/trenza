@@ -62,8 +62,7 @@ test('lee las interfaces con su dirección, su descripción y si están apagadas
 });
 
 test('las VLAN declaradas en el árbol valen aunque la configuración no las nombre', () => {
-  // Un switch configurado desde la interfaz de Packet Tracer no escribe bloques `vlan` en
-  // la running-config: el número y el nombre sólo están en el XML del dispositivo.
+  // Configurado desde la interfaz gráfica: las VLAN sólo están en el XML.
   const config = ['!', 'interface FastEthernet0/1', ' switchport access vlan 10', '!'];
   const declared = [
     { id: '1', name: 'default' },
@@ -231,7 +230,7 @@ test('lee los protocolos de enrutamiento con sus redes y sus interfaces pasivas'
 });
 
 test('un bloque de protocolo vacío igual cuenta: el equipo lo tiene activado', () => {
-  // Es lo que escribe Packet Tracer cuando alguien entra a `router rip` y sale sin más.
+  // `router rip` sin ninguna sentencia.
   const [rip] = readRoutingProtocols(['!', 'router rip', '!', 'ip classless', '!']);
 
   assert.equal(rip.protocol, 'RIP');

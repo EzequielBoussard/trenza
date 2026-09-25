@@ -1,16 +1,8 @@
-// El visor no le pide nada a ningún servidor salvo sus propios archivos: todo lo que hace
-// —descifrar, repartir, exportar— pasa en la máquina de quien lo abre. Con esto, una vez
-// visitado anda sin conexión, que es lo que cabe esperar de algo que se puede instalar.
-//
-// La estrategia es red primero y caché de respaldo, no al revés. Los archivos no llevan
-// huella en el nombre y el sitio los sirve con `no-cache`, así que servir de la caché de
-// entrada dejaría a la gente con una versión vieja hasta vaya a saber cuándo. Así, con
-// conexión siempre se ve lo último; sin conexión, lo último que se vio.
+// Red primero, caché de respaldo. Los nombres de archivo no llevan hash y el sitio se sirve
+// con no-cache, así que servir primero de la caché dejaría versiones viejas.
 const CACHE = 'trenza';
 
-// Lo que hace falta para abrir sin haber estado nunca sin conexión antes. Va la red del
-// showcase también: es el enlace corto que se comparte, y abrirlo y que no haya nada sería
-// peor que no abrir. Si un módulo deja de importarse desde `app.js`, sacarlo de acá.
+// Tiene que coincidir con el grafo de imports de app.js (y con los modulepreload del index).
 const SHELL = [
   '/',
   '/styles.css',
@@ -18,8 +10,7 @@ const SHELL = [
   '/favicon.svg',
   '/apple-touch-icon.png',
   '/showcase/red-supermercado-2023.pkt',
-  // Sólo las caras latinas: las extendidas se guardan solas si alguna vez hacen falta, y
-  // sin ellas el visor sin conexión igual se ve con su letra.
+  // Sólo el subconjunto latino; latin-ext se guarda si alguna vez se pide.
   '/fonts/sans-latin.woff2',
   '/fonts/condensed-500-latin.woff2',
   '/fonts/condensed-600-latin.woff2',
@@ -49,10 +40,8 @@ const SHELL = [
   '/src/view/svg-context.js',
 ];
 
-// Sólo se guarda lo propio. Lo de afuera es el `.pkt` que alguien abre con `?src=`: es un
-// archivo ajeno, que no tiene por qué quedarse en la máquina de quien lo miró una vez, y que
-// sin conexión no se puede volver a mirar de todos modos. Además llegaría opaco, o sea que
-// un error de red se guardaría igual que un archivo bueno.
+// Sólo se cachea el propio origen. Lo ajeno es el .pkt de ?src=, que no tiene por qué
+// quedar guardado en la máquina.
 function isOwn(request) {
   return request.method === 'GET' && new URL(request.url).origin === self.location.origin;
 }
@@ -66,9 +55,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
       .then(() => caches.open(CACHE))
-      // El nombre de la caché no lleva versión, así que nada la vacía sola: lo que se guardó
-      // alguna vez sigue ahí para siempre. Quien abrió el visor cuando la tipografía venía de
-      // Google arrastra siete archivos de otro dominio que ya nadie pide. Se van acá.
+      // La caché no tiene versión, así que lo ajeno que haya quedado de antes se borra acá.
       .then((cache) => cache.keys().then((saved) => Promise.all(
         saved.filter((request) => !isOwn(request)).map((request) => cache.delete(request)),
       )))
@@ -83,8 +70,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Se guarda la respuesta entera y buena, nada más: una página de error pisaría el
-        // archivo bueno que ya estaba, y con una parcial `put` tira una excepción.
+        // Sólo 200: un error pisaría la copia buena y con un 206 `put` lanza.
         if (response.status === 200) {
           const copy = response.clone();
           event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {}));
@@ -93,8 +79,7 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => caches.match(request).then((hit) => {
         if (hit) return hit;
-        // Una dirección que no está guardada —`/demo`, por ejemplo— igual abre el visor: es
-        // lo mismo que hace el servidor, que devuelve el index para toda ruta que no existe.
+        // Igual que el servidor: cualquier ruta de navegación devuelve el index.
         if (request.mode === 'navigate') return caches.match('/');
         return Response.error();
       })),

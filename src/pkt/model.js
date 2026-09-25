@@ -13,7 +13,7 @@ const DEVICE_CATEGORIES = [
   { match: /\bmcu|\bsbc|\biot|sensor|actuator|smart/i, category: 'iot' },
 ];
 
-// Los límites de palabra importan: sin ellos «TabletPC» cae en infraestructura por «table».
+// Con \b, para que "TabletPC" no caiga en infraestructura por "table".
 const INFRASTRUCTURE = /power distribution|coaxial splitter|\b(rack|shelf|table)\b/i;
 
 function childText(parent, tagName) {
@@ -23,7 +23,6 @@ function childText(parent, tagName) {
   return '';
 }
 
-/** El primero con ese nombre, o nada. Casi todas las etiquetas del árbol son únicas. */
 function childNamed(parent, tagName) {
   for (const child of parent.children) {
     if (child.tagName === tagName) return child;
@@ -31,8 +30,6 @@ function childNamed(parent, tagName) {
   return null;
 }
 
-// De una pasada, sin copiar antes la lista entera de hijos: el nodo de un dispositivo tiene
-// decenas y esto se pregunta varias veces por cada uno.
 function childrenNamed(parent, tagName) {
   const found = [];
   for (const child of parent.children) {
@@ -50,11 +47,8 @@ function classify(typeText, modelText) {
   return 'other';
 }
 
-/**
- * La base de VLAN que el dispositivo guarda en el árbol, con su número y su nombre. Es la
- * única fuente cuando el switch se configuró desde la interfaz de Packet Tracer, que no
- * escribe nada de esto en la `running-config`.
- */
+// Si el switch se configuró desde la interfaz gráfica, las VLAN sólo están en el XML y no
+// en la running-config.
 function vlansFromEngine(engine) {
   const declared = childNamed(engine, 'VLANS');
   if (!declared) return [];
@@ -99,8 +93,7 @@ function readDevice(deviceNode) {
     ? childrenNamed(configNode, 'LINE').map((line) => line.textContent.replace(/\r/g, ''))
     : [];
 
-  // Se parsean todas las interfaces, no sólo las que llevan dirección: un puerto de acceso
-  // sin IP no dice nada por sí solo, pero es el que dice qué VLAN vive en ese cable.
+  // Todas, también las que no tienen IP: un puerto de acceso dice a qué VLAN pertenece.
   const configured = readInterfaces(configLines);
   const namedInterfaces = configured.filter((entry) => entry.addresses.length > 0 || entry.description);
   const workspace = childNamed(deviceNode, 'WORKSPACE');
@@ -140,10 +133,6 @@ function readLink(linkNode) {
   };
 }
 
-/**
- * Traduce el XML interno de Packet Tracer al modelo que consume la interfaz:
- * dispositivos con posición y direcciones, y los enlaces que los unen.
- */
 export function buildNetworkModel(xmlText) {
   const document = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (document.querySelector('parsererror')) {

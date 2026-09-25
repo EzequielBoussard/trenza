@@ -21,24 +21,25 @@ const DICTIONARIES = {
     'theme.dark': 'Dark',
     'theme.light': 'Light',
 
-    'intro.eyebrow': 'Local viewer',
-    'intro.title': 'See the network without installing anything',
-    'intro.lead': 'Drop a {pkt} or {pka} file to see the topology, the interfaces and the configuration of every device. Drop a {pcap} or {pcapng} to walk through the packets layer by layer.',
+    'intro.title': 'Viewer for Packet Tracer files and network captures',
+    'intro.lead': 'Open a {pkt} or {pka} file to see the topology, interfaces and configuration of each device, or a {pcap} or {pcapng} file to go through the packets. The file is read in your browser and is not uploaded anywhere.',
     'intro.choose': 'Choose a file',
-    'intro.example': 'See an example',
-    'intro.hint': 'You can also drag the file anywhere on this page.',
+    'intro.example': 'Open the example',
+    'intro.hint': 'You can also drag the file onto the page.',
     'intro.drop': 'Drop the file to open it',
+    'intro.shotAlt': 'Part of the example network: a router, a server, two camera switches and the IP cameras connected to them, each with its name and address.',
+    'intro.shotCaption': 'The example is a supermarket network designed in 2023: 71 devices, with IP cameras and Wi-Fi.',
 
-    'about.title': 'What is this for',
-    'about.pktTerm': 'A .pkt file is a network built in Cisco Packet Tracer',
-    'about.pktBody': 'It is what students hand in for a networking course: devices, cabling and the configuration of each one. Opening it normally means installing Packet Tracer and signing in to a Cisco account. Here you drop it and see it.',
-    'about.pcapTerm': 'A .pcap file is recorded network traffic',
-    'about.pcapBody': 'Wireshark, tcpdump and the simulation mode of Packet Tracer all produce them. Each entry is one packet, with its addresses, its protocol and its bytes.',
-    'about.privacyTerm': 'Nothing is uploaded',
-    'about.privacyBody': 'The decoding runs in your browser. The file never leaves your machine, and there is no server holding a copy.',
-    'about.limitsTerm': 'It only reads',
-    'about.limitsBody': 'You cannot edit, simulate or run anything: for that you still need Packet Tracer. What you can do is look, search, and take it with you: the diagram as an image, the capture as CSV or pcap.',
-    'about.madeBy': 'Built by',
+    'about.pktTerm': '.pkt and .pka',
+    'about.pktBody': 'Networks built in Cisco Packet Tracer. Opening one usually requires installing Packet Tracer and signing in with a Cisco account.',
+    'about.pcapTerm': '.pcap and .pcapng',
+    'about.pcapBody': 'Traffic recorded with Wireshark, tcpdump or the simulation mode of Packet Tracer.',
+    'about.privacyTerm': 'Privacy',
+    'about.privacyBody': 'Decryption runs in the browser. There is no server that receives the file.',
+    'about.limitsTerm': 'Read only',
+    'about.limitsBody': 'It does not edit or simulate. The diagram can be exported as PNG, JPG, SVG or PDF, and the capture as CSV or pcap.',
+    'about.madeBy': 'Made by',
+    'about.disclaimer': 'Trenza is an independent project, not affiliated with or endorsed by Cisco. Cisco and Packet Tracer are trademarks of Cisco Systems, Inc.',
 
     'status.idle': 'No file open',
     'status.reading': 'Reading the file…',
@@ -269,24 +270,25 @@ const DICTIONARIES = {
     'theme.dark': 'Oscuro',
     'theme.light': 'Claro',
 
-    'intro.eyebrow': 'Visor local',
-    'intro.title': 'Mirá la red sin instalar nada',
-    'intro.lead': 'Soltá un archivo {pkt} o {pka} para ver la topología, las interfaces y la configuración de cada equipo. Soltá un {pcap} o {pcapng} para recorrer los paquetes capa por capa.',
+    'intro.title': 'Visor de archivos de Packet Tracer y capturas de red',
+    'intro.lead': 'Abrí un {pkt} o {pka} para ver la topología, las interfaces y la configuración de cada equipo, o un {pcap} o {pcapng} para recorrer los paquetes. El archivo se lee en el navegador y no se sube a ningún servidor.',
     'intro.choose': 'Elegir un archivo',
-    'intro.example': 'Ver un ejemplo',
-    'intro.hint': 'También podés arrastrar el archivo a cualquier parte de esta página.',
+    'intro.example': 'Abrir el ejemplo',
+    'intro.hint': 'También podés arrastrar el archivo a la página.',
     'intro.drop': 'Soltá el archivo para abrirlo',
+    'intro.shotAlt': 'Parte de la red de ejemplo: un router, un servidor, dos switches de cámaras y las cámaras IP conectadas a ellos, cada una con su nombre y su dirección.',
+    'intro.shotCaption': 'El ejemplo es la red de un supermercado diseñada en 2023: 71 equipos, con cámaras IP y Wi-Fi.',
 
-    'about.title': 'Para qué sirve',
-    'about.pktTerm': 'Un archivo .pkt es una red armada en Cisco Packet Tracer',
-    'about.pktBody': 'Es lo que se entrega en un curso de redes: los equipos, el cableado y la configuración de cada uno. Abrirlo normalmente exige instalar Packet Tracer y entrar con una cuenta de Cisco. Acá lo soltás y lo ves.',
-    'about.pcapTerm': 'Un archivo .pcap es tráfico de red grabado',
-    'about.pcapBody': 'Lo producen Wireshark, tcpdump y el modo simulación del propio Packet Tracer. Cada entrada es un paquete, con sus direcciones, su protocolo y sus bytes.',
-    'about.privacyTerm': 'No se sube nada',
-    'about.privacyBody': 'El descifrado corre en tu navegador. El archivo nunca sale de tu equipo y no hay servidor que se quede con una copia.',
-    'about.limitsTerm': 'Sólo lee',
-    'about.limitsBody': 'No podés editar, simular ni ejecutar: para eso sigue haciendo falta Packet Tracer. Lo que sí podés es mirar, buscar y llevártelo: el diagrama como imagen, la captura como CSV o pcap.',
+    'about.pktTerm': '.pkt y .pka',
+    'about.pktBody': 'Redes armadas en Cisco Packet Tracer. Para abrir una normalmente hay que instalar Packet Tracer y entrar con una cuenta de Cisco.',
+    'about.pcapTerm': '.pcap y .pcapng',
+    'about.pcapBody': 'Tráfico grabado con Wireshark, tcpdump o el modo simulación de Packet Tracer.',
+    'about.privacyTerm': 'Privacidad',
+    'about.privacyBody': 'El descifrado corre en el navegador. No hay un servidor que reciba el archivo.',
+    'about.limitsTerm': 'Sólo lectura',
+    'about.limitsBody': 'No edita ni simula. El diagrama se exporta como PNG, JPG, SVG o PDF, y la captura como CSV o pcap.',
     'about.madeBy': 'Hecho por',
+    'about.disclaimer': 'Trenza es un proyecto independiente, sin relación con Cisco ni respaldo de su parte. Cisco y Packet Tracer son marcas registradas de Cisco Systems, Inc.',
 
     'status.idle': 'Ningún archivo abierto',
     'status.reading': 'Procesando el archivo…',
@@ -529,15 +531,12 @@ export function setLanguage(language) {
   try {
     localStorage.setItem(STORAGE_KEY, language);
   } catch {
-    // Sin almacenamiento disponible el idioma dura lo que dure la pestaña.
+    // Sin almacenamiento el idioma dura lo que la pestaña.
   }
 }
 
-/**
- * Corre `write` como si el idioma elegido fuera otro, y deja el de la página como estaba.
- * Es lo que permite exportar en español mirando el visor en inglés. Sólo envuelve trabajo
- * sincrónico: si cediera el turno, el resto de la página se dibujaría en el idioma prestado.
- */
+// Corre `write` con otro idioma y restaura el anterior. `write` tiene que ser sincrónico:
+// si cediera el turno, el resto de la página se dibujaría en el idioma prestado.
 export function withLanguage(language, write) {
   if (!DICTIONARIES[language] || language === current) return write();
 
@@ -550,7 +549,6 @@ export function withLanguage(language, write) {
   }
 }
 
-// Las reglas de plural son un objeto caro de construir y no dependen más que del idioma.
 const pluralRules = new Map();
 
 function pluralFor(locale, count) {
@@ -562,13 +560,8 @@ function pluralFor(locale, count) {
   return rules.select(count);
 }
 
-/**
- * Las plantillas partidas en literales y nombres, `['', 'source', ' → ', 'destination', '']`.
- * Interpolar con una expresión regular y una función de reemplazo cuesta lo suyo, y son
- * siempre las mismas cinco o seis plantillas: en una captura de cien mil paquetes eran cien
- * mil pasadas de la misma expresión sobre el mismo texto, 53 ms por cada línea de resumen.
- * Hay una entrada por cadena del diccionario que lleve marcadores, así que el mapa no crece.
- */
+// Plantillas ya partidas en literales y nombres: interpolar con regex en cada resumen
+// costaba 53 ms en una captura de 100k paquetes.
 const templates = new Map();
 
 function fill(text, values) {
@@ -587,10 +580,7 @@ function fill(text, values) {
   return filled;
 }
 
-/**
- * Traduce una clave. Si se pasa `count`, primero se busca la variante de plural que
- * corresponde al idioma, para no terminar escribiendo «1 paquetes».
- */
+// Con `count` busca primero la variante de plural del idioma (clave#one, clave#other).
 export function t(key, values) {
   const dictionary = DICTIONARIES[current];
   let resolved = key;
@@ -609,7 +599,6 @@ export function countOf(unit, count) {
   return t(`unit.${unit}`, { count });
 }
 
-/** Aplica las traducciones al marcado estático marcado con atributos data-i18n. */
 export function translateDocument(root = document) {
   for (const node of root.querySelectorAll('[data-i18n]')) {
     node.textContent = t(node.dataset.i18n);
@@ -627,6 +616,9 @@ export function translateDocument(root = document) {
   }
   for (const node of root.querySelectorAll('[data-i18n-label]')) {
     node.setAttribute('aria-label', t(node.dataset.i18nLabel));
+  }
+  for (const node of root.querySelectorAll('[data-i18n-alt]')) {
+    node.alt = t(node.dataset.i18nAlt);
   }
   document.documentElement.lang = current;
   delete document.documentElement.dataset.translating;

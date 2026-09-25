@@ -21,7 +21,6 @@ const elements = {
   reset: document.querySelector('[data-reset]'),
   open: document.querySelector('[data-open]'),
   openCopy: document.querySelector('[data-open-copy]'),
-  example: document.querySelector('[data-example]'),
   themeToggle: document.querySelector('[data-theme-toggle]'),
   sizeField: document.querySelector('[data-size-field]'),
   sizeLabel: document.querySelector('[data-size-label]'),
@@ -45,9 +44,7 @@ const elements = {
 const EXAMPLE_FILE = '/showcase/red-supermercado-2023.pkt';
 const EXAMPLE_NAME = 'red-supermercado-2023.pkt';
 
-// Una ruta que no existe devuelve el index, así que el visor se sirve también en /demo.
-// Ahí no hay parámetro que leer: la ruta sola vale como pedido de la red del showcase, y
-// la dirección corta se queda entera en la barra en vez de convertirse en la del archivo.
+// Pages devuelve el index para cualquier ruta, así que /demo llega acá y abre el ejemplo.
 const DEMO_PATH = /^\/demo\/?$/;
 
 const state = {
@@ -66,8 +63,7 @@ const state = {
   status: { key: 'status.idle', values: null, tone: 'info' },
 };
 
-// Un valor { key } se traduce al pintar, no al guardarse: así el mensaje sigue al
-// idioma cuando se cambia con un archivo ya abierto.
+// Los valores { key } se traducen al pintar, para que el mensaje siga al cambio de idioma.
 function resolveValues(values) {
   if (!values) return values;
   return Object.fromEntries(
@@ -190,11 +186,7 @@ function showNetworkSummary() {
   });
 }
 
-/**
- * Vacía la escena. El visor de topología se da de baja antes: sigue escuchando el tamaño
- * de su recuadro, y si se lo sacan de debajo sin avisarle vuelve a dibujar sobre lo que
- * haya quedado en su lugar.
- */
+// La vista de topología se destruye antes: si no, su ResizeObserver vuelve a dibujar encima.
 function clearStage() {
   if (state.topology) state.topology.destroy();
   state.topology = null;
@@ -269,10 +261,6 @@ function paintCapture() {
   showPacketSelection(state.packetTable.getSelection(), null);
 }
 
-/**
- * Un paquete elegido muestra su desglose; varios, un resumen del tramo. Ninguno,
- * el de la captura entera.
- */
 function showPacketSelection(selection, last) {
   state.packetSelection = selection.map((packet) => packet.index);
 
@@ -293,9 +281,7 @@ function showCapture(bytes) {
 
   paintCapture();
 
-  // Una captura cortada a la mitad no es un error: los paquetes enteros que trae valen.
-  // Pero hay que decirlo, porque si el corte llegó antes del primer paquete la pantalla
-  // dice «0 paquetes» y parece que el visor no supo leer el archivo.
+  // Una captura truncada se muestra igual, pero con aviso.
   const { packets, container, truncated } = state.capture;
   const values = { packets: { key: 'unit.packets', values: { count: packets.length } }, container };
 
@@ -323,9 +309,7 @@ async function open(name, bytes) {
     if (looksLikeCapture(name, bytes)) {
       showCapture(bytes);
     } else {
-      // Un `.pkt` sin `DecompressionStream` no se abre de ninguna manera, y lo que dice el
-      // navegador viejo —«Can't find variable»— no le sirve a nadie. Las capturas no lo
-      // necesitan, así que el aviso va acá adentro y no al arrancar.
+      // Sólo el .pkt necesita DecompressionStream; las capturas abren igual.
       if (typeof DecompressionStream !== 'function') throw new Error(t('error.oldBrowser'));
       await showNetwork(bytes);
     }
@@ -353,8 +337,7 @@ async function openFile(file) {
 function wireFileInput() {
   elements.fileInput.addEventListener('change', () => {
     const [file] = elements.fileInput.files;
-    // El campo se vacía enseguida: si conserva la ruta, volver a elegir el mismo
-    // archivo no dispara ningún evento y la pantalla se queda con el error anterior.
+    // Si no se vacía, elegir el mismo archivo otra vez no dispara `change`.
     elements.fileInput.value = '';
     if (file) openFile(file);
   });
@@ -382,7 +365,15 @@ function wireFileInput() {
   elements.open.addEventListener('click', chooseFile);
   elements.openCopy.addEventListener('click', chooseFile);
 
-  elements.example.addEventListener('click', openExample);
+  // La imagen de la portada es un enlace a /demo (sirve para abrir en otra pestaña); el
+  // clic común abre el ejemplo sin recargar.
+  for (const trigger of document.querySelectorAll('[data-example]')) {
+    trigger.addEventListener('click', (event) => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+      event.preventDefault();
+      openExample();
+    });
+  }
 }
 
 async function openExample() {
@@ -404,9 +395,7 @@ function wireTheme() {
   });
 }
 
-// El nombre del archivo va primero en el título de la pestaña: con varias abiertas, y con
-// el enlace corto pegado en algún lado, «Trenza» a secas no distingue una solapa de otra.
-// `translateDocument` reescribe el título, así que esto se llama después de traducir.
+// Se llama después de translateDocument, que pisa el título.
 function refreshTitle() {
   document.title = state.file ? `${state.file.name} · Trenza` : t('app.title');
 }
@@ -438,8 +427,7 @@ function wireActions() {
     elements.rail.replaceChildren();
     elements.panel.replaceChildren();
     elements.fileInput.value = '';
-    // A la raíz y no a la ruta actual: en /demo, conservarla dejaba una dirección que al
-    // recargarse vuelve a abrir la red que se acaba de cerrar.
+    // A la raíz: si quedara /demo, recargar volvería a abrir el ejemplo.
     history.replaceState(null, '', '/');
     refreshTitle();
     setStatus('status.idle');
@@ -460,13 +448,9 @@ async function start() {
   setStatus('status.idle');
 
   let source = null;
-  // Un enlace roto no puede llevarse puesto lo que viene después: con un `return` acá, la
-  // visita que llegaba con un `?src=` caído se quedaba sin trabajador de servicio y sin
-  // poder recibir el archivo con el que la lanzó el sistema.
   try {
     source = await readSourceFromLocation();
     if (source) await open(source.name, source.bytes);
-    // Un `?src=` explícito manda: la ruta sólo abre el ejemplo cuando no se pidió otra cosa.
     if (!source && DEMO_PATH.test(location.pathname)) await openExample();
   } catch (error) {
     setStatus('status.linkFailed', { reason: error.message }, 'error');
@@ -476,13 +460,8 @@ async function start() {
   keepOffline();
 }
 
-/**
- * Instalado, el visor queda anotado en el sistema para los `.pkt` y las capturas, y abrir uno
- * desde el escritorio lo lanza con el archivo en la cola. El manifiesto pide reusar la ventana
- * que ya esté abierta, así que el archivo llega por acá y no por la dirección. Donde no existe
- * la cola —que es todo lo que no sea Chromium de escritorio— no se instala nada y el visor
- * abre igual desde el botón.
- */
+// Instalado como PWA, abrir un .pkt desde el sistema lo manda por launchQueue
+// (file_handlers en el manifiesto). Sólo Chromium de escritorio lo soporta.
 function acceptLaunchedFiles() {
   if (!('launchQueue' in window)) return;
   window.launchQueue.setConsumer(async ({ files }) => {
@@ -491,13 +470,7 @@ function acceptLaunchedFiles() {
   });
 }
 
-/**
- * Guarda el visor para poder abrirlo sin conexión. Va al final de todo y no al principio:
- * registrar el trabajador pone a bajar los veintitantos archivos otra vez, y hacerlo
- * mientras la página todavía se está dibujando le saca ancho de banda a lo que se está
- * mirando. Sin servicio de trabajadores —o en un origen inseguro— no pasa nada y el visor
- * sigue andando igual, sólo que hace falta conexión.
- */
+// Se registra al final para que la descarga del shell no compita con la carga inicial.
 function keepOffline() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('/sw.js').catch(() => {});

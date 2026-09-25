@@ -15,7 +15,6 @@ import {
 
 const CAPTURE_NOTES = { csv: 'export.csvNote', pcap: 'export.pcapNote' };
 
-/** Lo que el diálogo tiene cargado en este momento, listo para pedir la exportación. */
 function requestFrom(elements, state) {
   const fields = elements.exportForm.elements;
   return {
@@ -29,8 +28,7 @@ function requestFrom(elements, state) {
   };
 }
 
-// Una medida en la que el diagrama quedaría ilegible no se ofrece, y punto: una
-// opción tachada con su explicación es ruido que nadie va a elegir igual.
+// Las medidas ilegibles no se ofrecen; no se muestran deshabilitadas.
 function updateSizeOptions(elements, state) {
   const format = elements.exportForm.elements.format.value;
   const paper = format === 'pdf';
@@ -46,8 +44,7 @@ function updateSizeOptions(elements, state) {
     return option;
   }));
 
-  // Cambiar de tema o de idioma vuelve a pasar por acá; si la medida elegida sigue
-  // estando, se respeta en vez de saltar sola a la preferida.
+  // Si la medida elegida sigue disponible se respeta.
   const preferred = paper ? DEFAULT_PAPER : DEFAULT_RESOLUTION;
   const wanted = [chosen, preferred].find((name) => offered.includes(name));
   select.value = wanted ?? offered[0];
@@ -60,11 +57,7 @@ function updateScopeOptions(elements, state) {
   elements.exportForm.elements.scope.value = state.packetSelection.length > 0 ? 'selection' : 'all';
 }
 
-/**
- * Cada tipo de archivo ofrece sus formatos: de una captura no sale un diagrama, y de una
- * topología no sale una tabla de paquetes. Lo que no aplica se esconde entero, sin dejar
- * un campo apagado al lado explicando por qué no se puede tocar.
- */
+// Lo que no aplica al tipo de archivo o al formato se esconde, no se deshabilita.
 function updateFormatFields(elements, state, preview) {
   const capture = state.kind === 'capture';
 
@@ -82,8 +75,6 @@ function updateFormatFields(elements, state, preview) {
   elements.sizeField.hidden = capture || vector;
   if (!capture && !vector) updateSizeOptions(elements, state);
 
-  // El idioma alcanza a todo lo que lleve texto; el tema, sólo a lo que se dibuja. Un
-  // pcap no tiene ni una cosa ni la otra.
   elements.languageField.hidden = format === 'pcap';
   elements.themeField.hidden = capture;
   elements.scopeField.hidden = !capture || state.packetSelection.length === 0;
@@ -98,15 +89,13 @@ function updateFormatFields(elements, state, preview) {
   else preview.stop();
 }
 
-/** Vuelca la captura, entera o sólo el tramo elegido, a un formato que lea cualquiera. */
 function exportCapture(state, setStatus, { name, format, scope, language }) {
   const packets = scope === 'selection' && state.packetSelection.length > 0
     ? state.packetTable.getSelection()
     : state.packets;
 
   const origin = state.packets.length > 0 ? state.packets[0].timestamp : 0;
-  // Sólo el CSV lleva texto, y va en el idioma elegido para exportar; el aviso de abajo
-  // es del visor y se queda en el suyo.
+  // El CSV va en el idioma del exporte; el aviso de estado, en el del visor.
   const { blob, written } = format === 'csv'
     ? { blob: withLanguage(language, () => toCsv(packets, { origin })), written: packets.length }
     : toPcap(packets);
@@ -123,7 +112,6 @@ function exportCapture(state, setStatus, { name, format, scope, language }) {
 async function exportDiagram(state, setStatus, request) {
   try {
     const result = await exportNetwork(state.model, request);
-    // Ni un vector ni una hoja se miden en píxeles; informarlos así haría creerlo.
     const message = VECTOR_FORMATS.includes(request.format) ? 'status.exportedVector'
       : result.paper ? 'status.exportedPaper'
         : request.format === 'pdf' ? 'status.exportedPlain'
@@ -142,7 +130,6 @@ async function exportDiagram(state, setStatus, request) {
   }
 }
 
-/** Conecta el diálogo de exportación con el archivo abierto. */
 export function wireExportDialog({ elements, state, setStatus }) {
   const preview = createExportPreview({
     frame: elements.previewFrame,
@@ -156,7 +143,7 @@ export function wireExportDialog({ elements, state, setStatus }) {
     if (!state.kind) return;
     const fields = elements.exportForm.elements;
     fields.name.value = suggestExportName(state.file.name);
-    // El diálogo abre con lo que el usuario está mirando; cambiarlo acá no toca el visor.
+    // Arranca con el idioma y el tema del visor; cambiarlos acá no toca el visor.
     fields.language.value = getLanguage();
     fields.theme.value = currentTheme();
     if (state.kind === 'capture') updateScopeOptions(elements, state);

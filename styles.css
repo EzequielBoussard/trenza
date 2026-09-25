@@ -1,9 +1,4 @@
-/* IBM Plex servida desde el propio sitio y no desde Google. Tres razones: el navegador deja
-   de abrir dos conexiones a otro dominio antes de poder dibujar nada; sin conexión el diagrama
-   conserva su letra —y con ella sus medidas, que son las que decidieron el reparto—; y nadie
-   que abra el visor le avisa a un tercero que lo abrió. Son las variantes latinas de la
-   licencia OFL, en `fonts/`. IBM Plex Sans viene como tipografía variable, así que un solo
-   archivo cubre de 400 a 600; la condensada y la monoespaciada traen uno por peso. */
+/* IBM Plex (OFL), servida desde el sitio. Plex Sans es variable: un archivo cubre 400-600. */
 
 @font-face {
   font-family: 'IBM Plex Mono';
@@ -113,10 +108,7 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* La paleta sigue el código de colores del par trenzado T568B: cada hilo tiene una
-   versión plena y una pálida, y esa pareja es la que se usa para dibujar enlaces.
-   El tema oscuro es el de casa; el claro reescribe los mismos nombres, así que el
-   diagrama y las exportaciones lo siguen sin saber que existe. */
+/* Colores del par trenzado T568B, cada uno en versión plena y pálida. */
 :root {
   --ground: #0f1218;
   --surface: #151a22;
@@ -153,8 +145,6 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
 }
 
-/* Los hilos se oscurecen sobre fondo claro: el mismo naranja pálido que funciona
-   contra el grafito desaparecería contra el papel. */
 :root[data-theme='light'] {
   --ground: #f2f4f7;
   --surface: #ffffff;
@@ -209,9 +199,6 @@ body {
   outline-offset: 2px;
 }
 
-/* El primer tabulador salta la cabecera entera —abrir, exportar, cerrar, tema, idioma— y
-   cae en el visor. Está fuera de la pantalla hasta que recibe el foco: sólo le sirve a
-   quien navega con el teclado, y a ése le tiene que aparecer. */
 .skip {
   position: fixed;
   top: 0.5rem;
@@ -232,13 +219,10 @@ body {
 
 /* Cabecera */
 
-/* Mientras el guion de arranque no confirmó el idioma, el texto traducible espera
-   invisible: peor que un instante en blanco es verlo cambiar de idioma. */
+/* Hasta que se aplica el idioma guardado, para no ver el cambio. */
 html[data-translating] [data-i18n],
 html[data-translating] [data-i18n-html] { visibility: hidden; }
 
-/* En un iPhone apaisado la muesca se come el costado y el indicador de inicio, el pie. Los
-   márgenes de resguardo valen cero en todo lo demás, así que no hace falta condicionarlos. */
 .masthead {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -281,8 +265,6 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   letter-spacing: 0.01em;
 }
 
-/* Sin altura de línea propia, cada texto se apoyaría en su propia caja y los tres
-   quedarían a alturas distintas por más que el contenedor los centre. */
 .masthead__kind {
   display: flex;
   align-items: center;
@@ -293,8 +275,6 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   color: var(--text-faint);
 }
 
-/* Una barra inclinada separa mejor que un punto medio, que a este cuerpo de letra
-   se pierde entre las dos extensiones. */
 .masthead__divider {
   width: 1px;
   height: 0.95rem;
@@ -343,8 +323,7 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   }
 }
 
-/* Un disco al que un segundo círculo le muerde un lado. Con el mordisco encima queda
-   la luna; cuando se va del lienzo y aparecen los rayos, queda el sol. */
+/* Luna: un disco con un mordisco (máscara). Sol: sin mordisco y con rayos. */
 .theme-icon {
   width: 18px;
   height: 18px;
@@ -371,12 +350,6 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   opacity: var(--icon-rays);
   transform: rotate(calc((1 - var(--icon-rays)) * -55deg)) scale(calc(0.45 + 0.55 * var(--icon-rays)));
   transition: opacity 260ms ease-out, transform 380ms cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-body[data-theme-sweep] .theme-icon__core,
-body[data-theme-sweep] .theme-icon__bite,
-body[data-theme-sweep] .theme-icon__rays {
-  transition-delay: 300ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -489,11 +462,6 @@ body[data-theme-sweep] .theme-icon__rays {
 
 .dialog__preview { gap: 0.35rem; }
 
-/* Con sitio de sobra, la vista previa va al costado de los campos y se lleva todo el ancho
-   que sobre: es la parte que hay que mirar. El diálogo se ensancha sólo cuando la lleva,
-   porque para un pcap, que no tiene nada que mostrar, sobraría todo ese hueco. */
-/* Apilada todavía, pero con sitio para que la vista se vea: una tableta de pie no tiene
-   ancho para dos columnas y le sobra de más para un diálogo de teléfono. */
 @media (min-width: 34rem) {
   .dialog--wide { width: min(40rem, calc(100vw - 2rem)); }
 }
@@ -529,13 +497,7 @@ body[data-theme-sweep] .theme-icon__rays {
   background: var(--ground);
 }
 
-/* La lupa muestra el recorte a la escala del archivo que se va a bajar, que es la única
-   forma de saber antes de tiempo si el texto se va a leer. Sólo con ratón: en una pantalla
-   táctil no hay puntero al que seguir.
-
-   Va apaisada y con las esquinas apenas redondeadas, no redonda: lo que se mira son dos
-   renglones de texto, y un círculo les come las puntas. De paso evita el recorte con
-   `border-radius` dentro de un elemento transformado, que en Safari es terreno resbaladizo. */
+/* Rectangular y no redonda: se miran renglones de texto. Sólo con ratón. */
 .lens {
   position: absolute;
   z-index: 2;
@@ -553,7 +515,6 @@ body[data-theme-sweep] .theme-icon__rays {
   .lens { display: none !important; }
 }
 
-/* El damero deja ver la transparencia por lo que es y no como un fondo de color. */
 .preview--alpha {
   background-image:
     linear-gradient(45deg, var(--line-soft) 25%, transparent 25% 75%, var(--line-soft) 75%),
@@ -562,8 +523,6 @@ body[data-theme-sweep] .theme-icon__rays {
   background-size: 16px 16px;
 }
 
-/* Apilada bajo los campos, la vista no puede empujar el botón de exportar fuera de la
-   pantalla; al costado sí puede ocupar lo que tenga. */
 .preview canvas {
   display: block;
   width: auto;
@@ -620,7 +579,7 @@ body[data-theme-sweep] .theme-icon__rays {
   font-family: var(--font-display);
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -635,10 +594,7 @@ body[data-theme-sweep] .theme-icon__rays {
   font-size: 0.85rem;
 }
 
-/* Los formatos se reparten en una fila y bajan a la siguiente si no entran. Sin el salto,
-   en un teléfono de 360 px los cuatro pedían 291 y tenían 277: un botón no puede achicarse
-   por debajo de su propio texto, así que PDF se salía diecisiete píxeles del diálogo y
-   quedaba cortado contra el borde. */
+/* Con wrap: a 360 px los cuatro formatos no entraban en una fila. */
 .choice {
   display: flex;
   flex-wrap: wrap;
@@ -673,8 +629,7 @@ body[data-theme-sweep] .theme-icon__rays {
   cursor: pointer;
 }
 
-/* En una pantalla corta el diálogo se desplaza por dentro, y sin esto el botón de exportar
-   queda por debajo del borde: se ve el formulario y no hay con qué confirmarlo. */
+/* Pegado abajo: en pantallas bajas el diálogo se desplaza y el botón quedaba fuera. */
 .dialog__actions {
   position: sticky;
   bottom: 0;
@@ -700,8 +655,6 @@ body[data-theme-sweep] .theme-icon__rays {
 .statusbar[data-tone='ok'] { color: var(--green); }
 .statusbar[data-tone='error'] { color: var(--orange); }
 
-/* El aviso no es un error: el archivo se abrió, pero venía cortado. Va en el marrón del
-   código T568B, que es el único tono de la paleta que no está tomado por sí o por no. */
 .statusbar[data-tone='warn'] { color: var(--brown); }
 
 /* Estructura */
@@ -717,7 +670,6 @@ body[data-theme-sweep] .theme-icon__rays {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Cerrar sólo tiene sentido con algo abierto, y exportar sólo con un diagrama. */
 body:not([data-loaded]) [data-reset],
 body:not([data-loaded]) [data-export] { display: none; }
 
@@ -742,11 +694,7 @@ body:not([data-loaded]) .workspace {
 .rail { border-right: 1px solid var(--line); }
 .panel { border-left: 1px solid var(--line); }
 
-/* La leyenda es una franja al pie del diagrama, pero cuelga de la escena y no del recuadro
-   del dibujo: el visor mide ese recuadro para saber qué forma darle al lienzo, y midiendo
-   de más se lo calculaba más alto de lo que iba a tener. El dibujo entraba entonces por el
-   alto y dejaba franjas vacías a los costados: en un teléfono, un 14 % más chico de lo que
-   daba el lugar. */
+/* La leyenda es la segunda fila de la escena, fuera del recuadro que mide el visor. */
 .stage {
   position: relative;
   display: grid;
@@ -758,9 +706,7 @@ body:not([data-loaded]) .workspace {
     var(--ground);
 }
 
-/* Se estiran por ser celdas de la escena, no por un cien por ciento: contra una fila
-   `1fr` el porcentaje no tiene contra qué resolver en la primera pasada y el recuadro
-   mide cero, que es justo cuando el visor lo mide para darle forma al lienzo. */
+/* Sin height: 100%, que contra una fila 1fr mide 0 en la primera pasada. */
 .stage__canvas,
 .stage__table {
   position: relative;
@@ -793,9 +739,7 @@ body:not([data-loaded]) .workspace {
   cursor: pointer;
 }
 
-/* Dos rem son treinta y dos píxeles, que con el dedo se falla. No llegan a los cuarenta y
-   cuatro que pide Apple porque son tres apilados sobre un diagrama que en un teléfono mide
-   trescientos ochenta de alto, y ahí la columna taparía un tercio del dibujo. */
+/* 40 y no 44: son tres apilados sobre un diagrama que en un teléfono mide unos 380 de alto. */
 @media (pointer: coarse) {
   .zoom__button {
     width: 2.5rem;
@@ -810,14 +754,7 @@ body:not([data-loaded]) .workspace {
   }
 }
 
-/* La leyenda va debajo del diagrama, no flotando encima. Flotando tapaba equipos: el
-   reparto usa el lienzo entero porque nada le dice que un rincón esté ocupado, y en una
-   red rala —cinco equipos repartidos hasta los bordes— el de abajo a la izquierda quedaba
-   debajo. Reservarle el hueco en el reparto sería lienzo perdido siempre; como franja
-   cuesta unos treinta píxeles de alto y no hay ancho de pantalla en el que tape nada.
-
-   Columnas de ancho uniforme: así las entradas quedan alineadas entre sí en vez de
-   correrse según lo largo que sea cada texto. */
+/* Debajo del diagrama y no encima: flotando tapaba equipos de las esquinas. */
 .legend {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, max-content));
@@ -831,8 +768,6 @@ body:not([data-loaded]) .workspace {
   color: var(--text-muted);
 }
 
-/* Cada entrada filtra el diagrama, así que es un botón: hereda la letra del cuadro y no
-   trae nada del estilo propio de los botones del navegador. */
 .legend__item {
   display: flex;
   align-items: center;
@@ -858,8 +793,6 @@ body:not([data-loaded]) .workspace {
   color: var(--text);
 }
 
-/* Con el dedo el renglón de texto queda corto para acertarle: se le da alto de verdad, y
-   sin margen negativo, que superpondría el área de una entrada con la de la vecina. */
 @media (pointer: coarse) {
   .legend { gap: 0.1rem 0.75rem; }
 
@@ -883,8 +816,7 @@ body:not([data-loaded]) .workspace {
 
 /* Pantalla inicial */
 
-/* El aviso se escribe visible y se esconde cuando el guion de la cabecera deja su marca: si
-   se hiciera al revés, un guion que no corre —que es justo el caso— lo dejaría escondido. */
+/* Visible por defecto; se oculta con la marca que pone el script del head. */
 .nojs {
   display: grid;
   align-content: safe center;
@@ -905,80 +837,117 @@ html:not([data-js]) .intro {
 
 .intro {
   display: grid;
-  align-content: safe center;
-  justify-content: safe center;
-  padding: clamp(1.25rem, 4vw, 3.5rem);
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: clamp(2rem, 5vh, 3.5rem);
+  padding: clamp(1.5rem, 6vh, 4rem) clamp(1rem, 4vw, 3rem) 2rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background:
-    radial-gradient(circle at 1px 1px, var(--line-soft) 1px, transparent 0) 0 0 / 28px 28px,
-    var(--ground);
 }
 
-.intro__grid {
-  display: grid;
-  grid-template-columns: minmax(20rem, 30rem) minmax(22rem, 42rem);
-  gap: clamp(1.5rem, 3vw, 3.5rem);
-  align-items: start;
+.intro__main,
+.intro__notes,
+.intro__footer {
   width: 100%;
-  max-width: 76rem;
+  max-width: 72rem;
+  margin-inline: auto;
 }
 
-.intro__inner {
-  padding: clamp(1.5rem, 3vw, 2.5rem);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+.intro__main {
+  display: grid;
+  grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: center;
+}
+
+.intro__title {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.intro__lead {
+  margin: 0 0 1.5rem;
+  color: var(--text-muted);
+}
+
+.intro__lead b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
 }
 
 .intro__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.75rem;
 }
 
-.intro__about {
-  padding-top: 0.35rem;
+.intro__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-faint);
 }
 
-.intro__about-title {
-  margin: 0 0 1rem;
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+.intro__shot { margin: 0; }
+
+.intro__shot-link {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+@media (hover: hover) {
+  .intro__shot-link:hover { border-color: var(--text-faint); }
+}
+
+.intro__image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Una imagen por tema. Con loading="lazy", la oculta no se descarga. */
+.intro__image--light,
+[data-theme='light'] .intro__image--dark { display: none; }
+[data-theme='light'] .intro__image--light { display: block; }
+
+.intro__caption {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 
-.intro__faq {
+.intro__notes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: 1.25rem 2rem;
-  margin: 0;
+  margin-block: 0;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--line);
   font-size: 0.85rem;
 }
 
-.intro__faq dt {
-  margin-bottom: 0.25rem;
-  font-family: var(--font-display);
+.intro__notes dt {
+  margin-bottom: 0.3rem;
   font-weight: 600;
-  color: var(--text);
 }
 
-.intro__faq dd {
+.intro__notes dd {
   margin: 0;
   color: var(--text-muted);
 }
 
-.intro__author {
-  margin: 1.5rem 0 0;
-  padding-top: 1rem;
-  border-top: 1px solid var(--line);
-  font-size: 0.8rem;
+.intro__footer {
+  font-size: 0.78rem;
   color: var(--text-faint);
 }
+
+.intro__footer p { margin: 0 0 0.3rem; }
 
 .link {
   color: var(--orange);
@@ -987,7 +956,6 @@ html:not([data-js]) .intro {
 
 .link:hover { text-decoration-thickness: 2px; }
 
-/* El velo cubre la ventana entera mientras se arrastra: soltar vale en cualquier lado. */
 .dropveil {
   position: fixed;
   inset: 0;
@@ -1004,45 +972,6 @@ html:not([data-js]) .intro {
 
 body[data-dragging] .dropveil { display: grid; }
 
-.intro__eyebrow {
-  margin: 0 0 0.5rem;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--orange);
-}
-
-.intro__title {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-display);
-  font-size: clamp(1.75rem, 3.4vw, 3.1rem);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-
-.intro__lead {
-  margin: 0 0 1.25rem;
-  color: var(--text-muted);
-}
-
-.intro__lead b {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  color: var(--text);
-}
-
-/* El tono pálido sirve para trazos, no para texto: contra el fondo claro no llega
-   al contraste mínimo de lectura. */
-.intro__hint {
-  margin: 0 0 1.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--orange);
-}
-
 /* Lista lateral */
 
 .rail__head {
@@ -1057,7 +986,7 @@ body[data-dragging] .dropveil { display: grid; }
   font-family: var(--font-display);
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -1090,14 +1019,7 @@ body[data-dragging] .dropveil { display: grid; }
   cursor: pointer;
 }
 
-/* La casilla mide trece píxeles, y el renglón que la acompaña, diecinueve. Con el dedo eso
-   es apuntar a una línea de texto: la etiqueta entera pasa a tener alto de verdad, que es
-   la que recibe el toque. */
-/* Con el dedo, los renglones de la lista y el campo de búsqueda quedaban en veintinueve y
-   treinta y un píxeles, que es apuntar a una línea de texto: elegir un equipo en el teléfono
-   es justamente lo que se hace ahí. Pasan a los cuarenta y cuatro del resto de los mandos.
-   Los botones de acercar siguen en cuarenta, y con motivo: son tres apilados sobre un
-   diagrama que en un teléfono mide trescientos ochenta de alto. */
+/* Alto táctil de 44 px para las filas de la lista, el buscador y las casillas. */
 @media (pointer: coarse) {
   .toggle,
   .checkbox,
@@ -1225,8 +1147,7 @@ body[data-dragging] .dropveil { display: grid; }
 .node--security .node__disc { stroke: var(--orange-pale); }
 .node--iot .node__disc { stroke: var(--green-pale); }
 
-/* El contorno del color del fondo se pinta debajo del relleno: así el texto se lee
-   aunque le pase por encima un cable o el aro del nodo elegido. */
+/* Contorno del color del fondo debajo del relleno, para leer el texto sobre los cables. */
 .node__label,
 .node__address {
   paint-order: stroke;
@@ -1235,10 +1156,7 @@ body[data-dragging] .dropveil { display: grid; }
   stroke-linejoin: round;
 }
 
-/* Los cuerpos son los de LABEL_TYPE en graph.js, en unidades del lienzo: el nombre viaja
-   gratis y la dirección es la que fija cuánto hay que separar los equipos. La dirección va
-   en condensada porque en ese mismo ancho entran dos puntos más de cuerpo que en
-   monoespaciada, que acá no alinea nada. */
+/* Tienen que coincidir con LABEL_TYPE en graph.js. */
 .node__label {
   fill: var(--text);
   font-family: var(--font-display);
@@ -1253,17 +1171,13 @@ body[data-dragging] .dropveil { display: grid; }
   font-weight: 500;
 }
 
-/* El navegador dibuja su propio recuadro al hacer foco sobre un grupo SVG. Se anula
-   y el aviso para el teclado se dibuja dentro del diagrama. */
+/* El foco se marca con el halo (ver :focus-visible). */
 .node:focus { outline: none; }
 .node:focus-visible .node__halo {
   stroke: var(--orange);
   stroke-width: 3;
 }
 
-/* Con una selección puesta, el resto de la red queda al 22 %. El equipo que tiene el foco
-   del teclado se muestra entero igual: si no, recorrer con las flechas es seguir un aro
-   naranja sobre un icono que casi no se ve. */
 .node:focus-visible.is-dimmed { opacity: 1; }
 
 .tray__rule {
@@ -1278,13 +1192,7 @@ body[data-dragging] .dropveil { display: grid; }
   font-size: 12px;
 }
 
-/* Tres niveles: el elegido, los que cuelgan de él, y el resto apagado. Sin el nivel
-   del medio, el que tocaste se confunde con sus vecinos. */
-/* `transform-box: fill-box` no es un detalle: en SVG el origen de una transformación se
-   resuelve por omisión contra el lienzo entero, no contra el elemento, así que `center` era
-   el medio del diagrama. El aro de un equipo del borde no crecía en su lugar sino que
-   entraba volando desde ciento veintisiete píxeles más adentro, y mientras tanto su caja
-   quedaba fuera del lienzo. Con `fill-box`, `center` es el centro del propio círculo. */
+/* Sin fill-box, en SVG `center` es el centro del lienzo y no el del círculo. */
 .node__ring {
   fill: none;
   stroke: var(--orange);
@@ -1307,8 +1215,6 @@ body[data-dragging] .dropveil { display: grid; }
   stroke-width: 2;
 }
 
-/* El subrayado lleva el acento sin teñir el texto: el nombre sigue en el color de
-   lectura y la marca naranja queda al lado, no encima. */
 .node.is-selected .node__label {
   font-size: 21px;
   font-weight: 700;
@@ -1341,14 +1247,14 @@ body[data-dragging] .dropveil { display: grid; }
   border-bottom: 1px solid var(--line);
 }
 
-.panel-head__eyebrow {
+.panel-head__kind {
   margin: 0 0 0.15rem;
   font-family: var(--font-display);
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--orange);
+  color: var(--text-muted);
 }
 
 .panel-head__title {
@@ -1369,7 +1275,7 @@ body[data-dragging] .dropveil { display: grid; }
   font-family: var(--font-display);
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -1403,7 +1309,7 @@ body[data-dragging] .dropveil { display: grid; }
   font-family: var(--font-display);
   font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   text-align: left;
   color: var(--text-faint);
@@ -1417,15 +1323,10 @@ body[data-dragging] .dropveil { display: grid; }
 
 .table__mono { font-family: var(--font-mono); }
 
-/* Una tabla que no entre se desplaza acá adentro y no arrastra al panel entero. */
 .table-scroller { overflow-x: auto; }
 
-/* Una lista de veinticuatro nombres de interfaz no tiene un solo lugar donde cortar, y sin
-   permitirlo la tabla se lleva por delante el ancho del panel. */
 .table__wrap { overflow-wrap: anywhere; }
 
-/* Las reglas de una lista de acceso y las redes de un protocolo son una por renglón: el
-   orden es parte del dato y juntarlas con comas las vuelve un párrafo ilegible. */
 .table__lines { white-space: pre-line; }
 
 .connections {
@@ -1489,10 +1390,7 @@ body[data-dragging] .dropveil { display: grid; }
   z-index: 1;
 }
 
-/* El botón hereda el aspecto del encabezado en vez de traer el suyo: lo que se ve es la
-   misma fila de títulos de siempre, sólo que ahora se puede tocar. El relleno viaja del
-   `th` al botón para que el área que responde sea la celda entera y no el largo del
-   texto, que en `#` son ocho píxeles. */
+/* El relleno pasa al botón para que toda la celda sea clicable. */
 .table--packets th:has(.sortable) { padding: 0; }
 
 .sortable {
@@ -1527,9 +1425,6 @@ body[data-dragging] .dropveil { display: grid; }
   white-space: nowrap;
 }
 
-/* Con el dedo, una fila de veintiocho píxeles y un título de treinta y uno son apuntar a
-   una línea de texto. Se pagan tres filas menos en pantalla y se gana poder elegir la que
-   uno quiso; errarle a un título además ordena por otra columna. */
 @media (pointer: coarse) {
   .table--packets td { padding-block: 0.8rem; }
   .sortable { min-height: 44px; }
@@ -1563,52 +1458,8 @@ body[data-dragging] .dropveil { display: grid; }
   color: var(--text-faint);
 }
 
-/* Aparición del diagrama */
-
-/* El grupo del nodo lleva su posición en el atributo transform del SVG, que una
-   animación de transform en CSS sustituiría por completo. Por eso el grupo sólo
-   anima opacidad y la escala de entrada va en el disco interior. */
-@media (prefers-reduced-motion: no-preference) {
-  .node {
-    animation: node-in 300ms ease-out backwards;
-    animation-delay: var(--reveal-delay, 0ms);
-  }
-
-  /* Mismo motivo que en el aro: sin `fill-box` el disco no crece en su lugar, sale
-     despedido desde el medio del diagrama. */
-  .node__disc {
-    animation: disc-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
-    animation-delay: var(--reveal-delay, 0ms);
-    transform-box: fill-box;
-    transform-origin: center;
-  }
-
-  .link {
-    animation: link-in 500ms ease-out backwards;
-    animation-delay: 120ms;
-  }
-}
-
-@keyframes node-in {
-  from { opacity: 0; }
-}
-
-@keyframes disc-in {
-  from { transform: scale(0.55); }
-}
-
-@keyframes link-in {
-  from { opacity: 0; }
-}
-
 @media (max-width: 1180px) {
-  /* Apiladas, las tres zonas no entran en un alto de pantalla, y forzarlas era el peor de
-     los repartos: con el diagrama pidiendo veinticuatro rem de mínimo, en un teléfono de
-     844 de alto a la lista y al detalle les quedaban ciento veintiséis píxeles cada uno
-     —menos de lo que mide el campo de búsqueda, que salía cortado por el borde—. Así que
-     acá la página se desplaza, que es lo que se espera de algo apilado: el diagrama toma
-     un alto propio, la lista se desplaza por dentro porque puede tener setenta renglones,
-     y el detalle se estira con lo que tenga y empuja la página. */
+  /* Apiladas, las tres zonas no entran en la pantalla: se desplaza la página. */
   html, body {
     height: auto;
     min-height: 100%;
@@ -1627,11 +1478,7 @@ body[data-dragging] .dropveil { display: grid; }
     border-bottom: 1px solid var(--line);
   }
 
-  /* `min-width: 0` no es de adorno: sin desplazamiento propio, el mínimo automático de una
-     celda de grilla es el de su contenido, y el volcado hexadecimal de un paquete mide
-     quinientos y pico. Sin esto, ese ancho lo hereda el panel entero y se lleva de costado
-     a toda la página. Con esto, el panel mide lo que la columna y el volcado se desplaza
-     por dentro, que es lo que ya sabe hacer. */
+  /* Sin min-width: 0 el volcado hexadecimal (500+ px) ensancha toda la página. */
   .panel {
     max-height: none;
     min-width: 0;
@@ -1640,8 +1487,6 @@ body[data-dragging] .dropveil { display: grid; }
     border-bottom: 1px solid var(--line);
   }
 
-  /* Apilada, la cabecera se lee como un bloque centrado; alineada a la izquierda,
-     los controles quedan colgando de un borde y el resto vacío. */
   .masthead {
     grid-template-columns: 1fr;
     gap: 0.7rem;
@@ -1658,13 +1503,9 @@ body[data-dragging] .dropveil { display: grid; }
 }
 
 @media (max-width: 62rem) {
-  .intro__grid {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 44rem;
-  }
+  .intro__main { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Sin puntero fino, los controles necesitan un blanco que el dedo acierte. */
 @media (hover: none) {
   .button,
   .icon-button,
@@ -1674,8 +1515,6 @@ body[data-dragging] .dropveil { display: grid; }
     min-height: 44px;
   }
 
-  /* El de icono es cuadrado y sólo le crecía el alto: quedaba en 32 de ancho, por debajo del
-     piso que se le pide a todo lo demás. */
   .icon-button {
     min-width: 44px;
   }
@@ -1684,65 +1523,4 @@ body[data-dragging] .dropveil { display: grid; }
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
-}
-
-/* Barrido de cambio de tema: una franja inclinada con líneas de barrido cruza la
-   pantalla y los colores cambian por detrás de su filo, que va en el color de acento. */
-.theme-sweep {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: none;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-body[data-theme-sweep] .theme-sweep { display: block; }
-
-/* La franja es más ancha que la pantalla y se queda quieta un instante en el medio:
-   ahí, con todo tapado, cambian los colores. El tono es fijo a propósito, porque uno
-   que siguiera al tema cambiaría a la vista justo en ese instante. */
-.theme-sweep::before {
-  content: '';
-  position: absolute;
-  /* El sesgo corre los bordes laterales tanto como la mitad del alto de la franja:
-     poca altura de más y sobrante lateral en vmax, para que ni una pantalla alta y
-     angosta deje los vértices al descubierto. */
-  top: -10%;
-  bottom: -10%;
-  left: -20vmax;
-  width: calc(100% + 40vmax);
-  border-left: 2px solid var(--orange);
-  border-right: 2px solid var(--orange);
-  background:
-    repeating-linear-gradient(
-      0deg,
-      rgb(228 118 60 / 0.16) 0 1px,
-      transparent 1px 5px),
-    #0d1117;
-  will-change: transform;
-  animation: theme-sweep var(--sweep-duration, 880ms) both;
-}
-
-/* Cada tramo lleva su propia curva: entra frenando hasta cubrir, se detiene mientras
-   cambian los colores y sale acelerando. Una sola curva para todo haría que el
-   frenado y el arranque se notaran como un tirón. */
-@keyframes theme-sweep {
-  0% {
-    transform: translateX(-135%) skewX(-14deg);
-    animation-timing-function: cubic-bezier(0.25, 0.7, 0.3, 1);
-  }
-  62% {
-    transform: translateX(0) skewX(-14deg);
-    animation-timing-function: linear;
-  }
-  68% {
-    transform: translateX(0) skewX(-14deg);
-    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4);
-  }
-  100% { transform: translateX(135%) skewX(-14deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .theme-sweep { display: none !important; }
 }

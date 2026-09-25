@@ -133,10 +133,7 @@ function reedSolomonWord(key, offset) {
   return word >>> 0;
 }
 
-/**
- * Twofish en modo bloque. Sólo expone cifrado de bloque: EAX construye el flujo
- * de descifrado a partir de CTR, que nunca necesita la operación inversa.
- */
+// Sólo cifra bloques: EAX descifra con CTR, que no usa la operación inversa.
 export class Twofish {
   constructor(key) {
     if (key.length !== 16 && key.length !== 24 && key.length !== 32) {

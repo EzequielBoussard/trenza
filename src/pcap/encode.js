@@ -8,10 +8,7 @@ function csvCell(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-/**
- * Vuelca los paquetes a CSV. Lleva marca de orden de bytes porque, sin ella, Excel
- * abre el archivo en la codificación del sistema y rompe los acentos.
- */
+// Con BOM: sin él, Excel abre el CSV en la codificación del sistema y rompe los acentos.
 export function toCsv(packets, { origin }) {
   const headers = ['table.number', 'table.time', 'panel.packet', 'table.source', 'table.destination',
     'table.protocol', 'table.length', 'table.detail'].map((key) => t(key));
@@ -32,11 +29,7 @@ export function toCsv(packets, { origin }) {
   return new Blob([`﻿${text}\r\n`], { type: 'text/csv;charset=utf-8' });
 }
 
-/**
- * Escribe un pcap clásico con los paquetes indicados. Es el formato que lee todo,
- * Wireshark incluido; pcapng añadiría bloques y descripciones de interfaz sin
- * aportar nada, porque el visor ya trabaja con un solo tipo de enlace por paquete.
- */
+// pcap clásico y no pcapng: alcanza con un tipo de enlace por paquete.
 export function toPcap(packets) {
   const linkType = packets.length > 0 ? packets[0].linkType : 1;
   const usable = packets.filter((packet) => packet.linkType === linkType);

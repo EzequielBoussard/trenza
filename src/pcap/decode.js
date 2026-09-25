@@ -39,9 +39,7 @@ function readPcap(view, bytes) {
     offset += capturedLength;
   }
 
-  // Lo que sobra al final es un registro que quedó a medias: la captura se cortó. Sin
-  // guardarlo, un archivo truncado justo después de la cabecera dice «0 paquetes» y
-  // parece que el visor no supo leerlo.
+  // Bytes sobrantes al final: la captura está truncada.
   return { container: 'pcap', linkType, packets, truncated: bytes.length - offset };
 }
 
@@ -67,10 +65,7 @@ function readPcapng(view, bytes) {
   while (offset + 12 <= bytes.length) {
     const blockType = view.getUint32(offset, little);
 
-    // Un pcapng puede ser la concatenación de varias capturas, y cada sección abre con su
-    // propia cabecera: la numeración de interfaces vuelve a empezar y el orden de bytes
-    // puede ser otro. Sin reiniciar la lista, un paquete de la segunda sección se lee con
-    // el tipo de enlace y la resolución de tiempo de la primera.
+    // Cada sección de un pcapng reinicia las interfaces y puede cambiar el orden de bytes.
     if (blockType === PCAPNG_SECTION_HEADER) {
       little = view.getUint32(offset + 8, false) !== 0x1a2b3c4d;
       interfaces = [];
@@ -130,7 +125,6 @@ function readPcapng(view, bytes) {
   };
 }
 
-/** Lee una captura en formato pcap clásico o pcapng y devuelve sus paquetes crudos. */
 export function decodeCapture(bytes) {
   if (bytes.length < 24) throw new Error(t('error.captureShort'));
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

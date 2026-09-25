@@ -20,41 +20,25 @@ import {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// El visor reparte la red en un lienzo propio: el más chico donde todas las etiquetas
-// tienen lugar limpio. Después el SVG lo lleva al tamaño del panel, y el zoom se mueve por
-// dentro de un dibujo ya resuelto, así que acercarse no hace aparecer ni desaparecer nada,
-// sólo agranda. Cuanto más chico el lienzo, más grandes salen los iconos y los textos.
+// Ancho del lienzo en unidades de diseño. Se usa el más chico en el que las etiquetas no se
+// pisan; el zoom después sólo agranda, no vuelve a repartir.
 const MIN_VIEW_WIDTH = 900;
 const MAX_VIEW_WIDTH = 5200;
 
-// Cuánto se agranda el lienzo entre un intento y el siguiente. Los huecos donde el reparto
-// queda prolijo son angostos y no vienen en orden, así que un paso grueso los saltea: con
-// escalones de trescientas unidades, la red del showcase pasaba de 2400 —que ya estaba
-// limpia— a 3664, un tercio de cuerpo de letra tirado. Cada intento cuesta cuatro décimas
-// de milisegundo, así que recorrer el rango entero de a cincuenta son 33 ms en el peor caso.
+// La prolijidad no es monótona con el ancho, así que no se puede bisecar. Barrer todo el
+// rango de a 50 cuesta unos 33 ms en el peor caso.
 const VIEW_STEP = 50;
 
-// El lienzo toma la proporción del panel donde va a entrar. Con una fija sobraba: un
-// lienzo apaisado dentro de un panel casi cuadrado entraba por el ancho y dejaba 312 px
-// de los 812 en blanco, y el dibujo se achicaba para caber en la parte que sí usaba.
-//
-// Los topes son por si el panel queda con una forma imposible, pero el de arriba estaba
-// corto: un teléfono apaisado deja un recuadro de 640 × 156, proporción 4,09, y recortarlo
-// a 2,6 dejaba 233 píxeles de banda vacía a los costados —el 36 % del área— con el dibujo
-// un 23 % más chico de lo que daba el lugar. Una proporción extrema no rompe el reparto:
-// el lienzo se achica de alto, las etiquetas se rozan, y la búsqueda del ancho lo
-// resuelve sola ensanchándolo. Sin panel medido —oculto o recién creado— vale la de siempre.
+// El lienzo toma la proporción del panel para no dejar franjas vacías. Un teléfono apaisado
+// llega a 4,09, de ahí el tope de arriba.
 const FALLBACK_ASPECT = 1.6;
 const MIN_VIEW_ASPECT = 0.6;
 const MAX_VIEW_ASPECT = 4.5;
 
-// Cuánto tiene que cambiar la forma del panel para que valga la pena rehacer el reparto,
-// medido en logaritmo para que ensanchar y angostar pesen igual. 0,12 son un 13 %.
+// Cambio de proporción del panel, en logaritmo, a partir del cual se rehace el reparto.
 const RESHAPE_THRESHOLD = 0.12;
 
-// Las teclas que mueven el foco entre equipos, y cuánto se corre cada una en el recorrido.
-// Las cuatro flechas hacen lo mismo de a uno porque el orden es una fila: una red no tiene
-// filas ni columnas, así que «abajo» no significa nada distinto de «el siguiente».
+// El recorrido es una sola fila, así que las cuatro flechas avanzan o retroceden de a uno.
 const ARROW_STEPS = {
   ArrowRight: 1,
   ArrowDown: 1,
@@ -64,38 +48,25 @@ const ARROW_STEPS = {
   End: Infinity,
 };
 
-// Cuánto se deja libre entre el equipo enfocado y el borde del recuadro al traerlo a la
-// vista. Es lo que ocupa su etiqueta, para que no llegue pegada al filo ni cortada.
+// Margen al traer a la vista el equipo enfocado, para que su etiqueta no quede cortada.
 const FOCUS_MARGIN = 80;
 
-// Márgenes del área de dibujo. Arriba alcanza con el halo del nodo. Abajo tiene que caber el
-// bloque de nombre y dirección en el último renglón al que puede bajar, que es lo que mide
-// `LABEL_REACH_BELOW`: con noventa, la etiqueta de un equipo de la fila de abajo se dibujaba
-// fuera del lienzo y el SVG la recortaba —cinco píxeles de la dirección de dos equipos en un
-// panel de 768×349—, y encima era otro número que el exporte, que sí reservaba lo que hace
-// falta. A los costados no hay número fijo: es la mitad de la etiqueta más ancha, medida.
+// Abajo tiene que entrar la etiqueta en el renglón más bajo al que puede bajar. El margen de
+// los costados se calcula: es la mitad de la etiqueta más ancha.
 const VIEW_INSETS = { top: 70, bottom: LABEL_REACH_BELOW + 6 };
 const VIEW_SIDE_MARGIN = 40;
 
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 6;
 
-// Cuánto tarda la vista en alcanzar el destino cuando se anima, que es sólo al usar los
-// botones. La rueda y el pellizco no se animan: ahí el gesto ya marca el ritmo y cualquier
-// suavizado encima se siente como retraso.
+// Constante de tiempo, en ms, de la animación de los botones de zoom. La rueda y el
+// pellizco no se animan porque se sienten con retraso.
 const GLIDE_TAU = 45;
 
-// Cuánto se demora la entrada de cada dispositivo respecto del anterior, y a partir de
-// cuándo deja de demorarse: en una red de setenta equipos, el último no puede esperar
-// casi un segundo para aparecer.
-const REVEAL_STEP = 12;
-const REVEAL_CAP = 420;
-
-// Cuánto acerca cada unidad de rueda. Una muesca de ratón manda 100 y da un paso de 1,17.
+// Una muesca de rueda manda deltaY 100 y acerca ×1,17.
 const WHEEL_SENSITIVITY = 0.0016;
 
-// El pellizco del trackpad llega como rueda con Control apretado y avisos mucho más chicos,
-// así que necesita más ganancia para que el gesto recorra la misma distancia.
+// El pellizco del trackpad llega como rueda con Ctrl y deltas mucho más chicos.
 const PINCH_SENSITIVITY = 0.01;
 
 
@@ -105,11 +76,7 @@ function element(name, attributes = {}) {
   return node;
 }
 
-/**
- * Buscar el lienzo obliga a repartir la red hasta quince veces, y en cada pasada se
- * consulta el ancho de cada nombre y de cada dirección. Los cuerpos son fijos, así que
- * cada cadena se mide una sola vez y las demás pasadas salen de la tabla.
- */
+// Cada texto se mide una vez: la búsqueda del ancho reparte la red decenas de veces.
 function labelMeasurer() {
   const context = document.createElement('canvas').getContext('2d');
   const measured = (font) => {
@@ -155,19 +122,10 @@ export class TopologyView {
     this.watchFonts();
   }
 
-  /**
-   * Las tipografías llegan por la red y el primer dibujado puede caer antes. Medir con la
-   * alternativa reparte la red para una letra que después no es la que se ve: la condensada
-   * de IBM es hasta un 19 % más ancha que Arial Narrow en una dirección, así que las
-   * etiquetas quedan más juntas de lo que necesitan y alguna termina rozando a su vecina.
-   * Cuando llegan se mide de nuevo, con la misma prudencia que el observador de forma:
-   * sólo si nadie tocó la vista todavía, que rehacer el reparto la mueve entera.
-   */
+  // Si las fuentes llegan después del primer dibujado, las medidas estaban hechas con la
+  // alternativa (hasta 19 % más angosta). Se reparte de nuevo, sólo con la vista sin tocar.
   watchFonts() {
     labelFontsReady().then(() => {
-      // Con las tipografías ya cargadas esto resuelve como microtarea, antes del primer
-      // dibujado —el constructor y `render` corren seguidos—, así que no hay nada que
-      // rehacer y se sale por acá. Sólo llega al final el caso que importa: llegaron tarde.
       if (!this.last) return;
       const { x, y, scale } = this.target;
       if (x !== 0 || y !== 0 || scale !== 1) return;
@@ -176,16 +134,9 @@ export class TopologyView {
     });
   }
 
-  /**
-   * El lienzo se calcula para la forma del panel, así que un panel con otra forma pide otro
-   * lienzo. Se rehace sólo si la vista está sin tocar: rehacer el reparto mueve todo de
-   * lugar, y hacérselo a alguien que estaba mirando algo de cerca molesta más que la franja
-   * que evita. Un cambio chico tampoco cuenta, que no vale la pena por unos píxeles.
-   */
+  // Rehace el reparto si el panel cambia bastante de forma, pero sólo con la vista sin tocar.
   watchPanelShape() {
-    // El observador se guarda: sin una referencia viva el navegador lo recolecta y deja de
-    // avisar, así que el reparto se quedaba con la forma que tuviera el panel al abrir el
-    // archivo. Al primer aviso todavía no hay nada dibujado, y ahí no hay qué rehacer.
+    // Hay que guardar la referencia: si no, el observador se recolecta y deja de avisar.
     this.shapeWatcher = new ResizeObserver(() => {
       if (!this.last || !this.aspect) return;
       const { x, y, scale } = this.target;
@@ -196,12 +147,7 @@ export class TopologyView {
     this.shapeWatcher.observe(this.container);
   }
 
-  /**
-   * Deja de escuchar. Hace falta porque la leyenda cuelga de la escena y no del recuadro
-   * propio: una vista a la que ya reemplazaron sigue teniendo su observador de forma vivo,
-   * y al quedar su recuadro fuera del documento el observador avisa de un cambio a cero y
-   * la vista muerta vuelve a dibujar su leyenda en la escena que ahora es de otra.
-   */
+  // Una vista reemplazada seguía recibiendo avisos del observador y volvía a poner su leyenda.
   destroy() {
     this.shapeWatcher.disconnect();
     if (this.legend) this.legend.remove();
@@ -210,38 +156,28 @@ export class TopologyView {
   }
 
   render(model, { showInfrastructure }) {
-    // Nadie dibuja desde fuera del documento: un aviso tardío —del observador de forma o de
-    // las tipografías— puede llegar cuando esta vista ya fue reemplazada.
     if (!this.container.isConnected) return;
 
     this.last = { model, showInfrastructure };
     const { devices: visible, links } = selectVisible(model, showInfrastructure);
 
     this.container.replaceChildren();
-    // La leyenda cuelga de la escena y no del recuadro del dibujo, así que vaciar el
-    // recuadro no se la lleva: hay que sacarla a mano o se apila una por cada reparto.
+    // La leyenda está fuera del contenedor, así que replaceChildren no se la lleva.
     if (this.legend) this.legend.remove();
     this.legend = null;
     if (visible.length === 0) return;
 
-    // Y se pone antes de medir, no después. La franja le saca alto al recuadro, así que
-    // midiendo sin ella el lienzo sale con la forma de un espacio más alto del que va a
-    // tener y el dibujo entra por el alto, dejando franjas vacías a los costados: en un
-    // teléfono, un 12 % del ancho desperdiciado. Su contenido sale de los enlaces, que ya
-    // están, así que no hay nada que esperar.
+    // Va antes de medir el panel, porque le quita alto.
     this.legend = this.buildLegend(links);
     if (this.legend) this.legendHost.append(this.legend);
 
-    // Los apartados van a una bandeja al pie: si entraran al encuadre general, uno
-    // solo tirado en un rincón del espacio de trabajo aplastaría toda la red.
+    // Los equipos sueltos van a una bandeja al pie. Uno solo lejos del resto achicaba toda la red.
     const { placed, stray } = partitionDevices(visible, links);
     const devices = [...placed, ...stray];
     this.aspect = this.panelAspect();
     const { width, height, positions, plan, tray, trayTop, side } = this.layoutFor(placed, stray, this.aspect);
 
-    // `group` y no `img`: un `img` se anuncia como una sola imagen y deja fuera del alcance
-    // del lector todo lo que tiene adentro, que acá son los equipos, uno por uno. La imagen
-    // exportada sí es `img`, porque ahí de verdad no hay nada que recorrer.
+    // `group` y no `img`, para que el lector de pantalla pueda recorrer los equipos.
     const svg = element('svg', {
       viewBox: `0 0 ${width} ${height}`,
       class: 'topology',
@@ -300,16 +236,14 @@ export class TopologyView {
     }
 
     const nodes = new Map();
-    devices.forEach((device, order) => {
+    devices.forEach((device) => {
       const position = positions.get(device.id);
       const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
       const node = element('g', {
         class: `node node--${device.category}`,
         transform: `translate(${position.x} ${position.y})`,
         'data-id': device.id,
-        // Un solo equipo entra en el recorrido del tabulador y las flechas mueven entre
-        // ellos: con setenta y uno, uno por parada son setenta y una pulsaciones para
-        // pasar de largo el diagrama y llegar al panel de al lado.
+        // Tabindex móvil: una sola parada para todo el diagrama, las flechas mueven entre equipos.
         tabindex: '-1',
         role: 'button',
         'aria-pressed': 'false',
@@ -317,12 +251,6 @@ export class TopologyView {
           ? `${device.name}, ${t(`category.${device.category}`)}, ${address.address}`
           : `${device.name}, ${t(`category.${device.category}`)}`,
       });
-
-      // El retraso va por CSSOM y no como atributo `style`: la política de seguridad de
-      // contenido no lleva `unsafe-inline`, así que un atributo de estilo se descarta, y
-      // con setenta y un dispositivos eso eran setenta y un rechazos por dibujado. Escribir
-      // la propiedad no pasa por esa puerta.
-      node.style.setProperty('--reveal-delay', `${Math.min(order * REVEAL_STEP, REVEAL_CAP)}ms`);
 
       node.append(
         element('circle', { class: 'node__ring', r: 31 }),
@@ -335,9 +263,6 @@ export class TopologyView {
         }),
       );
 
-      // Nombre y dirección van en un grupo que se corre entero al renglón que le tocó, y
-      // que no compensa el zoom: la etiqueta crece y se achica con el dibujo, igual que en
-      // la imagen exportada.
       const labels = element('g', {
         class: 'node__labels',
         transform: `translate(0 ${plan.get(device.id).offset})`,
@@ -372,9 +297,7 @@ export class TopologyView {
     });
     this.nodes = nodes;
 
-    // El recorrido de las flechas es el de lectura: de arriba abajo y, a igual altura, de
-    // izquierda a derecha. El orden en que se dibujan es otro —primero los enlazados, después
-    // los apartados— y saltaría de un rincón al otro de la pantalla.
+    // Las flechas siguen el orden de lectura, no el de dibujo.
     this.order = devices
       .map((device) => ({ id: device.id, ...positions.get(device.id) }))
       .sort((a, b) => a.y - b.y || a.x - b.x)
@@ -396,22 +319,16 @@ export class TopologyView {
     if (this.selectedId) this.highlight(this.selectedId);
   }
 
-  /** Proporción del panel, que es la que le conviene al lienzo para no dejar franjas. */
   panelAspect() {
     const { width, height } = this.container.getBoundingClientRect();
     if (!width || !height) return FALLBACK_ASPECT;
     return Math.min(MAX_VIEW_ASPECT, Math.max(MIN_VIEW_ASPECT, width / height));
   }
 
-  /**
-   * Reparte la red y, si alguna etiqueta quedó rozando a otra, agranda el lienzo y vuelve a
-   * probar. Es la misma idea que en la exportación: antes que esconder un nombre o una
-   * dirección, darle más lugar al dibujo.
-   */
+  // Si alguna etiqueta se pisa, agranda el lienzo y vuelve a probar. No se esconde ninguna.
   layoutFor(placed, stray, aspect) {
     const devices = [...placed, ...stray];
 
-    // Lo que sobresale la etiqueta más ancha, que es lo que hay que dejar libre a los lados.
     let reach = 0;
     for (const device of devices) reach = Math.max(reach, halfLabelWidth(device, this.measure));
     const side = Math.ceil(reach) + VIEW_SIDE_MARGIN;
@@ -434,9 +351,7 @@ export class TopologyView {
 
       const plan = planLabels(devices, positions, this.measure);
 
-      // Qué tan lejos quedó de lo prolijo: una etiqueta rozando a otra pesa mucho más que
-      // una corrida de renglón, pero las dos cuentan. El objetivo es que todos los bloques
-      // queden a la misma altura bajo su icono.
+      // Una etiqueta encimada pesa 1000 y una bajada de renglón, 1.
       const untidiness = devices.reduce((total, device) => {
         const spot = plan.get(device.id);
         return total + (spot.crowded ? 1000 : 0) + (spot.offset > 0 ? 1 : 0);
@@ -445,10 +360,7 @@ export class TopologyView {
       return { width, height, positions, plan, tray, trayTop, side, untidiness };
     };
 
-    // Se prueba de menos a más ancho y gana el primero que quede prolijo, que por ser el
-    // primero es también el más chico: cuanto más chico el lienzo, más grande sale todo.
-    // Más ancho no siempre es más prolijo —al estirarse cambia la separación vertical—, así
-    // que si ninguno llega a cero queda el que menos lejos se haya quedado.
+    // Gana el primer ancho prolijo, que es el más chico. Si ninguno llega a 0, el de menor puntaje.
     let best = attempt(MIN_VIEW_WIDTH);
     for (let width = MIN_VIEW_WIDTH + VIEW_STEP; width <= MAX_VIEW_WIDTH && best.untidiness > 0; width += VIEW_STEP) {
       const candidate = attempt(width);
@@ -468,10 +380,7 @@ export class TopologyView {
     return group;
   }
 
-  /**
-   * La leyenda además filtra: tocar un tipo de cable deja encendidos sólo los suyos. Es el
-   * lugar donde ya se está mirando cuando surge la pregunta «¿cuáles son los cruzados?».
-   */
+  // Cada entrada de la leyenda filtra los cables de su tipo.
   buildLegend(links) {
     const used = new Set(links.map(threadFor));
     const legend = document.createElement('ul');
@@ -501,12 +410,10 @@ export class TopologyView {
     return legend.childElementCount > 0 ? legend : null;
   }
 
-  /** Enciende un tipo de cable y apaga el resto. Con el mismo que ya estaba, vuelve atrás. */
   highlightThread(thread) {
     const next = this.thread === thread ? null : thread;
 
-    // Los dos resaltados dirían cosas distintas a la vez, así que elegir uno apaga el otro.
-    // El aviso va antes de encender el nuevo, porque limpiar la selección apaga los cables.
+    // Limpia la selección de equipo. Va antes porque limpiar también apaga los cables.
     if (next) this.onClear();
 
     this.thread = next;
@@ -531,15 +438,8 @@ export class TopologyView {
     let dragging = null;
     let origin = null;
 
-    // El paso sale de cuánto giró la rueda, no de un salto fijo: así un trackpad, que manda
-    // muchos avisos chicos, acerca despacio, y un ratón de muescas avanza a su ritmo. El
-    // pellizco del trackpad llega por acá también, con Control apretado.
-    //
-    // Los avisos se juntan y se aplican una sola vez por cuadro. Atenderlos de a uno hace
-    // dibujar varias veces por cuadro y, peor, obliga a recalcular la posición del SVG en
-    // cada uno: trabajo que no se ve pero que se siente como retraso. Y no se anima nada:
-    // detrás hay un gesto continuo que ya da la sensación de avance, y cualquier suavizado
-    // encima es la vista yendo atrás del dedo.
+    // Los eventos de rueda se acumulan y se aplican una vez por cuadro: getScreenCTM fuerza
+    // un recálculo de layout en cada llamada.
     let turning = null;
     const applyTurn = () => {
       const { factor, focus } = turning;
@@ -561,8 +461,7 @@ export class TopologyView {
       turning.focus = this.pointerInScene(event, turning.matrix);
     }, { passive: false });
 
-    // Safari manda su propio gesto de pellizco además de la rueda. Sin atenderlo, el
-    // navegador acerca la página entera en vez del diagrama.
+    // Safari manda gesture* además de wheel. Sin esto acerca la página entera.
     let pinch = 1;
     svg.addEventListener('gesturestart', (event) => {
       event.preventDefault();
@@ -585,18 +484,15 @@ export class TopologyView {
 
     svg.addEventListener('pointermove', (event) => {
       if (!dragging) return;
-      // El factor sale de la matriz del SVG, no del ancho: con relaciones de aspecto
-      // distintas el dibujo queda apaisado dentro del elemento y el ancho miente.
+      // La escala sale de la matriz: con otra proporción, el ancho del elemento no sirve.
       const ratio = 1 / svg.getScreenCTM().a;
       this.target.x += (event.clientX - dragging.x) * ratio;
       this.target.y += (event.clientY - dragging.y) * ratio;
       dragging = { x: event.clientX, y: event.clientY };
-      // Arrastrar tiene que ir pegado al dedo: acá no hay nada que suavizar.
       this.settle();
     });
 
-    // Soltar sin haber arrastrado, y fuera de todo nodo, es un clic al vacío: limpia
-    // la selección. El umbral tolera el temblor del dedo o del ratón al hacer clic.
+    // Soltar sin moverse más de 5 px, fuera de un nodo, limpia la selección.
     const endDrag = (event) => {
       const click = origin
         && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < 5
@@ -611,22 +507,13 @@ export class TopologyView {
     svg.addEventListener('pointercancel', endDrag);
   }
 
-  /**
-   * Punto del cursor en las coordenadas sobre las que opera el desplazamiento. La matriz se
-   * puede pasar ya calculada: pedirla obliga al navegador a rehacer la posición del SVG, y
-   * dentro de un mismo cuadro no cambia.
-   */
   pointerInScene(event, matrix) {
     return new DOMPoint(event.clientX, event.clientY)
       .matrixTransform(matrix ?? this.svg.getScreenCTM().inverse());
   }
 
-  /**
-   * Acerca dejando quieto el punto indicado. Sin eso el diagrama se va hacia la
-   * esquina y hay que perseguirlo arrastrando después de cada rueda. El cálculo se hace
-   * sobre el destino, no sobre lo que se está viendo: dos vueltas seguidas de rueda se
-   * suman en vez de pelearse con la animación de la primera.
-   */
+  // Acerca dejando quieto `focus`. Se calcula sobre el destino para que dos ruedas seguidas
+  // se sumen en vez de pelearse con la animación.
   zoomTo(scale, focus) {
     const previous = this.target.scale;
     const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
@@ -642,15 +529,11 @@ export class TopologyView {
     return true;
   }
 
-  /** Los botones sí se animan: no hay detrás un gesto continuo que dé sensación de avance. */
   zoomBy(factor) {
     if (this.zoomTo(this.target.scale * factor)) this.glide();
   }
 
-  /**
-   * Lleva la vista hacia el destino un poco por cuadro, en vez de saltar. El avance es por
-   * tiempo y no por cuadro, así que se ve igual en una pantalla de 60 Hz que en una de 144.
-   */
+  // Avance exponencial por tiempo, no por cuadro: igual a 60 Hz que a 144.
   glide() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       this.settle();
@@ -679,7 +562,6 @@ export class TopologyView {
     this.gliding = requestAnimationFrame(step);
   }
 
-  /** Salta al destino sin animar: es lo que hace falta al arrastrar y al reencuadrar. */
   settle() {
     if (this.gliding) cancelAnimationFrame(this.gliding);
     this.gliding = 0;
@@ -698,11 +580,6 @@ export class TopologyView {
     this.settle();
   }
 
-  /**
-   * Cuál de los equipos es la parada del tabulador. Uno solo la tiene; el resto se alcanza
-   * con las flechas. Sigue a la selección para que volver al diagrama desde otro control
-   * caiga sobre el equipo que se está mirando y no sobre el primero de la lista.
-   */
   setTabStop(id) {
     if (!this.nodes || !this.nodes.has(id)) return;
     for (const [own, node] of this.nodes) node.setAttribute('tabindex', own === id ? '0' : '-1');
@@ -719,11 +596,7 @@ export class TopologyView {
     this.bringIntoView(id);
   }
 
-  /**
-   * Con el diagrama acercado, el equipo que recibe el foco puede quedar fuera de lo que se
-   * ve. Acá no hay barra de desplazamiento que el navegador pueda mover —el zoom es una
-   * transformación— así que el encuadre se corre a mano, lo mínimo y sólo si hacía falta.
-   */
+  // El zoom es una transformación, así que no hay scroll que el navegador pueda mover.
   bringIntoView(id) {
     const position = this.positions.get(id);
     if (!position || !this.frame) return;
@@ -744,13 +617,13 @@ export class TopologyView {
     this.glide();
   }
 
-  /** Selección hecha desde el diagrama: avisa al resto de la interfaz. */
+  // Desde el diagrama: avisa al resto de la interfaz.
   select(id) {
     this.focus(id);
     this.onSelect(id);
   }
 
-  /** Selección hecha desde otro control: sólo actualiza el diagrama. */
+  // Desde otro control: sólo actualiza el diagrama.
   focus(id) {
     this.selectedId = id;
     this.highlight(id);

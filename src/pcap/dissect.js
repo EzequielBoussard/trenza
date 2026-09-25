@@ -66,9 +66,7 @@ const ICMPV6_TYPES = {
 
 const TCP_FLAG_NAMES = ['FIN', 'SYN', 'RST', 'PSH', 'ACK', 'URG', 'ECE', 'CWR'];
 
-// Los enlaces que sabe leer el visor. Ethernet es casi todo lo que se captura, pero un
-// `tcpdump -i any` da «Linux cooked», la interfaz de bucle de macOS da «loopback», y un
-// enlace serie entre routers —lo que arma medio curso de redes— da Cisco HDLC.
+// Tipos de enlace soportados (LINKTYPE_* de tcpdump.org).
 const LINK_TYPES = {
   0: 'Loopback',
   1: 'Ethernet',
@@ -83,14 +81,11 @@ const LINK_TYPES = {
 
 const hex2 = (value) => value.toString(16).padStart(2, '0');
 
-// Los enteros de dos bytes se leen a mano en vez de con una `DataView`. Los encabezados de
-// red y de transporte piden dos o tres cada uno, y una vista por paquete son cien mil
-// objetos para leer seis números que están ahí al lado. La vista sigue usándose donde no
-// duele: dentro de los campos, que se arman sólo para el paquete que se está mirando.
+// Sin DataView en el camino caliente: con 100k paquetes serían 100k objetos para leer unos
+// pocos enteros.
 const uint16 = (bytes, offset) => (bytes[offset] << 8) | bytes[offset + 1];
 
-// Los ocho bits de banderas dan 256 combinaciones posibles y en una captura se ven cuatro o
-// cinco. Armarlas es filtrar un arreglo y unirlo, una vez por paquete TCP.
+// Texto de las flags TCP precalculado para las 256 combinaciones.
 const TCP_FLAG_TEXT = [];
 
 function tcpFlags(bits) {
@@ -263,12 +258,11 @@ function dissectIPv6(bytes, offset) {
   };
 }
 
-/** Cómo se llama el enlace del que salió la captura, para el resumen del archivo. */
 export function linkTypeName(linkType) {
   return LINK_TYPES[linkType] || t('packet.linkType', { type: linkType });
 }
 
-/** El nibble de versión dice si lo que empieza en `offset` es IPv4, IPv6 o ninguna cosa. */
+// IPv4 o IPv6 según el nibble de versión.
 function ipEtherType(bytes, offset) {
   const version = bytes[offset] >> 4;
   if (version === 4) return 0x0800;
@@ -281,12 +275,7 @@ function etherTypeLabel(value) {
   return ETHERTYPES[value] ? `${hex} (${ETHERTYPES[value]})` : hex;
 }
 
-/**
- * La capa de enlace: qué encabezado trae el paquete, cuánto mide y qué lleva adentro. El
- * tipo no lo dice el paquete sino la captura, y de él depende dónde empieza todo lo
- * demás: leer un «Linux cooked» como si fuera Ethernet corre las direcciones dos bytes y
- * el desglose sale entero pero mal.
- */
+// El tipo de enlace viene de la captura, no del paquete.
 function dissectLink(linkType, bytes) {
   const layers = [];
   const named = (fields) => layers.push({ name: LINK_TYPES[linkType], fields });
@@ -316,14 +305,13 @@ function dissectLink(linkType, bytes) {
     return { layers, offset, etherType, macs: true };
   }
 
-  // Sin encabezado: el paquete IP arranca en el primer byte.
+  // Raw IP: sin encabezado de enlace.
   if (linkType === 101 || linkType === 228 || linkType === 229) {
     return { layers, offset: 0, etherType: ipEtherType(bytes, 0), macs: false };
   }
 
-  // Bucle local de BSD y macOS: cuatro bytes con la familia de direcciones, en el orden de
-  // bytes del equipo que capturó y con un valor distinto por sistema para IPv6. Mirar la
-  // versión del paquete que sigue contesta lo mismo sin depender de nada de eso.
+  // Loopback BSD: la familia de direcciones cambia según el sistema, así que se mira la
+  // versión del paquete IP.
   if (linkType === 0) {
     const etherType = ipEtherType(bytes, 4);
     named(() => [[t('field.protocol'), etherType ? ETHERTYPES[etherType] : t('field.unknown')]]);
@@ -338,7 +326,7 @@ function dissectLink(linkType, bytes) {
     return { layers, offset: start + 2, etherType, macs: false };
   }
 
-  // Cisco HDLC: dirección, control y un EtherType. Es lo que sale de un enlace serie.
+  // Cisco HDLC: dirección, control y EtherType.
   if (linkType === 104) {
     const etherType = (bytes[2] << 8) | bytes[3];
     named(() => [
@@ -348,8 +336,7 @@ function dissectLink(linkType, bytes) {
     return { layers, offset: 4, etherType, macs: false };
   }
 
-  // Las dos formas del encabezado que pone Linux cuando se captura de todas las interfaces
-  // a la vez: el EtherType está al final en la primera y al principio en la segunda.
+  // Linux cooked v1 (113) y v2 (276): el EtherType está al final o al principio.
   if (linkType === 113 || linkType === 276) {
     const at = linkType === 113 ? 14 : 0;
     const etherType = (bytes[at] << 8) | bytes[at + 1];
@@ -360,22 +347,13 @@ function dissectLink(linkType, bytes) {
   return { layers, offset: 0, etherType: null, macs: false };
 }
 
-/**
- * Descompone un paquete en capas legibles. Se detiene con lo que haya podido leer
- * cuando la captura está truncada, en vez de descartar el paquete entero.
- *
- * Los campos de cada capa se arman recién cuando alguien los pide, porque sólo se ven los
- * del paquete elegido. Armándolos de entrada, una captura de cien mil paquetes construía
- * 1,17 millones de pares de etiqueta y valor traducidos que nadie iba a leer: 1441 ms de
- * pantalla congelada, contra 101 ms que cuesta recorrer los bytes.
- */
+// Un paquete truncado devuelve las capas que se pudieron leer. Los campos de cada capa se
+// arman al pedirlos: con 100k paquetes armarlos de entrada costaba 1,4 s.
 export function dissectPacket(packet) {
   const bytes = packet.bytes;
   const layers = [];
   let source = '';
   let destination = '';
-  // Un paquete que el visor no sabe desarmar igual dice de qué enlace salió, que es más
-  // de lo que dice un guión.
   let protocol = linkTypeName(packet.linkType);
   let summary = '';
   let ethernet = false;
@@ -402,10 +380,7 @@ export function dissectPacket(packet) {
       destination = network.layer.destination;
       protocol = IP_PROTOCOLS[network.protocol] || `IP/${network.protocol}`;
 
-      // El resumen de la capa de red es el de reserva y va en la última rama, no antes: en
-      // TCP, UDP e ICMP —que son casi todo el tráfico— lo pisaba el de la capa de arriba, y
-      // era una traducción interpolada por paquete tirada a la basura. En cien mil paquetes,
-      // 53 ms.
+      // El resumen de la capa de red va en la última rama para no armarlo y pisarlo.
       if (network.protocol === 6) {
         const tcp = dissectTcp(bytes, network.next, network.payloadLength);
         layers.push(tcp);
@@ -429,9 +404,7 @@ export function dissectPacket(packet) {
     summary = t('packet.truncated');
   }
 
-  // Las MAC valen como origen y destino sólo cuando ninguna capa de red puso direcciones.
-  // Formatearlas cuesta treinta veces más que leer una IP —seis bytes a hexadecimal, con
-  // sus relleno y su unión— y en tráfico IP, que es casi todo, se descartarían las dos.
+  // Las MAC sólo se formatean si no hubo direcciones IP: es 30 veces más caro.
   if (!source && ethernet) {
     source = formatMac(bytes, 6);
     destination = formatMac(bytes, 0);
@@ -443,8 +416,6 @@ export function dissectPacket(packet) {
     source,
     destination,
     protocol,
-    // El texto de reserva se arma sólo si no hubo otro: interpolarlo para después pisarlo
-    // es una traducción por paquete tirada a la basura.
     summary: summary || t('packet.undissected', { bytes: packet.capturedLength }),
   };
 }

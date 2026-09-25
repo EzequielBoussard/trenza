@@ -9,13 +9,12 @@ async function inflate(data) {
   try {
     return new Uint8Array(await new Response(stream).arrayBuffer());
   } catch {
-    // El navegador informa el fallo de zlib como un error de red; sin esto, un
-    // archivo que no es de Packet Tracer termina diciendo «Failed to fetch».
+    // El navegador reporta el error de zlib como error de red ("Failed to fetch").
     throw new Error(t('error.inflate'));
   }
 }
 
-// Packet Tracer antepone el tamaño descomprimido en cuatro bytes big-endian.
+// Packet Tracer antepone el tamaño descomprimido en 4 bytes big-endian.
 async function inflateWithSizeHeader(data) {
   if (data.length < 5) throw new Error(t('error.truncated'));
   const expected = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
@@ -26,9 +25,8 @@ async function inflateWithSizeHeader(data) {
   return inflated;
 }
 
-// Primera capa de ofuscación: invierte el archivo y lo enmascara con un valor que
-// depende de la posición. El producto se trunca a 8 bits, así que el desbordamiento
-// de 32 bits del código original no altera el resultado.
+// Capa exterior: archivo invertido y XOR con un valor que depende de la posición y el
+// largo. Se trunca a 8 bits, así que el desborde de 32 bits del original no importa.
 function deobfuscateOuter(input) {
   const length = input.length;
   const output = new Uint8Array(length);
@@ -38,7 +36,7 @@ function deobfuscateOuter(input) {
   return output;
 }
 
-// Segunda capa: máscara descendente sobre el texto plano ya descifrado.
+// Capa interior, sobre el texto ya descifrado.
 function deobfuscateInner(input) {
   const length = input.length;
   const output = new Uint8Array(length);
@@ -59,10 +57,6 @@ async function decodeLegacy(bytes) {
   return inflateWithSizeHeader(deobfuscateInner(bytes));
 }
 
-/**
- * Convierte un archivo .pkt o .pka en el XML que Packet Tracer guarda dentro.
- * Devuelve también qué variante del formato resultó válida.
- */
 export async function decodePacketTracerFile(bytes) {
   const attempts = [
     { variant: 'modern', decode: decodeModern },
@@ -79,7 +73,6 @@ export async function decodePacketTracerFile(bytes) {
     }
   }
 
-  // El detalle de cada variante sirve para diagnosticar, no para leerlo en pantalla.
   console.warn('Trenza:', failures.join(' | '));
   throw new Error(t('error.decrypt'));
 }

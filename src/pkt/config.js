@@ -1,15 +1,6 @@
-/**
- * Lectura de la `running-config` que Packet Tracer guarda por dispositivo. Es texto de
- * Cisco IOS, no XML, y todo lo de acá trabaja sobre líneas sueltas: sirve para probarlo
- * sin navegador y deja a `model.js` con una sola tarea, traducir el árbol del archivo.
- */
+// Parsers de la running-config (texto IOS). No dependen del DOM, así se prueban con node.
 
-/**
- * Las interfaces con nombre sólo aparecen acá; el árbol de puertos del XML guarda
- * direcciones pero no la nomenclatura que usa el equipo. Devuelve todas, incluso las que
- * no llevan dirección: un puerto de acceso sin IP no dice nada por sí solo, pero es el que
- * dice qué VLAN vive en ese cable.
- */
+// El XML guarda las direcciones de los puertos pero no sus nombres; los nombres salen de acá.
 export function readInterfaces(configLines) {
   const interfaces = [];
   let current = null;
@@ -40,19 +31,16 @@ export function readInterfaces(configLines) {
     const access = line.match(/^switchport access vlan\s+(\d+)/i);
     if (access) current.vlan = access[1];
 
-    // Router en un palo: la subinterfaz no es un puerto de acceso, es la puerta de enlace
-    // de esa VLAN. El número lo lleva la encapsulación, no el nombre de la interfaz.
+    // Router-on-a-stick: la VLAN la da la encapsulación, no el nombre de la subinterfaz.
     const tagged = line.match(/^encapsulation\s+dot1q\s+(\d+)/i);
     if (tagged) current.dot1q = tagged[1];
 
     const group = line.match(/^ip access-group\s+(\S+)\s+(in|out)\b/i);
     if (group) current.accessGroups.push({ id: group[1], direction: group[2].toLowerCase() });
 
-    // Un tronco sin lista de permitidas las lleva todas, que es lo que hace Cisco por
-    // omisión y lo que escribe Packet Tracer cuando se configura por la interfaz.
+    // Un trunk sin "allowed vlan" las lleva todas.
     if (/^switchport mode trunk$/i.test(line)) current.trunkAll = true;
 
-    // Un tronco puede declarar sus VLAN en varias líneas, con `add` en las siguientes.
     const trunk = line.match(/^switchport trunk allowed vlan\s+(?:add\s+)?(\S+)/i);
     if (trunk) current.trunk = current.trunk ? `${current.trunk},${trunk[1]}` : trunk[1];
 
@@ -62,7 +50,7 @@ export function readInterfaces(configLines) {
   return interfaces;
 }
 
-/** Una lista de VLAN de tronco: números sueltos y rangos, `10,20,30-32`. */
+// "10,20,30-32"
 function expandVlanList(list) {
   if (!list) return [];
 
@@ -78,18 +66,11 @@ function expandVlanList(list) {
   return ids;
 }
 
-// Packet Tracer crea estas en cada switch por su cuenta y nadie las toca. Aparecen siempre,
-// así que listarlas sería una fila de ruido por dispositivo; se muestran sólo si algún
-// puerto las nombra, que ahí sí alguien decidió algo.
+// Existen en todo switch; sólo se muestran si algún puerto las usa.
 const DEFAULT_VLANS = new Set(['1', '1002', '1003', '1004', '1005']);
 
-/**
- * Las VLAN salen de dos lados del archivo y hay que cruzarlos. El árbol XML del dispositivo
- * trae la base con el número y el nombre —y es la única fuente cuando el switch se configuró
- * por la interfaz de Packet Tracer, que no escribe nada en la configuración—; la
- * configuración dice qué puerto pertenece a cuál, que el XML no guarda. `declared` son las
- * del XML; una VLAN que sólo aparezca en un puerto se define igual, al vuelo.
- */
+// Cruza las VLAN del XML (`declared`: número y nombre) con la running-config, que dice qué
+// puerto pertenece a cuál.
 export function readVlans(configLines, interfaces, declared = []) {
   const vlans = new Map();
   const named = new Set();
@@ -130,7 +111,7 @@ export function readVlans(configLines, interfaces, declared = []) {
     }
   }
 
-  // Los troncos sin lista se resuelven al final, cuando ya se sabe qué VLAN hay.
+  // Los trunks sin lista se resuelven al final, cuando ya se conocen todas las VLAN.
   for (const entry of interfaces) {
     if (!entry.trunkAll) continue;
     for (const vlan of vlans.values()) {
@@ -143,7 +124,7 @@ export function readVlans(configLines, interfaces, declared = []) {
     .sort((a, b) => Number(a.id) - Number(b.id));
 }
 
-/** Las rutas escritas a mano. Las que aprende un protocolo no están en la configuración. */
+// Sólo rutas estáticas: las aprendidas no están en la configuración.
 export function readRoutes(configLines) {
   const routes = [];
 
@@ -160,12 +141,8 @@ export function readRoutes(configLines) {
   return routes;
 }
 
-/**
- * Las listas de acceso, con las reglas en el orden en que están escritas: en una lista de
- * acceso el orden es la regla, porque se evalúa de arriba abajo y la primera que coincide
- * decide. Se cruzan con las interfaces para decir dónde está aplicada cada una, que es la
- * mitad del dato: una lista escrita y no aplicada no filtra nada.
- */
+// Las reglas conservan su orden (gana la primera que coincide) y cada lista sabe en qué
+// interfaces está aplicada.
 export function readAccessLists(configLines, interfaces = []) {
   const lists = new Map();
   const define = (id) => {
@@ -177,8 +154,8 @@ export function readAccessLists(configLines, interfaces = []) {
   for (const raw of configLines) {
     const line = raw.trim();
 
-    // Las numeradas van en una línea cada una; las nombradas abren un bloque con sus
-    // reglas adentro, y el bloque termina en la primera línea que no es una regla.
+    // Numeradas: una regla por línea. Nombradas: un bloque que termina en la primera línea
+    // que no es regla.
     const numbered = line.match(/^access-list\s+(\S+)\s+(.+)$/i);
     if (numbered) {
       define(numbered[1]).rules.push(numbered[2].trim());
@@ -206,13 +183,7 @@ export function readAccessLists(configLines, interfaces = []) {
   return [...lists.values()];
 }
 
-/**
- * Los protocolos de enrutamiento dinámico. Las redes se guardan tal como están escritas
- * —`10.0.0.0 0.0.0.255 area 0`— en vez de despiezarlas: cada protocolo le da su propia
- * forma a esa línea y volver a armarla para mostrarla no agrega nada que el original no
- * diga. Las rutas que el protocolo aprende no están en el archivo; esto es la
- * configuración, no la tabla de enrutamiento.
- */
+// Las sentencias `network` quedan como texto: cada protocolo tiene su propia sintaxis.
 export function readRoutingProtocols(configLines) {
   const protocols = [];
   let open = null;

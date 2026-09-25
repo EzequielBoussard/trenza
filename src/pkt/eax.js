@@ -82,11 +82,7 @@ function constantTimeEquals(a, b) {
   return difference === 0;
 }
 
-/**
- * Descifra un mensaje Twofish-EAX cuyo tag de autenticación va anexado al final.
- * Es la disposición que produce Crypto++, la biblioteca con la que se generan los
- * archivos de Packet Tracer.
- */
+// El tag va al final del mensaje, como lo deja Crypto++ (con lo que Packet Tracer cifra).
 export function decryptTwofishEax(payload, key, nonce, { verifyTag = true } = {}) {
   if (payload.length < BLOCK_SIZE) {
     throw new Error(t('error.eaxShort'));

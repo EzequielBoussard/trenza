@@ -10,9 +10,7 @@ test('una cadena sin marcadores vuelve tal cual', () => {
 });
 
 test('la misma plantilla con valores distintos no se contamina', () => {
-  // Las plantillas se parten una sola vez y se guardan. Si lo guardado fuera el resultado
-  // y no las piezas, el segundo paquete saldría con los datos del primero, y eso en una
-  // captura son cien mil filas iguales.
+  // Se cachea la plantilla partida, no el resultado.
   const primero = t('packet.lengths', { source: 51000, destination: 53, length: 40 });
   const segundo = t('packet.lengths', { source: 40404, destination: 443, length: 8 });
 

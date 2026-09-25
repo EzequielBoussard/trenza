@@ -7,8 +7,7 @@ import { decodePacketTracerFile } from '../src/pkt/decode.js';
 // Los mensajes que se comparan abajo son los del idioma por defecto.
 setLanguage('en');
 
-// Construye un archivo con el formato anterior a Packet Tracer 6.2, que es el
-// único que se puede generar sin implementar también el cifrado.
+// Formato anterior a 6.2: se puede generar sin cifrar.
 function buildLegacyFile(xml) {
   const payload = deflateSync(Buffer.from(xml, 'utf8'));
   const withHeader = Buffer.alloc(4 + payload.length);

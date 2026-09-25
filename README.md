@@ -1,310 +1,82 @@
 # Trenza
 
-Un visor de sólo lectura para archivos `.pkt` y `.pka` de Cisco Packet Tracer y para capturas `.pcap` y `.pcapng`. Todo se procesa en el navegador: el archivo nunca sale hacia un servidor.
+Visor web de sólo lectura para archivos `.pkt` y `.pka` de Cisco Packet Tracer y capturas `.pcap` y `.pcapng`. Descifra el archivo y dibuja la topología en el navegador; el archivo no se sube a ningún servidor.
 
-## Qué muestra
+**Demo:** [trenza.pages.dev/demo](https://trenza.pages.dev/demo) abre una red de ejemplo de 71 equipos.
 
-De Packet Tracer: la topología lógica con las posiciones originales, el inventario de equipos, las interfaces con sus direcciones, las VLAN, las rutas estáticas, los protocolos de enrutamiento, las listas de acceso, y el `running-config` de cada dispositivo que lo tenga.
+![Parte de la red de ejemplo en Trenza](showcase/preview-dark.webp)
 
-Todo eso sale de leer la configuración, que es texto de Cisco IOS y vive en `src/pkt/config.js`, aparte del resto: así se prueba sin navegador y `model.js` se queda con una sola tarea, traducir el árbol del archivo. De las rutas sólo están las escritas a mano; las que aprende un protocolo no viven en la configuración.
+## Qué hace
 
-De los protocolos —RIP, OSPF, EIGRP— se lee qué redes anuncia cada uno y qué interfaces quedaron pasivas. Las redes se muestran tal como están escritas, `10.0.0.0 0.0.0.255 area 0`, en vez de despiezarlas: cada protocolo le da su propia forma a esa línea y volver a armarla no agrega nada que el original no diga. Un bloque vacío igual aparece, porque «este equipo tiene RIP activado y no anuncia nada» es justamente lo que hay que ver; es además lo que escribe Packet Tracer cuando alguien entra a `router rip` y sale sin más, y pasa en tres de los archivos de prueba.
+Con un `.pkt` o `.pka`:
 
-De las listas de acceso se leen las reglas en orden y dónde está aplicada cada una, que son las dos mitades del dato: en una lista de acceso el orden es la regla, porque se evalúa de arriba abajo y la primera que coincide decide; y una lista escrita y no aplicada no filtra nada. Al revés también: una interfaz con `ip access-group` de una lista que no existe deja pasar todo, así que esa lista aparece igual, vacía y con su interfaz al lado. Las numeradas van en una línea cada una y las nombradas abren un bloque; las dos terminan en la misma tabla.
+- Dibuja la topología lógica con las posiciones guardadas en el archivo.
+- Muestra cada equipo con sus interfaces y direcciones, VLAN, rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y la `running-config`.
+- Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español y con tema claro u oscuro.
 
-Las VLAN hay que cruzarlas de dos lados del archivo, porque cada lado guarda la mitad. El árbol XML del dispositivo trae la base con el número y el nombre, y es la única fuente cuando el switch se configuró desde la interfaz de Packet Tracer, que no escribe nada de esto en la configuración; la configuración, a su vez, dice qué puerto pertenece a cuál, que el XML no guarda. Un tronco declarado sin lista de permitidas las lleva todas, que es lo que hace Cisco por omisión. Y las que Packet Tracer crea solo en cada switch —la 1 y las 1002 a 1005— no se listan salvo que algún puerto las nombre, porque aparecen siempre y serían una fila de ruido por dispositivo.
+Con un `.pcap` o `.pcapng`:
 
-Se agrupan por VLAN y no por puerto porque la pregunta es «qué VLAN hay y por dónde pasa», y un switch de veinticuatro bocas contestada al revés son veinticuatro renglones para leer de a uno. Nada de esto aparece cuando no hay: la red del showcase es plana y no muestra ninguna de las dos secciones.
+- Lista los paquetes con tiempo, direcciones y protocolo, con filtro y orden por columna.
+- Desglosa cada paquete por capas y muestra el volcado hexadecimal.
+- Exporta la captura, o los paquetes seleccionados, como CSV o pcap.
 
-En un router en un palo la VLAN no pasa por un puerto de acceso sino por una subinterfaz con `encapsulation dot1Q`, que es su puerta de enlace. Esas van en su propia columna, y la columna sólo existe cuando hay alguna: en un switch sería una columna de guiones.
+No edita ni simula nada: para eso sigue haciendo falta Packet Tracer.
 
-De una captura: la lista de paquetes con tiempo relativo, direcciones y protocolo, el desglose por capas y el volcado hexadecimal.
+## Uso
 
-El tipo de enlace no lo dice el paquete sino la captura, y de él depende dónde empieza todo lo demás: leer un «Linux cooked» como si fuera Ethernet corre las direcciones dos bytes y el desglose sale entero pero mal. Se leen Ethernet con sus VLAN apiladas, IP en crudo, el bucle local de BSD y macOS, PPP, Cisco HDLC —que es lo que sale de un enlace serie entre routers— y las dos formas del encabezado que pone Linux al capturar de todas las interfaces a la vez. El del bucle local se resuelve por el nibble de versión del paquete que sigue y no por la familia de direcciones, que vale distinto según el sistema y viene en el orden de bytes del equipo que capturó. El que no se conoce se nombra por su número en vez de quedar en blanco, y el resumen del archivo dice siempre de qué enlace salió.
+- Abrir un archivo con el botón o arrastrándolo a la página.
+- `?src=<url>` abre un archivo publicado en otro sitio, si ese servidor permite CORS (por ejemplo `raw.githubusercontent.com`). Sólo se aceptan direcciones `https`.
+- `/demo` abre la red de ejemplo de `showcase/`.
+- Funciona sin conexión después de la primera visita y se puede instalar como aplicación.
 
-## El formato de los archivos de Packet Tracer
+## Cómo se lee un `.pkt`
 
-Un `.pkt` no es un contenedor estándar. Desde la versión 6.2 la tubería es ésta, en el orden inverso al que aplica Packet Tracer:
+El formato no está documentado. Desde la versión 6.2, Packet Tracer guarda el XML interno así, y el visor deshace los pasos en orden inverso:
 
-1. **Ofuscación exterior.** El archivo se lee al revés y cada byte se enmascara con un valor derivado de su posición y del largo total.
-2. **Descifrado.** Twofish en modo EAX, con clave y nonce fijos e iguales para todas las instalaciones: dieciséis bytes `0x89` y dieciséis bytes `0x10`.
-3. **Ofuscación interior.** Otra máscara dependiente de la posición, esta vez sobre el texto plano.
-4. **Descompresión.** zlib, con el tamaño descomprimido en los primeros cuatro bytes.
+1. Ofuscación exterior: el archivo invertido y cada byte con XOR contra un valor que depende de la posición y del largo.
+2. Twofish en modo EAX, con clave y nonce fijos: 16 bytes `0x89` y 16 bytes `0x10`.
+3. Ofuscación interior: otra máscara por posición sobre el texto descifrado.
+4. zlib, con el tamaño descomprimido en los primeros 4 bytes.
 
-El resultado es el XML interno de Packet Tracer. Los archivos anteriores a 6.2 sólo tienen los pasos 3 y 4, así que el visor prueba primero la variante moderna y cae en la heredada si falla.
+Los archivos anteriores a 6.2 sólo tienen los pasos 3 y 4. El formato lo documentaron antes [pka2xml](https://github.com/mircodz/pka2xml) y [ptexplorer](https://github.com/axcheron/ptexplorer); Trenza reimplementa la lectura en JavaScript para que corra en el navegador. Twofish está escrito a mano porque WebCrypto no lo incluye, y se prueba contra los vectores del paper original.
 
-La tubería está documentada por ingeniería inversa pública, sobre todo en [`pka2xml`](https://github.com/mircodz/pka2xml) y [`ptexplorer`](https://github.com/axcheron/ptexplorer). El proyecto no distribuye software, iconografía ni contenido de Cisco, y no reimplementa el simulador: sólo lee.
-
-## Idiomas
-
-La interfaz está en inglés y en español. El selector vive en la cabecera y la elección queda guardada en el navegador. Cambiar de idioma redibuja lo que esté abierto, incluidos los nombres de los campos de los paquetes, sin perder la selección.
-
-Los textos están en `src/i18n.js`, un diccionario por idioma. Agregar uno es copiar el bloque y traducir las claves.
-
-Dos reglas que se revisan enfrentando los dos diccionarios: los marcadores tienen que ser los mismos en las dos cadenas, y **lo que va a la barra de estado no termina en punto**, sea un aviso o un error. Es una barra, no un párrafo, y tenerla mitad con punto y mitad sin él delata que las cadenas se escribieron de a una sin mirar el conjunto. Los párrafos de la pantalla inicial, las notas del diálogo y los avisos de lista vacía sí llevan punto, que ahí sí son prosa. Lo que queda igual en los dos idiomas está porque tiene que estarlo: `Router`, `Switch`, `IoT`, `EtherType`, `Bytes` y las cadenas que sólo son marcadores y unidades.
-
-## De dónde salen las posiciones
-
-Del archivo. Cada dispositivo trae su X y su Y en `WORKSPACE/LOGICAL`, que son las que Packet Tracer guardó cuando alguien lo arrastró hasta ahí. El visor no reordena nada: sólo lleva ese rectángulo al que tenga a mano, con un estiramiento acotado para cuando las proporciones no coinciden.
-
-Eso fija el techo de todo lo demás. Separar dos equipos que el archivo puso juntos es agrandar el dibujo entero, y agrandar el dibujo entero es achicar la letra respecto del marco. Son la misma perilla, no dos.
-
-## El tamaño de los nombres y las direcciones
-
-Todo el dibujo se define en unidades de diseño y después se multiplica por una escala hasta llegar al panel o a la imagen. El cuerpo que se ve, entonces, es el cuerpo de diseño por esa escala, y la escala es el ancho de salida dividido por el ancho del lienzo. A menos unidades de lienzo, más grande sale todo.
-
-Y el ancho del lienzo no se elige: es el más chico donde ninguna etiqueta se roza con otra. De modo que la pregunta «¿por qué la letra es de este tamaño?» es en realidad «¿cuánto hay que separar los equipos?».
-
-La respuesta es la dirección IP. En la red del showcase el nombre típico ocupa 49 unidades y la dirección, 68: catorce caracteres son más anchos que un `PC13` por mucho que el cuerpo sea la mitad. Como la caja que se reserva es la más ancha de las dos, la dirección decide el reparto en 60 de los 71 equipos, y de ahí salen tres consecuencias que no son obvias:
-
-- **El cuerpo de la dirección no cambia cómo se la ve.** Subirlo ensancha las cajas, obliga a un lienzo más ancho en la misma proporción, y la escala baja lo mismo que subió el cuerpo. Medido: con cuerpo 10 hacen falta 2743 unidades y con cuerpo 9, 2436; en pantalla la dirección queda en 2,92 px y en 2,96 px. Prácticamente idéntica.
-- **El ancho de la dirección sí.** Lo que hay que atacar no es su cuerpo sino cuánto ocupa. Una dirección en monoespaciada de 9 mide 70 unidades; en condensada de 11, 68. Dos puntos más de cuerpo en menos lugar. Alinear dígitos, que es para lo que sirve la monoespaciada, no aporta nada en una etiqueta suelta centrada bajo un icono; en la tabla de paquetes, donde sí hay columnas, se sigue usando.
-- **El cuerpo del nombre es gratis.** Como el nombre no fija el reparto, subirlo no obliga a separar nada. Entre 17 y 24 el lienzo no se mueve ni una unidad, y de ahí en más es sólo una cuestión de proporción contra el icono.
-
-Por eso el nombre va en 20 y la dirección en 11, las dos en condensada. No es una decisión tipográfica sino la consecuencia de cuál de los dos textos paga el ancho. Los cuatro valores —los dos cuerpos y las dos líneas de base— viven juntos en `LABEL_TYPE`, en `src/view/graph.js`, junto a las dos familias completas, y los comparten el visor y la exportación: lo que se mide para repartir tiene que ser lo que después se dibuja.
-
-El lienzo toma además la proporción del panel donde va a entrar. Con una proporción fija, un lienzo apaisado dentro de un panel casi cuadrado entraba por el ancho y dejaba 312 px de los 812 en blanco, y el dibujo se achicaba para caber en la parte que sí usaba. Si el panel cambia de forma el reparto se rehace, pero sólo mientras la vista esté sin tocar: rehacerlo debajo de alguien que estaba mirando algo de cerca molesta más que la franja que evita.
-
-El ancho se busca de menos a más, de a cincuenta unidades, y gana el primero que quede prolijo, que por ser el primero es también el más chico. El paso tiene que ser fino porque los huecos donde el reparto queda limpio son angostos y no vienen en orden: con escalones de trescientas unidades, en un panel de 960 × 810 la búsqueda pasaba de 2400 —que ya estaba limpio— a 3664, y eso son 42 % de cuerpo de letra tirado. Sale barato porque cada intento cuesta cuatro décimas de milisegundo: recorrer el rango entero son 33 ms en el peor caso, y un dibujado completo, entre 13 y 22.
-
-Todo junto, sobre un panel de 1272 × 834, el nombre pasó de 5,42 px a 9,27 px y la dirección de 4,17 px a 5,10 px, sin franjas vacías.
-
-Lo que ninguna de las dos arregla es que una red de setenta equipos, vista entera en un panel de ochocientos píxeles, tiene unos 3 px de dirección. Eso es geometría: setenta cajas de 63 unidades no entran en menos lienzo del que entran. Para leer las direcciones hay que acercarse, y por eso todas las etiquetas están dibujadas desde el primer cuadro, para que acercarse sólo agrande y no haga aparecer nada.
-
-## Exportar el diagrama
-
-El botón **Exportar diagrama** dibuja la red entera en un lienzo aparte, con el encuadre calculado desde los límites reales de la topología. No captura la pantalla: el zoom y el desplazamiento actuales no afectan el resultado y no se recorta nada.
-
-Los formatos son PNG, JPG, SVG y PDF de una página. PNG y SVG admiten fondo transparente. El nombre propuesto es el del archivo abierto sin extensión, editable antes de exportar.
-
-El diagrama tiene un tamaño natural: aquel donde ninguna etiqueta pisa a otra. El SVG sale siempre de ese tamaño y, por ser vectorial, se agranda después sin perder nitidez. Las resoluciones en píxeles toman el mismo dibujo y lo reparten en la medida pedida.
-
-Con una medida fija, lo único que se elige es en cuántas unidades de diseño se reparte el dibujo. Arrancan en 2200 y son las mismas venga la salida de 1080 o de 4K, así que subir la resolución agranda nombres, direcciones e iconos en vez de sumar píxeles al mismo dibujo diminuto. Si con ese ancho alguna etiqueta se queda sin lugar, el diseño se ensancha hasta que entren todas, con tope en el ancho natural: una dirección a medias no sirve para nada, y el precio es cuerpo de letra, no información.
-
-En la red del showcase el diseño queda en 2700 unidades, con las setenta y una etiquetas alineadas y ninguna rozando a otra, que en 4K son nombres de 28 px y direcciones de 16 px, y en 2560 × 1440, de 19 y de 10. Sin medida fija —el SVG, o «ajustar al diagrama»— el tamaño natural es de 3097 × 1383.
-
-Y como el marco casi nunca tiene la proporción de la red, ésta se estira hasta 1,75 veces en un eje antes que dejar franjas vacías: es un esquema, no un plano. En un 4K los cuatro márgenes quedan en unos 100 px sobre 3840.
-
-El nombre y la dirección son una sola pieza. Se dibujan juntos y, si el lugar está ocupado, bajan juntos al renglón siguiente: separarlos dejaba la dirección flotando lejos de su nombre, sin que se supiera de quién era. Lo que no encuentra ningún renglón libre se dibuja igual, rozando a otra etiqueta, porque una etiqueta que aparece y desaparece al acercarse molesta más que dos que se tocan. Nunca se deja de dibujar una dirección.
-
-Pero un bloque corrido rompe la alineación, y en una fila de equipos iguales con uno más abajo eso canta. Así que el ancho no se busca hasta que las etiquetas entren, sino hasta que **todas queden en el mismo renglón**: la medida de lo prolijo cuenta las que se rozan y las que bajaron, y el diseño crece hasta llevarla a cero. Más ancho no siempre es más prolijo —al estirarse cambia también la separación vertical—, así que se prueban varios y gana el primero que llega a cero.
-
-El disco reservado mide lo mismo que el dibujado, 26, y se mide como el círculo que es: una caja que sólo alcanza la esquina de su cuadrado no lo toca de verdad, y descartarla por eso cuesta once píxeles en diagonal. Con 22 reservados sobre 26 dibujados, una dirección podía apoyarse en el anillo de afuera y quedar tapada por él.
-
-El marco —título, leyenda y dirección del sitio— no sigue esa cuenta: son cinco cadenas cortas que no compiten con nada, así que crecen con la imagen y no con el dibujo. La letra se calibra contra una salida de 1100 px de ancho y el aire que la rodea contra una de 1600, porque cada unidad de margen se la saca al dibujo, que es lo que de verdad está apretado. La banda del título mide sus dos renglones más un respiro fijo, por el mismo motivo. En un 4K eso deja el título en 84 px, la leyenda en 45 y la dirección del sitio en 42.
-
-De ahí el criterio para el menú de medidas: la que dejaría el texto por debajo del piso legible no se ofrece, y no se ofrece a secas, sin explicación al lado. El piso se mide sobre la dirección, que es el texto más chico del dibujo y el que trae el dato; ponerlo sobre el nombre, que es casi el doble, dejaba pasar salidas con direcciones ilegibles. Son 7 px en pantalla, lo que en la red del showcase deja afuera 1280 × 720, donde la dirección caería a 5,2 px. Cada formato pide lo suyo: píxeles para PNG y JPG, hoja —A4, Carta, A3 o ajustar al diagrama— para PDF, y nada para SVG, que sale siempre al tamaño natural. El PDF se rasteriza a 300 puntos por pulgada, que es definición de imprenta y aguanta ampliar al 300 % en pantalla antes de que se note el píxel; en papel el piso es de 2,5 pt, bastante menor que en pantalla porque esos 300 puntos resuelven trazos que un monitor no.
-
-Toda exportación lleva la dirección del visor abajo a la derecha.
-
-Sobre la vista previa hay una lupa que sigue al puntero y dibuja ese pedazo a la escala real del archivo, no un aumento de la miniatura: es la única forma de saber, antes de bajar nada, si los nombres y las direcciones se van a leer. Sale barata porque reaprovecha el reparto ya calculado y sólo vuelve a pintar, con lo que quede fuera del recuadro descartado por el propio lienzo: alrededor de milisegundo y medio por movimiento. Va apaisada y no redonda, porque lo que se mira son dos renglones de texto. No aparece con pantalla táctil, donde no hay puntero al que seguir, ni cuando taparía media vista previa.
-
-El diálogo muestra la salida al costado y se lleva el ancho que sobre, hasta 88 rem; por debajo de 50 rem la vista pasa abajo de los campos, y por debajo de 34 rem el diálogo se angosta a lo de un teléfono. Los botones quedan pegados al pie, porque si no, en una pantalla corta el de exportar se va debajo del borde. La vista se dibuja con el mismo plan en un lienzo chico: mismo reparto, mismas etiquetas, mismo encuadre, sólo que con menos píxeles debajo. Cuesta unos quince milisegundos, así que se rehace con cada cambio. Dos resoluciones del mismo formato dan la misma imagen —el reparto no depende de los píxeles, sólo la definición—, y por eso el pie dice la medida real, que es lo que sí cambia. Con fondo transparente va sobre un damero, para que se vea por lo que es.
-
-El diálogo también pregunta el idioma y el tema, y viene con los que el usuario tiene puestos. Sirve para sacar un diagrama claro en inglés desde un visor oscuro en español sin tocar nada de la pantalla: se toma prestado el idioma mientras se dibuja, y la paleta del otro tema se lee poniéndole el atributo al elemento raíz un instante, sin que entre medio haya un repintado. El aviso de estado sigue en el idioma del visor, que es el de quien mira, no el del archivo.
-
-El idioma alcanza también al CSV, que lleva los encabezados traducidos. Al pcap no, que es sólo bytes, y al tema tampoco, que no dibuja nada.
-
-El tamaño natural sale del contenido y no de una medida elegida de antemano: se mide cada etiqueta con la tipografía real, se busca la escala mínima donde ningún par de dispositivos se pisa —a dos vecinos les alcanza con separarse en un eje— y sobre esa área se suman los márgenes del título, la leyenda y las etiquetas. Cada etiqueta lleva además un contorno del color del fondo por debajo del relleno, el mismo que en pantalla, para que un cable que le pase por detrás no la borre.
-
-La leyenda se arma en columnas de ancho uniforme, alineadas entre sí, y pasa a varias filas si no entran a lo ancho.
-
-El PDF se escribe a mano: una página con el diagrama como imagen RGB comprimida con `FlateDecode`, sin pérdida. Un documento tan chico no justifica sumar una biblioteca de PDF entera.
-
-El lienzo tiene un techo de dieciséis millones y pico de píxeles, que es lo que entrega Safari en iPhone antes de devolver uno en blanco sin avisar. Un A3 a 300 puntos por pulgada son 17,4 millones, así que baja a 294, que es una diferencia que no se ve. La hoja no cambia de medida: el PDF la calcula desde los píxeles que salieron, no al revés.
-
-## Tema claro y oscuro
-
-Los colores viven en variables CSS y el tema claro reescribe los mismos nombres, así que el diagrama en pantalla y las exportaciones lo siguen sin enterarse. Cambiar de tema lanza un barrido de 900 ms: una franja inclinada con líneas de barrido entra desde un costado frenando, queda quieta un instante tapando la pantalla entera —ahí cambian los colores, sin que se vea el corte— y sale por el otro acelerando. Cada tramo lleva su curva; una sola para todo haría notar el frenado y el arranque como un tirón. El sobrante lateral se mide en `vmax` porque el sesgo corre los bordes tanto como la mitad del alto de la franja, y con un porcentaje del ancho una pantalla alta y angosta dejaría los vértices al descubierto.
-
-El icono del botón espera a que la franja lo destape antes de transformarse: cambia justo cuando el barrido tapa la cabecera, y sin esa espera el sol y la luna se transformaban a la vista. El icono se dibuja desde esas mismas variables —el radio del disco, la posición del mordisco, la presencia de los rayos—, así que pasa de luna a sol animándose por el mismo camino que los colores, sin una sola regla que sepa qué tema está puesto. El oscuro es el de por omisión; el botón de la cabecera fija el otro y lo recuerda. Un guion en la cabecera aplica el tema y el idioma guardados antes del primer pintado, para que la página no arranque con lo predeterminado y salte al rato; va con hash en la política de seguridad, no con `unsafe-inline`. Los hilos del código T568B se oscurecen sobre fondo claro: un naranja pálido que funciona contra grafito desaparecería contra papel.
-
-## Dispositivos apartados
-
-Packet Tracer deja arrastrar un equipo a cualquier rincón del espacio de trabajo, y ahí queda guardado. Uno solo a 3900 unidades del resto multiplica por diez los límites del dibujo y aplasta la red entera contra el centro. Por eso los dispositivos sin ningún enlace que además caen fuera del rectángulo donde vive la red se dibujan aparte, en una bandeja al pie del diagrama. Aparecen igual, sin deformar lo demás, y con el motivo a la vista.
-
-## El diagrama en pantalla
-
-El visor reparte la red en un lienzo propio: el más chico donde todas las etiquetas tienen lugar limpio, entre 900 y 5200 unidades, con la proporción del panel. Después el SVG lo lleva al tamaño del panel y el zoom se mueve por dentro de un dibujo ya resuelto, así que acercarse sólo agranda: no aparece ni desaparece nada, ni se corre de sitio. La red del showcase pide unas 2450 unidades —el número exacto depende de la forma del panel— y hay que acercarse para leer las direcciones, pero las setenta y una etiquetas están dibujadas desde el primer cuadro.
-
-Es el mismo dibujo que la exportación, a menos píxeles: mismo reparto, mismos renglones, misma prueba de choque, los mismos cuerpos de letra. Lo único que no se puede igualar es el presupuesto, un panel de 800 px contra una imagen de 3840.
-
-Y los mismos márgenes, que hasta hace poco no. Abajo hay que reservar lo que el bloque de nombre y dirección alcanza cuando le toca el último renglón, y a los costados, la mitad de la etiqueta más ancha, medida y no supuesta. El visor tenía dos números fijos —noventa abajo, ciento veinte al costado— mientras la exportación reservaba lo que hacía falta, y con eso la dirección de los equipos de la fila de abajo se dibujaba fuera del lienzo: el SVG la recortaba, cinco píxeles en un panel de 768 × 349. Ahora los dos reservan lo mismo porque lo sacan del mismo lugar.
-
-Lo que mide cada etiqueta se guarda, porque la búsqueda del ancho lo pregunta una vez por candidato, pero se guarda **por medidor y no en un mapa suelto del módulo**. La diferencia no es cosmética: las tipografías llegan por la red y el primer dibujado del visor puede caer antes, midiendo con la alternativa. La condensada de IBM es hasta un 19 % más ancha que Arial Narrow en una dirección, así que esa medida vieja repartía la red para una letra que no es la que se ve. Compartiendo el mapa se le colaba además al exporte, que sí espera a que carguen: la red del showcase salía en 2722 unidades en vez de 3097, con una etiqueta rozando a otra. Y cuando las tipografías llegan, el visor mide de nuevo y rehace el reparto, con la misma prudencia que el observador de forma: sólo si nadie tocó la vista todavía.
-
-Esperar a `document.fonts.ready` no alcanza, y es una trampa fina: promete que terminó lo que estaba cargando, no que esté cargada una familia que todavía nadie pidió. La condensada la usa el diagrama y nada más, así que una exportación lanzada antes de haber dibujado uno medía con la alternativa aunque hubiera esperado. Se piden las dos por nombre, `document.fonts.load`, que sí lo garantiza y no cuesta nada cuando ya están. Si no llegan —sin red, o con la hoja de fuentes bloqueada— se mide la alternativa, que es la que se va a ver.
-
-La prueba de choque de las etiquetas recorre los equipos de arriba abajo y compara cada uno sólo contra los que tiene cerca en vertical, no contra todos. Dos equipos separados por más de lo que alcanza un bloque más el radio del disco no pueden tocarse pase lo que pase, y ése es el corte. Importa porque la búsqueda del ancho repite esa prueba una vez por candidato, unas treinta veces: en una red de trescientos equipos la pasada bajó de 0,585 ms a 0,207. Lo que cada etiqueta mide, que no depende de dónde caiga, se calcula una sola vez por dispositivo en vez de una vez por candidato.
-
-La rueda acerca dejando quieto el punto que está bajo el cursor, no la esquina, así que no hay que perseguir el diagrama arrastrando después de cada giro. El paso sale de cuánto giró la rueda y no de un salto fijo: un trackpad, que manda muchos avisos chicos, avanza de a poco, y un ratón de muescas da su paso entero. Nada de eso se anima: detrás hay un gesto continuo que ya marca el ritmo, y cualquier suavizado encima es la vista yendo atrás del dedo. Sólo se animan los botones de más y menos, que no tienen gesto detrás. Los avisos de rueda se juntan y se aplican una sola vez por cuadro: atenderlos de a uno dibuja varias veces por cuadro y, peor, obliga a recalcular la posición del SVG en cada uno. Con la matriz calculada una vez por cuadro, seis muescas seguidas cuestan 1,6 ms en total y se resuelven en un solo movimiento.
-
-El pellizco entra por dos puertas: la rueda con Control apretado, que es como lo mandan los trackpads, y los eventos de gesto propios de Safari, que además hay que atender para que el navegador no acerque la página entera en vez del diagrama. El factor de conversión entre píxeles de pantalla y unidades del dibujo sale de la matriz del SVG y no de su ancho: cuando las proporciones no coinciden, el dibujo queda apaisado dentro del elemento y el ancho miente.
-
-Las dos entradas de la leyenda son botones: tocar una deja encendidos sólo los cables de ese tipo y apaga el resto, y tocarla otra vez vuelve atrás. Es el lugar donde ya se está mirando cuando surge la pregunta. Elegir un dispositivo apaga el filtro, y al revés, porque los dos resaltados dirían cosas distintas a la vez.
-
-Un clic en el vacío del diagrama, o la tecla `Escape`, deselecciona lo que haya, sea un dispositivo o un tipo de cable. Arrastrar para desplazarse no cuenta como clic: el umbral es de cinco píxeles.
-
-El lienzo toma la proporción del recuadro del dibujo, y del recuadro nada más: la franja de la leyenda cuelga de la escena y no de él. Contándola, el lienzo salía con la forma de un espacio más alto del que iba a tener, el dibujo entraba por el alto y dejaba bandas vacías a los costados —en un teléfono, el 12 % del ancho—. La franja se pone antes de medir, no después, porque su contenido sale de los enlaces y ésos ya están.
-
-El tope de esa proporción estaba corto. Un teléfono apaisado deja un recuadro de 640 × 156, proporción 4,09, y recortarla a 2,6 desperdiciaba el 36 % del área con el dibujo un 10 % más chico de lo que daba el lugar. Una proporción extrema no rompe nada: el lienzo se achica de alto, las etiquetas se rozan y la búsqueda del ancho lo resuelve sola ensanchándolo, que es exactamente para lo que está.
-
-Apiladas, las tres zonas no entran en un alto de pantalla, y forzarlas era el peor de los repartos: con el diagrama pidiendo veinticuatro rem de mínimo, en un teléfono de 844 de alto a la lista y al detalle les quedaban ciento veintiséis píxeles cada uno, menos de lo que mide el campo de búsqueda, que salía cortado contra el borde. Por debajo de 1180 la página se desplaza, que es lo que se espera de algo apilado: el diagrama toma un alto propio, la lista se desplaza por dentro porque puede tener setenta renglones, y el detalle se estira con lo que tenga.
-
-La leyenda va debajo del diagrama y no flotando sobre el rincón de abajo a la izquierda. Flotando tapaba equipos, y no sólo en un teléfono: el reparto usa el lienzo entero porque nada le dice que un rincón esté ocupado, así que basta una red rala —cinco equipos repartidos hasta los bordes— y un panel ancho y bajo para que uno quede debajo. Medido, pasaba entre 700 y 800 px de ancho y no pasaba ni a 640 ni a 900, que es lo que tiene depender de dónde cayó cada equipo: ningún punto de corte por ancho lo arregla. Reservarle el hueco en el reparto sería lienzo perdido en todas las pantallas; como franja al pie cuesta unos treinta píxeles de alto y no hay ancho en el que tape nada. Sin enlaces no hay leyenda, que una franja vacía no dice nada.
-
-Los símbolos de cada dispositivo son propios y no los de Cisco, que es el juego que la industria da por estándar pero que el proyecto no distribuye. Siguen su convención igual donde ésta dice algo: el router lleva las cuatro flechas de «elige por dónde sale» y el switch, dos opuestas de «cruza tráfico entre bocas». Sin flechas, dos rieles con topes se leen como el control de un ecualizador, que es de lo más común en cualquier interfaz. El resto son símbolos que se entienden fuera de las redes también —el arco del wifi, el monitor, la nube, las unidades apiladas del servidor, el chip, el bastidor—, y ahí gana el que reconoce cualquiera. La seguridad va con un escudo y no con el muro de ladrillos del cortafuegos de Cisco, porque a diez píxeles el muro se vuelve una mancha y el escudo conserva su silueta; ese tamaño es el que manda, porque es el que se ve con la red entera en pantalla.
-
-Al elegir un dispositivo, el diagrama queda en tres niveles: el elegido con aro y halo naranjas y el nombre en negrita y subrayado en el color de acento, los que cuelgan de él con halo punteado, y el resto apagado. Sin el nivel del medio, el que tocaste se confunde con sus vecinos.
-
-El aro crece en su lugar, y eso hubo que pedirlo: en SVG el origen de una transformación se resuelve por omisión contra el lienzo entero y no contra el elemento, así que `transform-origin: center` era el medio del diagrama. El aro de un equipo del borde estaba a ciento veintisiete píxeles de su nodo —invisible, porque hasta que se lo elige va en opacidad cero— y al elegirlo entraba volando desde ahí en vez de crecer donde estaba. Lo mismo el disco al aparecer. `transform-box: fill-box` hace que `center` sea el centro del propio círculo.
-
-Cada etiqueta lleva un contorno del color del fondo pintado debajo del relleno —`paint-order: stroke`—, así se lee aunque le pase por encima un cable o el aro del nodo elegido. El nombre del elegido no va en el color de acento justamente porque competiría con esos aros.
-
-## Teclado
-
-El diagrama y la tabla de paquetes se recorren con las flechas y ocupan una sola parada del tabulador cada uno. Es lo contrario de lo que sale por omisión —cada equipo y cada fila son elementos con foco propio—, y por omisión estaba mal: setenta y un equipos, o cien mil filas, a una parada cada uno dejan la región sin salida, y llegar al panel de al lado son setenta y una pulsaciones. Dentro, las flechas mueven de uno en uno en orden de lectura, `Inicio` y `Fin` van a los extremos, y `Entrar` elige. La parada sigue a la selección, así que volver al diagrama desde la lista cae sobre el equipo que se está mirando y no sobre el primero.
-
-En la tabla, `Entrar` con `Mayúsculas` toma el tramo y con `Control` suma o quita uno, igual que el clic: la función que elige lee esas teclas del evento, y un evento de teclado las trae. `RePág` y `AvPág` saltan veinte filas, y bajar más allá de lo dibujado dibuja la tanda siguiente, igual que desplazarse. `Fin` va al final de lo dibujado, que es hasta donde llega también la barra de desplazamiento: en una captura de cien mil paquetes las filas aparecen de a trescientas y no existe un final antes de pedirlo.
-
-La tabla se anuncia como rejilla. En una tabla común el renglón no admite `aria-selected`, así que el lector de pantalla no decía qué estaba elegido y la selección quedaba sólo en el color. Y ordenar por una columna rehace la tabla entera, encabezados incluidos: el botón recién pulsado deja de existir y el foco se caía al documento, lo que con el teclado obliga a volver con el tabulador desde el principio de la página para ordenar dos veces seguidas. Ahora el foco vuelve al encabezado, y sólo si estaba adentro.
-
-Con el diagrama acercado, el equipo que recibe el foco puede quedar fuera de lo que se ve, y ahí no hay barra de desplazamiento que el navegador pueda mover porque el zoom es una transformación: el encuadre se corre a mano, lo mínimo y sólo si hacía falta.
-
-El primer tabulador de la página salta la cabecera entera y cae en el visor. Ese enlace está fuera de la pantalla hasta que recibe el foco.
-
-El SVG del diagrama se anuncia como grupo y no como imagen: un `role="img"` lo presenta como una sola figura y deja fuera del alcance del lector de pantalla los setenta y un equipos que tiene adentro. Cada uno es un botón con su nombre, su categoría y su dirección. La imagen exportada sí es una imagen, porque ahí de verdad no hay nada que recorrer.
-
-## La cabecera
-
-Los botones de cerrar y de exportar aparecen con un archivo abierto. Lo decide la hoja de estilos desde un atributo en el cuerpo, no un puñado de llamadas repartidas por el código. Ese mismo atributo resalta en el acento cuál de los dos formatos, `.pkt` o `.pcap`, está abierto.
-
-## Exportar una captura
-
-De un `.pkt` sale un diagrama; de una captura, datos. Los formatos son **CSV**, que abre en cualquier planilla con una fila por paquete, y **PCAP** clásico, que lleva los bytes originales y lo lee cualquier herramienta, Wireshark incluido.
-
-No hay exportación a imagen porque una tabla de miles de filas no se lee en un PNG. Tampoco a pcapng: añadiría bloques y descripciones de interfaz sin aportar nada, ya que el visor trabaja con un tipo de enlace por paquete y el pcap clásico lo expresa entero. Si una captura mezclara tipos de enlace, sólo se escriben los que coinciden con el primero, y el estado dice cuántos paquetes salieron.
-
-El CSV lleva marca de orden de bytes: sin ella Excel abre el archivo en la codificación del sistema y rompe los acentos.
-
-Al filtrar, los tramos de texto que hicieron coincidir cada fila quedan resaltados en las columnas por las que busca el filtro: origen, destino, protocolo y descripción. Cada columna se mira por separado y no todas pegadas en una sola cadena: pegadas, buscar `icmp 192` coincidía en la juntura entre el protocolo y el origen y la fila salía sin una sola marca encima, sin que se pudiera ver por qué estaba ahí. Si una fila aparece, algo tiene resaltado.
-
-Cualquier columna ordena, y un clic recorre tres estados: de menor a mayor, al revés, y de vuelta al orden de la captura. El tercero hace falta porque ordenar por cualquier cosa pierde la secuencia, que en una captura es la mitad de la información. Las direcciones se comparan con orden numérico, así que `192.168.1.10` va después de `192.168.1.2` y no antes, que es lo que da compararlas letra a letra. El encabezado es un botón de verdad, no un `th` con un `click` encima: se llega con el tabulador y el lector de pantalla anuncia por dónde está ordenada. Ordenar no pierde la selección; filtrar sí la limpia, porque una selección con filas escondidas adentro haría que el diálogo ofreciera exportar paquetes que no están a la vista.
-
-De cada paquete se lee de entrada lo que la tabla necesita —origen, destino, protocolo, tamaño y una línea de resumen—, pero los campos de cada capa se arman recién cuando alguien los pide, porque sólo se ven los del paquete elegido. Armándolos de entrada, una captura de cien mil paquetes construía 1,17 millones de pares de etiqueta y valor traducidos que nadie iba a leer. Por el mismo motivo las direcciones MAC se formatean sólo cuando hacen de origen y destino, que es cuando no hay capa de red encima: seis bytes a hexadecimal cuestan treinta veces más que leer una IP, y en tráfico IP se descartaban las dos.
-
-Lo que quedaba caro era el resumen, y por tres motivos que se miden aparte. El primero, una traducción por paquete tirada a la basura: el resumen de la capa de red se armaba siempre y en TCP, UDP e ICMP —que son casi todo el tráfico— lo pisaba el de la capa de arriba. El segundo, la interpolación en sí: `t()` pasaba una expresión regular con función de reemplazo sobre el mismo texto cien mil veces, así que ahora cada plantilla se parte una sola vez en literales y nombres y después es una concatenación. El tercero, las asignaciones que no se veían: una `DataView` por paquete para leer seis números de dos bytes que están ahí al lado, y las banderas de TCP filtradas y unidas una vez por paquete cuando hay 256 combinaciones posibles y en una captura se ven cuatro.
-
-Desglosar cien mil paquetes pasó de 201 ms a 81, y abrir el archivo entero, de 291 a 131.
-
-Filtrar también se paga por tecla. Los cuatro campos por los que busca el filtro se pasan a minúscula una sola vez, la primera vez que alguien escribe, y quedan guardados; y cuando el texto nuevo contiene al anterior no puede reaparecer ninguna fila que ya estaba escondida —si una cadena contiene `icmp`, contiene `icm`—, así que se filtra el resultado anterior en vez de la captura entera. Escribir `icmp` en cien mil paquetes pasó de cuatro pulsaciones de 30 a 40 ms a una de 60, que arma el índice, y tres de 8 a 14.
-
-Una captura cortada a la mitad no es un error: los paquetes enteros que trae valen y se muestran. Pero se avisa, porque si el corte llegó antes del primer paquete la pantalla decía «0 paquetes» y parecía que el visor no supo leer el archivo. El estado dice cuántos bytes quedaron sin leer y el resumen lo repite, que es donde alguien va a mirar cuando la cuenta le parezca corta.
-
-En la tabla se eligen filas como en una planilla: un clic elige una, `Mayúsculas` toma el tramo desde la última, y `Control` o `Comando` suma o quita una. Con varias elegidas, el panel muestra el resumen del tramo —cuántos paquetes, cuántos bytes, qué duración, qué protocolos— y el diálogo ofrece exportar sólo esa selección o la captura entera.
-
-## Descargar el original
-
-El panel de resumen ofrece el archivo tal cual se abrió. Sirve para el que abriste vos y para el que llegó por `?src=`, porque en los dos casos el visor tiene los bytes.
-
-## Abrir un archivo publicado
-
-`?src=<dirección>` hace que el visor descargue el archivo de esa dirección y lo abra. El servidor de origen tiene que permitir CORS: `raw.githubusercontent.com` sí, la descarga directa de Google Drive no. Sólo se aceptan direcciones `https`, salvo en el mismo origen que el visor.
-
-Para publicar una red, dejás el `.pkt` en una dirección accesible y compartís el enlace con el parámetro. Quien lo abra ve la topología y puede bajar el archivo original.
-
-El visor no empaqueta archivos dentro del enlace. Un `.pkt` ya viene comprimido por dentro, así que codificado ocupa más de lo que aceptan los navegadores y la mensajería, y el resultado sería un enlace roto según por dónde se pegue. Para pasarle el archivo a alguien, se le pasa el archivo.
-
-**[`trenza.pages.dev/demo`](https://trenza.pages.dev/demo)** abre la red del showcase sin que haya que escribir el parámetro. Existe para tener una dirección corta y estable que pegar en un currículum o en un portafolio, y por eso no es un desvío sino la misma página: una ruta que no existe devuelve el index con código 200, el visor reconoce `/demo` y carga la red, y la barra de direcciones se queda con lo que la persona escribió. Un desvío dejaba a la vista `/?src=/showcase/…` con el nombre del archivo escapado, que es la dirección que después queda en el historial y en lo que se comparte; y una reescritura declarada en `_redirects` no sirve porque Pages convierte el destino `/index.html` en un desvío a `/`, que es peor todavía: se pierde la ruta y no se abre nada.
-
-De ahí sale una regla para el resto del sitio: las rutas propias del documento van desde la raíz. Con rutas relativas, una dirección como `/demo/algo` haría que la hoja de estilo y el módulo se buscaran un nivel adentro, y ahí el servidor devuelve el index en lugar de cada archivo: la página sale sin estilo y sin código.
-
-## Marca e iconos
-
-`logo.svg` es el original: una trenza sobre fondo oscuro, de 512 × 512, con el dibujo dentro de la zona segura. De ahí salió el juego de iconos de la raíz —`favicon.ico`, `favicon.svg`, `favicon-96x96.png`, `apple-touch-icon.png` y los dos del manifiesto—, generado con [realfavicongenerator.net](https://realfavicongenerator.net). Para rehacerlo, subí de nuevo `logo.svg` y reemplazá los archivos.
-
-Las direcciones de Open Graph van absolutas y no relativas. Quien lee esas etiquetas no es el navegador sino el robot de LinkedIn, de WhatsApp o de Slack, que no resuelve una ruta contra la página: con `/og-image.png` la tarjeta salía sin imagen, que es justo lo que se ve cuando alguien pega el enlace en un currículum. El manifiesto declara dos juegos. Los de `any` son los redondeados de siempre. Los de `maskable` son los mismos con las cuatro esquinas apoyadas sobre el fondo del propio icono, `#151a22`: una máscara adaptativa recorta el cuadrado con la forma que use el lanzador, así que un icono con las esquinas transparentes se ve con huecos, y declarar los redondeados como `maskable` los recortaría dos veces. El dibujo ya entra en la zona segura —el punto más lejano queda a 186 de los 205 que da el círculo—, así que alcanza con rellenar. El fondo tiene que ser el del icono y no el de la página: con `#0f1218` se veía el contorno del cuadrado redondeado que quedaba debajo.
-
-`og-image.png` es la tarjeta que se ve al compartir un enlace: 1200 × 630, que es la medida que esperan todas las redes, y con `summary_large_image` para que no la recorten a un cuadradito. Lleva sólo la marca —la trenza con sus dos hilos, el nombre, qué es y la dirección— sobre el fondo del tema oscuro, con los colores leídos de las mismas variables CSS que el resto. Antes apuntaba al icono cuadrado de 512, que en una tarjeta ancha sale recortado o con franjas.
-
-Los colores están medidos: el texto a 4,5:1 o más y los trazos a 3:1 o más contra el fondo más desfavorable de cada tema.
-
-## Sin conexión
-
-El visor no le pide nada a ningún servidor salvo sus propios archivos, así que una vez visitado abre sin conexión: `sw.js` guarda el visor entero —los veinte módulos, la hoja de estilo, los iconos, las tipografías latinas y la red del showcase— y responde de lo guardado cuando la red falla.
-
-La estrategia es red primero y caché de respaldo, no al revés. Los archivos no llevan huella en el nombre y el sitio los manda con `no-cache`, así que servir de la caché de entrada dejaría a la gente con una versión vieja y sin forma de enterarse. Así, con conexión siempre se ve lo último; sin conexión, lo último que se vio. Una dirección que no está guardada —`/demo`, por ejemplo— igual abre el visor, que es lo mismo que hace el servidor.
-
-Sólo se guarda lo del propio sitio. El `.pkt` que alguien abre con `?src=` es un archivo ajeno: no tiene por qué quedarse en la máquina de quien lo miró una vez, y sin conexión no se puede volver a mirar de todos modos. Como el nombre de la caché no lleva versión, nada la vacía sola, así que al activarse el trabajador borra lo que no sea del sitio: quien abrió el visor cuando la tipografía venía de Google arrastraba siete archivos de otro dominio que ya nadie pide.
-
-## Instalar
-
-Cumple lo que pide un navegador para ofrecer la instalación: HTTPS, manifiesto con nombre, iconos de 192 y 512, `start_url`, `display: standalone`, y un trabajador de servicio que atiende `fetch`. Instalado abre en su propia ventana, con su icono y sin barra de direcciones, y sigue andando sin conexión.
-
-El manifiesto lleva además dos cosas que sólo sirven instalado. Un atajo a `/demo`, que aparece al mantener apretado el icono. Y `file_handlers`, que anota el visor en el sistema para `.pkt`, `.pka`, `.pcap`, `.pcapng` y `.cap`: abrir uno desde el escritorio lo lanza con el archivo en la cola, que `app.js` atiende con `launchQueue`. `launch_handler` pide reusar la ventana abierta, así que el archivo llega por la cola y no por la dirección. Donde no existe la cola no se registra nada y el visor abre igual desde el botón.
-
-Eso último está sin verificar contra una instalación real: hace falta Chromium de escritorio con la aplicación instalada, y el navegador de pruebas no instala nada.
-
-## Tipografía
-
-IBM Plex, servida desde el propio sitio y no desde Google: son las doce caras latinas de la licencia OFL, en `fonts/`, declaradas al principio de `styles.css`. Tres razones. El navegador deja de abrir dos conexiones a otro dominio antes de poder dibujar nada. Sin conexión el diagrama conserva su letra, y con ella sus medidas, que son las que decidieron el reparto. Y nadie que abra el visor le avisa a un tercero que lo abrió.
-
-Son los mismos archivos que servía Google, verificado midiendo: el ancho de un nombre en condensada de 15 da 128,49 unidades en los dos casos, así que el reparto no se movió. IBM Plex Sans viene como tipografía variable —un solo archivo cubre de 400 a 600— y la condensada y la monoespaciada traen uno por peso. Van con caché de un año porque el nombre del archivo lleva la familia, el peso y el subconjunto: ese archivo no cambia nunca.
-
-## Cuánto tarda en abrir
-
-Los veinte módulos se declaran con `modulepreload` en la cabecera. Sin eso el navegador los descubre recién al leer el que los importa, y se piden en cascada: cuatro niveles de profundidad, un viaje de ida y vuelta cada uno. Declarados, se piden todos juntos desde la primera línea del documento, y el DOM queda listo en 464 ms en vez de 1154. Hay un script que compara esa lista contra el grafo real de importaciones, porque una lista que se queda atrás no avisa.
-
-Descifrar el `.pkt` de 110 kB del showcase son 29 ms: las cuatro capas juntas, incluido Twofish escrito a mano.
-
-## Navegadores
-
-El piso lo ponen `DecompressionStream` y `CompressionStream`, que son lo que descomprime el `.pkt` y comprime la imagen del PDF sin sumar una biblioteca: **Safari 16.4, iOS 16.4, Chrome 80, Firefox 113**. Todo lo demás que usa el visor entra por debajo de ese piso —`dialog.showModal` y `:has()` piden Safari 15.4, `color-mix()` 16.2, `replaceChildren` 14—, así que no hay nada aparte que verificar.
-
-En Apple hay varias cosas que no son estándar y sí hacen falta. Los eventos de gesto de Safari para el pellizco, que además hay que atender para que el navegador no acerque la página entera en vez del diagrama. Evitar recortar con `border-radius` dentro de un elemento transformado, que ahí es terreno resbaladizo. Los márgenes de resguardo, porque en un iPhone apaisado la muesca se come el costado y el indicador de inicio, el pie; valen cero en cualquier otra pantalla, así que no hace falta condicionarlos. Y el techo del lienzo, que es de Safari en iPhone y es lo que fija a cuánto se rasteriza la hoja más grande.
-
-El diagrama lleva `touch-action: none` para que arrastrar y pellizcar sean del dibujo y no de la página. Con el dedo, todo lo que se toca llega a los cuarenta y cuatro píxeles que pide Apple, y no llegaba: la casilla medía trece y su renglón diecinueve, el renglón de la lista de equipos veintinueve, el campo de búsqueda treinta y uno, y en la tabla de paquetes la fila veintiocho y el título treinta y uno. Eso es apuntar a una línea de texto, y elegir un equipo o un paquete es justamente lo que se hace en el teléfono; errarle a un título además ordena por otra columna. En la tabla se pagan tres filas menos en pantalla. Las entradas de la leyenda crecen sin margen negativo, que superpondría el área de una con la de la vecina. La única excepción son los botones de acercar, que se quedan en cuarenta: son tres apilados sobre un diagrama que en un teléfono mide trescientos ochenta de alto, y la columna taparía un tercio del dibujo.
-
-Lo que no está probado en hardware Apple es nada de esto: el piso, los gestos y el techo del lienzo salen de la documentación y de la cuenta, no de un iPhone.
+El resto de los datos sale del XML y de la `running-config` de cada equipo. Las VLAN, por ejemplo, hay que cruzarlas: el XML guarda número y nombre, y la configuración dice qué puerto pertenece a cuál.
 
 ## Desarrollo
+
+No hay dependencias ni paso de compilación: son módulos ES servidos tal cual.
 
 ```bash
 npm test
 ```
 
-Sin dependencias ni paso de compilación. Para probarlo en local alcanza con servir la carpeta con cualquier servidor estático: el navegador necesita los módulos por HTTP y no funciona abriendo `index.html` desde el disco.
+Las pruebas (44, con `node:test`) cubren el descifrado, los parsers de pcap y de configuración IOS, el reparto del diagrama y las traducciones. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
-## Despliegue en Cloudflare Pages
+```
+src/
+  app.js        estado de la aplicación y conexión entre vistas
+  i18n.js       textos en inglés y español
+  pkt/          descifrado (twofish, eax, decode) y modelo de red (model, config)
+  pcap/         lectura de capturas, disección por capas y exportación
+  view/         diagrama, reparto de etiquetas, exportación, inspector, tabla de paquetes
+sw.js           caché para uso sin conexión
+test/           pruebas con node:test
+```
 
-Sin comando de compilación, con la raíz del repositorio como directorio de salida. `_headers` define la política de seguridad de contenido: todo tiene que venir del mismo origen y lo demás está bloqueado. Desde que la tipografía se sirve desde acá, el sitio no pide un solo byte a otro dominio.
+Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define la política de seguridad de contenido: todo tiene que venir del mismo origen y el script en línea del `<head>` va con hash, así que si se modifica hay que recalcular el `sha256` en `_headers`.
 
-Lleva también `form-action 'none'`: el único formulario del sitio es el del diálogo de exportación, que nunca se envía a ningún lado —se atiende en el código y se cancela—, así que prohibirlo no cuesta nada y cierra la puerta.
+Las decisiones de diseño, con lo que se midió para tomarlas, están en [`docs/decisiones.md`](docs/decisiones.md).
 
-Esa política no lleva `unsafe-inline`, y eso alcanza a los atributos `style`: escribir uno desde el código se descarta en silencio. El retraso de entrada de cada dispositivo se escribe como propiedad, `node.style.setProperty`, que no pasa por esa puerta. El guion de la cabecera va con hash, así que **tocarlo obliga a recalcularlo**: es el `sha256-` del `script-src`.
+## Compatibilidad
 
-Un servidor estático cualquiera sirve para desarrollar, pero no manda esas cabeceras, así que lo que dependa de ellas no se ve hasta desplegar. Para probarlo antes hay que servir la carpeta mandando lo que dice `_headers`.
+Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`.
 
-El visor se manda con `no-cache` porque ningún nombre de archivo lleva huella: el navegador tiene que preguntar antes de reusar lo que guardó, o un despliegue nuevo tarda en verse. Las excepciones son las que no cambian. La tipografía va un año, porque el nombre lleva familia, peso y subconjunto. Los iconos y la red del showcase van un día: Pages los manda con `must-revalidate` y sin esto cada visita paga una vuelta al servidor por cada uno para que le contesten 304, con la red del showcase justo en la ruta que está en el currículum.
-
-Sin JavaScript no hay visor —el descifrado, el reparto y el dibujo pasan todos acá— y como el texto lo pone el diccionario, la página salía en blanco con los botones puestos, que parece rota en vez de no soportada. Ahora hay un aviso en los dos idiomas. Está escrito visible y se esconde cuando el guion de la cabecera deja su marca en el documento: al revés, un guion que no corre —que es justo el caso— dejaría el aviso escondido.
-
-## Estado
-
-Validado contra archivos reales de Packet Tracer **7.3.0, 7.3.1, 8.2.1 y 9.0.1** —catorce redes, de tres a setenta y dos equipos, con VLAN, troncos, rutas estáticas y RIP—, archivos de formato heredado, y capturas pcap y pcapng generadas para pruebas, incluidos los casos de archivo dañado, vacío, sin topología, de un solo dispositivo, con dispositivos superpuestos y de cien mil paquetes.
-
-La responsividad se revisa midiendo, no mirando: para cada ancho —320, 375, 812 apaisado, 768, 1024, 1180, 1440, 1920 y 2560— y para cada estado —pantalla inicial, red abierta, equipo elegido, diálogo de exportación abierto, captura abierta, paquete elegido— se comprueba que la página no se desplace de costado, que ningún elemento sobresalga del cuerpo salvo dentro de un contenedor que se desplaza, que ninguna etiqueta quede recortada contra el borde del lienzo, que la leyenda no tape ningún equipo, y que con el dedo nada que se toque baje de cuarenta píxeles. Ochenta combinaciones, y las tres primeras vueltas encontraron tres defectos: la etiqueta recortada, el aro que crecía desde el medio del diagrama, y los renglones de veintinueve píxeles.
-
-La tubería no cambió en todo ese rango. Comparando la misma red guardada con 8.2.1 y con 9.0.1, la versión nueva suma treinta y seis etiquetas al XML —listas de acceso, PTP, NTP, licencias, medidas de las ventanas— y no saca ninguna: todo lo que el visor lee sigue donde estaba. Las posiciones bailan un píxel, que es cómo redondea cada versión.
-
-Un pcapng puede ser la concatenación de varias capturas, y cada sección abre con su propia cabecera: la numeración de interfaces vuelve a empezar y el orden de bytes puede ser otro. Sin reiniciar la lista en cada cabecera, los paquetes de la segunda sección se leían con el tipo de enlace y la resolución de tiempo de la primera.
-
-Ninguna lista de acceso salió de un archivo real: no hay una sola configurada en los catorce, así que esa parte está probada contra configuraciones armadas a mano y contra un `.pkt` de prueba con OSPF, listas y un router en un palo. Lo que el XML de 9.0.1 guarda en `ACL_IN_ID` y `ACL_OUT_ID` no se lee, y no por olvido: viene vacío en los catorce archivos, el puerto que lo lleva no guarda su nombre, y un número suelto sin interfaz al lado no nombra nada. La configuración sí dice las dos cosas.
+Está probado con archivos de Packet Tracer 7.3.0, 7.3.1, 8.2.1 y 9.0.1 (14 redes de entre 3 y 72 equipos). Falta probar archivos reales de las versiones 6.2 a 7.2 y del formato anterior a 6.2, que sólo se probó con archivos generados. Las listas de acceso se probaron con configuraciones escritas a mano, porque ninguno de los archivos reales tenía una.
 
 ## Licencia
 
-MIT: está en `LICENSE`. Se puede usar, modificar y redistribuir, también en algo comercial, conservando el aviso de copyright.
+El código es MIT (ver `LICENSE`).
 
-Eso alcanza al código de este repositorio y a nada más. El formato `.pkt`, los nombres de los equipos y la iconografía de Cisco son de Cisco; el proyecto no los distribuye, no reimplementa el simulador y sólo lee. La red de `showcase/` es un trabajo propio de curso, y está para que el botón de ejemplo tenga qué abrir.
+La tipografía de `fonts/` es IBM Plex, bajo la SIL Open Font License 1.1 (`fonts/LICENSE.txt`). La red de `showcase/` es un trabajo propio de un curso de redes.
 
-La tipografía de `fonts/` es IBM Plex, de IBM, bajo la licencia SIL Open Font 1.1, que permite redistribuirla junto con el proyecto. El texto de esa licencia va al lado de los archivos, en `fonts/LICENSE.txt`.
+Trenza es un proyecto independiente, sin relación con Cisco ni respaldo de su parte. Cisco y Packet Tracer son marcas registradas de Cisco Systems, Inc. El proyecto no incluye software, iconos ni contenido de Cisco: los símbolos del diagrama son propios.

@@ -46,7 +46,7 @@ function buildCapture(frames, linkType = 1) {
   return new Uint8Array(Buffer.concat(parts));
 }
 
-/** Un bloque de pcapng: tipo, largo total, cuerpo con relleno a cuatro, y el largo otra vez. */
+// Bloque pcapng: tipo, largo, cuerpo alineado a 4 y el largo otra vez.
 function block(type, body) {
   const padding = (4 - (body.length % 4)) % 4;
   const total = 12 + body.length + padding;
@@ -129,8 +129,7 @@ test('los campos de cada capa se arman recién cuando se piden', () => {
   const [ethernetLayer] = dissectPacket(capture.packets[0]).layers;
   assert.equal(typeof ethernetLayer.fields, 'function', 'los campos se armaron de entrada');
 
-  // Las MAC siguen estando, sólo que se formatean al pedirlas: en una captura grande son
-  // dos cadenas por paquete que nadie mira.
+  // Las MAC se formatean recién al pedir los campos.
   const fields = new Map(ethernetLayer.fields());
   assert.equal(fields.get('Source MAC'), '00:01:02:03:04:05');
   assert.equal(fields.get('Destination MAC'), '00:aa:bb:cc:dd:ee');
@@ -166,9 +165,7 @@ test('sobrevive a un paquete truncado', () => {
 });
 
 test('cada sección de un pcapng trae sus propias interfaces', () => {
-  // Un pcapng puede ser la concatenación de dos capturas distintas. La segunda vuelve a
-  // numerar sus interfaces desde cero: si se siguiera usando la lista de la primera, este
-  // paquete se leería como Ethernet y el desglose saldría corrido.
+  // La segunda sección numera sus interfaces desde cero y con otro tipo de enlace.
   const ethernetFrame = Buffer.concat([
     ethernet(MAC_ROUTER, MAC_CLIENT, 0x0800),
     ipv4(1, '10.0.0.1', '10.0.0.2', Buffer.alloc(8)),

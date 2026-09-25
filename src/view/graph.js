@@ -1,7 +1,5 @@
-// Los símbolos siguen la convención que usa quien lee diagramas de red: el router lleva las
-// cuatro flechas de «elige por dónde sale», y el switch, dos flechas opuestas de «cruza
-// tráfico entre bocas». La dirección importa: sin flechas, dos rieles con topes se leen como
-// el control de un ecualizador, que es de lo más común en cualquier interfaz.
+// Símbolos de la convención de diagramas de red: cuatro flechas para el router, dos
+// opuestas para el switch.
 export const CATEGORY_GLYPHS = {
   router: 'M3 12h18M12 3v18M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3',
   switch: 'M4 9h16M20 9l-3-3M20 9l-3 3M20 15H4M4 15l3-3M4 15l3 3',
@@ -15,8 +13,7 @@ export const CATEGORY_GLYPHS = {
   other: 'M5 5h14v14H5z',
 };
 
-// Cada categoría toma un hilo del código T568B: el tono pleno para el contorno y
-// el pálido para el símbolo interior.
+// Colores del código T568B: el pleno para el contorno y el pálido para el símbolo.
 export const CATEGORY_THREADS = {
   router: ['orange', 'orange-pale'],
   switch: ['blue', 'blue-pale'],
@@ -61,19 +58,15 @@ export function threadFor(link) {
   return WIRING_THREADS[link.wiring] || MEDIA_THREADS[link.media] || 'neutral';
 }
 
-// Los colores viven en variables CSS para que el diagrama en pantalla y la exportación
-// sigan el mismo tema sin enterarse de cuál es.
+// Variables CSS que se leen para exportar con los mismos colores que la pantalla.
 const PALETTE_NAMES = [
   'orange', 'orange-pale', 'green', 'green-pale', 'blue', 'blue-pale',
   'brown', 'brown-pale', 'neutral', 'neutral-pale',
   'ground', 'surface', 'raised', 'line', 'text', 'text-muted', 'text-faint',
 ];
 
-/**
- * Sin argumento devuelve los colores que se están viendo. Con uno, los del otro tema: las
- * variables cuelgan del elemento raíz, así que hay que ponérselo un instante. Nadie ve el
- * cambio, porque entre ponerlo y devolverlo no se cede el turno y el navegador no repinta.
- */
+// Para leer los colores de otro tema se cambia el atributo del elemento raíz y se restaura
+// en el mismo turno, sin que el navegador llegue a repintar.
 export function readPalette(theme) {
   const root = document.documentElement;
   const previous = root.getAttribute('data-theme');
@@ -104,11 +97,8 @@ const TRAY_SLOT = 160;
 const TRAY_ROW_HEIGHT = 96;
 const TRAY_HEADING = 26;
 
-/**
- * Separa los dispositivos que el archivo dejó apartados: sin ningún enlace y fuera
- * del rectángulo donde vive la red. Packet Tracer permite arrastrarlos a cualquier
- * rincón del espacio de trabajo, y uno solo a 3900 unidades aplasta todo el resto.
- */
+// Aparta los equipos sin enlaces que quedaron fuera del rectángulo de la red: uno solo a
+// 3900 unidades achicaba todo el resto.
 export function partitionDevices(devices, links) {
   const connected = new Set(links.flatMap((link) => [link.from, link.to]));
   const wired = devices.filter((device) => connected.has(device.id));
@@ -129,7 +119,6 @@ export function partitionDevices(devices, links) {
   return { placed, stray };
 }
 
-/** Cuánto espacio pide la bandeja de apartados. Se necesita antes de fijar el lienzo. */
 export function trayPlan(stray, availableWidth) {
   if (stray.length === 0) return { columns: 0, rows: 0, height: 0 };
   const columns = Math.max(1, Math.min(stray.length, Math.floor(availableWidth / TRAY_SLOT)));
@@ -152,10 +141,7 @@ export function trayPositions(stray, plan, { x, y, width }) {
   return positions;
 }
 
-// De una pasada y sin desparramar el arreglo en argumentos: `Math.min(...xs)` arma dos
-// arreglos intermedios por llamada, y esto se llama una vez por cada ancho que se prueba.
-// Con muchos argumentos además desborda la pila, que es un límite absurdo para una red pero
-// un límite al fin.
+// Sin Math.min(...xs): se llama una vez por ancho probado y el spread arma arreglos.
 export function measureBounds(devices) {
   let minX = Infinity;
   let minY = Infinity;
@@ -172,18 +158,11 @@ export function measureBounds(devices) {
   return { minX, minY, spanX: maxX - minX || 1, spanY: maxY - minY || 1 };
 }
 
-// Cuánto se admite estirar un eje respecto del otro al repartir la red. Casi ninguna red
-// tiene la proporción del marco que le toca —ni la del visor, ni la de un 16:9— y sin esto
-// el dibujo queda con franjas vacías. Estirar un esquema no lo falsea; deformarlo al doble, sí.
+// Cuánto puede estirarse un eje respecto del otro para llenar el marco sin franjas vacías.
 export const LAYOUT_STRETCH = 1.75;
 
-/**
- * Reparte los dispositivos dentro de un rectángulo. `stretch` es cuánto se admite estirar
- * un eje respecto del otro: con 1 la red conserva su proporción y, si el rectángulo tiene
- * otra, quedan franjas vacías a los costados o arriba y abajo; por encima de 1 la red se
- * reparte hasta llenarlas. Es un esquema, no un plano: separar más los equipos en un eje
- * no dice nada falso sobre la red.
- */
+// Con stretch = 1 se conserva la proporción de la red; por encima de 1 se estira hasta
+// llenar el rectángulo.
 export function projectIntoRect(devices, rect, { stretch = 1 } = {}) {
   const { minX, minY, spanX, spanY } = measureBounds(devices);
   const fit = Math.min(rect.width / spanX, rect.height / spanY);
@@ -200,10 +179,8 @@ export function projectIntoRect(devices, rect, { stretch = 1 } = {}) {
   );
 }
 
-// Geometría del bloque de etiqueta, medida desde el centro del dispositivo. El radio es el
-// del halo que se dibuja, no uno menor: con 22 reservados sobre un disco de 26, una
-// dirección podía apoyarse en el anillo de afuera y quedar tapada por él. Y `nameTop` no
-// puede bajar de ese radio: el nombre quedaría dentro del disco y chocaría con él siempre.
+// Medidas desde el centro del dispositivo. discRadius tiene que ser el del halo dibujado,
+// y nameTop no puede ser menor que discRadius.
 const LABEL_GEOMETRY = {
   discRadius: 26,
   nameTop: 26,
@@ -213,26 +190,9 @@ const LABEL_GEOMETRY = {
   gap: 5,
 };
 
-/**
- * El cuerpo de las etiquetas y dónde apoyan sus renglones, en unidades de diseño. Lo
- * comparten el visor y la exportación, que son el mismo dibujo a distinta escala.
- *
- * Lo que decide cuánto hay que separar los equipos es la caja más ancha de cada bloque, y
- * ésa es la de la dirección en sesenta de los setenta y un equipos del showcase. De ahí
- * salen los cuatro valores:
- *
- * - La dirección va en condensada y no en monoespaciada. Una dirección tiene trece
- *   caracteres, así que su ancho es lo único que fija el reparto, y en condensada el mismo
- *   ancho alcanza para dos puntos más de cuerpo. Alinear dígitos, que es para lo que sirve
- *   la monoespaciada, no aporta nada en una etiqueta suelta centrada bajo un icono; en la
- *   tabla de paquetes, donde sí hay columnas que alinear, se sigue usando.
- * - El nombre viaja gratis: no fija el reparto, así que subirlo no obliga a separar nada.
- *   Entre 17 y 24 el lienzo no se mueve ni una unidad, y a partir de ahí es sólo una
- *   cuestión de proporción contra el icono.
- *
- * Las dos líneas de base están donde la tinta entra justa en la caja reservada: el nombre
- * ocupa de 27 a 45 y la dirección de 49 a 57, medidos desde el centro del dispositivo.
- */
+// Tipografía de las etiquetas, en unidades de diseño; la comparten el visor y el exporte.
+// La dirección es la caja más ancha y la que fija la separación entre equipos, por eso va
+// en condensada. El tamaño del nombre no cambia el reparto.
 export const LABEL_TYPE = {
   nameSize: 20,
   addressSize: 11,
@@ -240,46 +200,30 @@ export const LABEL_TYPE = {
   addressBaseline: 57,
 };
 
-// Las familias son las mismas que declara la hoja de estilos, alternativas incluidas: lo
-// que se mide para repartir tiene que ser lo que después se dibuja, y si la tipografía no
-// llegara a cargar, medir contra otra alternativa repartiría la red para una letra que
-// nadie va a ver.
+// Tienen que coincidir con las de styles.css, alternativas incluidas.
 const CONDENSED = "'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif";
 export const LABEL_FONT = `600 ${LABEL_TYPE.nameSize}px ${CONDENSED}`;
 export const ADDRESS_FONT = `500 ${LABEL_TYPE.addressSize}px ${CONDENSED}`;
 
-/**
- * `document.fonts.ready` promete que terminó lo que estaba cargando, no que esté cargada
- * una familia que todavía nadie pidió. La condensada la usa el diagrama y nada más, así
- * que un exporte lanzado antes de haber dibujado uno medía con la alternativa y repartía
- * la red en 2722 unidades en vez de 3097, con una etiqueta rozando a otra. Pedirlas por
- * nombre sí lo garantiza, y no cuesta nada cuando ya están. Si no llegan —sin red, o con
- * la hoja de fuentes bloqueada— se mide con la alternativa, que es la que se va a ver.
- */
+// document.fonts.ready no carga una familia que nadie pidió todavía, así que se piden por
+// nombre. Sin esto un exporte hecho antes del primer dibujado medía con la alternativa.
 export async function labelFontsReady() {
   if (!document.fonts) return;
   try {
     await Promise.all([document.fonts.load(LABEL_FONT), document.fonts.load(ADDRESS_FONT)]);
   } catch {
-    // Sin la tipografía preferida se dibuja con la alternativa; medirla es lo correcto.
+    // Si no cargan se dibuja con la alternativa, y se mide con ella.
   }
 }
 
-// Nombre y dirección son una sola pieza y se corren juntos: separarlos dejaba la dirección
-// flotando lejos de su nombre, sin que se supiera de quién era. Cuando el lugar de siempre
-// está ocupado, el bloque entero baja un renglón, lo justo para pasar por debajo del que ya
-// estaba ahí.
+// Nombre y dirección se mueven juntos. Si su lugar está ocupado, el bloque baja un renglón.
 const BLOCK_STEP = 36;
 const BLOCK_SLOTS = [0, BLOCK_STEP, BLOCK_STEP * 2];
 
-/** Lo que un bloque sobresale hacia abajo cuando le toca el último renglón. */
 export const LABEL_REACH_BELOW = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOCK_SLOTS.length - 1];
 
-/**
- * Escala mínima, en píxeles por unidad del archivo, para que ningún par de
- * dispositivos se pise. Dos vecinos alcanza con que se separen en un eje, así que
- * de cada par se toma el eje más barato y del conjunto, el caso peor.
- */
+// Escala mínima para que ningún par se pise. Alcanza con separarlos en un eje, así que de
+// cada par se toma el más barato y del conjunto, el peor caso.
 export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3.5 } = {}) {
   let required = 0;
 
@@ -300,18 +244,8 @@ export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3
   return Math.min(cap, required);
 }
 
-/**
- * Lo que mide la etiqueta de un dispositivo no depende de dónde caiga: sale de su nombre,
- * de su primera dirección y del cuerpo de letra. La búsqueda del ancho llama a `planLabels`
- * una vez por candidato —treinta veces en una red típica—, así que sin guardarlo cada
- * dispositivo aplana sus interfaces treinta veces para sacar siempre la misma dirección.
- *
- * Lo guardado cuelga del medidor y no de un mapa suelto del módulo, y la diferencia no es
- * cosmética: las tipografías llegan por la red, y un medidor creado antes de que lleguen
- * mide con la alternativa. Compartiendo el mapa, esa medida vieja se le colaba al exporte,
- * que sí espera a que carguen: la red del showcase salía repartida en 2722 unidades en vez
- * de 3097, con una etiqueta rozando a otra. Cada medidor guarda lo suyo.
- */
+// La caché va en el medidor y no en el módulo: un medidor creado antes de que carguen las
+// fuentes mide con la alternativa, y esas medidas no se pueden mezclar con las buenas.
 function labelBox(device, measure) {
   let boxes = measure.boxes;
   if (!boxes) {
@@ -335,39 +269,22 @@ function labelBox(device, measure) {
   return box;
 }
 
-/**
- * Mitad de la etiqueta más ancha de un dispositivo: lo que sobresale a cada lado de su
- * icono. Es lo que hay que dejar libre en los bordes para que no quede cortada, y lo que
- * hay que separar entre dos vecinos para que no se toquen.
- */
 export function halfLabelWidth(device, measure) {
   return labelBox(device, measure).half;
 }
 
-// Hasta dónde llega la influencia de un dispositivo hacia arriba y hacia abajo: lo que
-// ocupa su bloque en el último renglón, más el radio del disco. Dos dispositivos separados
-// por más que esto no pueden tocarse pase lo que pase, y ése es el corte que convierte la
-// prueba de choque de «cada uno contra todos» en «cada uno contra sus vecinos».
+// Más allá de esta distancia vertical dos dispositivos no pueden chocar, así que cada uno
+// se prueba sólo contra sus vecinos.
 const NEIGHBOURHOOD = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOCK_SLOTS.length - 1]
   + LABEL_GEOMETRY.discRadius;
 
-/**
- * Decide a qué altura va el bloque de cada dispositivo. Si su lugar está ocupado baja al
- * siguiente renglón, y si no queda ninguno libre se dibuja igual en el suyo: una etiqueta
- * que aparece y desaparece al acercarse molesta más que dos que se rozan. `crowded` marca
- * las que quedaron encimadas, que es de lo que la exportación se guía para darle más lugar
- * al dibujo hasta que no quede ninguna.
- *
- * Se recorre de arriba abajo y cada uno se prueba sólo contra los que tiene cerca en
- * vertical. Probarlo contra todos es cuadrático y se paga completo en cada candidato de
- * ancho: en una red de trescientos equipos eran 1,73 ms por pasada y 48 ms por reparto.
- */
+// Asigna un renglón a cada bloque. Si no hay ninguno libre queda en el suyo marcado como
+// `crowded`; nunca se esconde. Ojo: offset 0 es un valor válido, comparar contra null.
 export function planLabels(devices, positions, measure) {
   const overlaps = (box, other) =>
     box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1;
 
-  // El disco es redondo: una caja que sólo alcanza la esquina de su cuadrado no lo toca de
-  // verdad, y descartar por eso un lugar que servía cuesta hasta once píxeles en diagonal.
+  // Contra el círculo, no contra su cuadrado.
   const touchesDisc = (box, disc) => {
     const dx = disc.x - Math.max(box.x1, Math.min(disc.x, box.x2));
     const dy = disc.y - Math.max(box.y1, Math.min(disc.y, box.y2));
@@ -392,8 +309,7 @@ export function planLabels(devices, positions, measure) {
     const half = box.half + LABEL_GEOMETRY.gap;
     const bottom = box.bottom;
 
-    // La ventana de vecinos. Como se recorre en orden de altura, su borde de arriba sólo
-    // avanza, y el de abajo se busca desde ahí.
+    // Ventana de vecinos: se recorre en orden de altura, así que el borde de arriba sólo avanza.
     while (first < i && discs[first].y < y - NEIGHBOURHOOD) first++;
     let last = i;
     while (last + 1 < ordered.length && discs[last + 1].y <= y + NEIGHBOURHOOD) last++;
@@ -406,8 +322,6 @@ export function planLabels(devices, positions, measure) {
     });
 
     const collides = (box) => {
-      // Su propio disco entra en la cuenta, como antes: es lo que hace valer que `nameTop`
-      // no pueda bajar del radio, porque si bajara todo bloque chocaría con su propio icono.
       for (let j = first; j <= last; j++) {
         if (touchesDisc(box, discs[j])) return true;
         if (j < i && overlaps(box, reserved[j])) return true;
@@ -418,8 +332,7 @@ export function planLabels(devices, positions, measure) {
     const free = BLOCK_SLOTS.find((offset) => !collides(boxAt(offset)));
     const offset = free ?? 0;
 
-    // La caja se reserva aunque haya quedado encimada: la tinta está ahí igual, y el
-    // que venga después tiene que contar con ella.
+    // Se reserva aunque haya quedado encimada: se dibuja igual.
     reserved[i] = boxAt(offset);
     plan.set(device.id, { offset, crowded: free === undefined });
   }
@@ -427,10 +340,6 @@ export function planLabels(devices, positions, measure) {
   return plan;
 }
 
-/**
- * Calcula el lienzo a partir del área que ocupan los dispositivos a la escala
- * pedida, más los márgenes del título, la leyenda y las etiquetas.
- */
 export function frameForNetwork(devices, insets, scale) {
   const { spanX, spanY } = measureBounds(devices);
   const contentWidth = Math.round(spanX * scale);

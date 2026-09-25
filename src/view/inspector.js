@@ -15,18 +15,7 @@ function definitionList(entries) {
   return list;
 }
 
-/**
- * Una tabla de encabezados traducidos y filas de celdas, que es lo que son casi todas.
- * `wrap` marca las celdas que pueden partirse por cualquier lado: una lista de veinticuatro
- * `GigabitEthernet0/n` no tiene un solo lugar donde cortar, y sin eso la tabla se lleva por
- * delante el ancho del panel. En una dirección IP no se usa, que partida no se lee.
- * `lines` respeta los saltos de renglón, para lo que es una lista y no un valor suelto.
- */
-/**
- * Red de seguridad: una tabla que no entre se desplaza dentro de su propio recuadro en vez
- * de estirar el panel entero. Sin esto, un solo nombre largo mandaba a desplazarse de
- * costado a todo lo que hay al lado, incluido lo que sí entraba.
- */
+// Una tabla que no entra se desplaza en su recuadro en vez de ensanchar el panel.
 function scrollable(table) {
   const wrapper = createElement('div', 'table-scroller');
   wrapper.append(table);
@@ -70,8 +59,7 @@ function interfaceTable(interfaces) {
     const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '—', mask: '—' }];
     for (const address of addresses) {
       const row = createElement('tr');
-      // `GigabitEthernet0/0.10` no tiene un lugar natural donde cortar y es lo más ancho de
-      // la tabla: sin dejarlo partir, cuatro columnas no entran en el panel.
+      // Nombres como GigabitEthernet0/0.10 no tienen dónde cortar; se deja partirlos.
       const name = createElement('td', 'table__mono table__wrap', entry.name || entry.mac || '—');
       if (entry.description) name.title = entry.description;
 
@@ -89,14 +77,9 @@ function interfaceTable(interfaces) {
   return scrollable(table);
 }
 
-/**
- * Cada VLAN con su nombre y los puertos que la llevan. Se agrupa por VLAN y no por puerto
- * porque la pregunta es «qué VLAN hay y por dónde pasa», y un switch de veinticuatro bocas
- * contestada al revés son veinticuatro renglones para leer de a uno.
- */
+// Agrupada por VLAN y no por puerto: un switch de 24 bocas serían 24 renglones.
 function vlanTable(vlans) {
-  // La columna de subinterfaces sólo existe en un router en un palo. En un switch sería
-  // una columna de guiones, así que ahí directamente no está.
+  // La columna de subinterfaces sólo aparece en un router-on-a-stick.
   const routed = vlans.some((vlan) => vlan.routed.length > 0);
   const headings = ['table.vlan', 'table.vlanName', 'table.accessPorts', 'table.trunkPorts'];
   if (routed) headings.push('table.routedPorts');
@@ -113,7 +96,6 @@ function vlanTable(vlans) {
   }));
 }
 
-/** Las rutas escritas a mano, en el orden en que están en la configuración. */
 function routeTable(routes) {
   return dataTable(
     ['table.destination', 'table.mask', 'table.via'],
@@ -125,16 +107,12 @@ function routeTable(routes) {
   );
 }
 
-/** `RIP v2`, `OSPF 1`, `EIGRP 100`: el protocolo y lo que lo identifica en el equipo. */
+// "RIP v2", "OSPF 1", "EIGRP 100"
 function protocolLabel(entry) {
   const version = entry.version ? `v${entry.version}` : '';
   return [entry.protocol, entry.id, version].filter(Boolean).join(' ');
 }
 
-/**
- * Los protocolos de enrutamiento con las redes que anuncian. Lo que el protocolo termine
- * aprendiendo no está en el archivo: esto es lo que el equipo tiene configurado.
- */
 function routingTable(routing) {
   const passive = routing.some((entry) => entry.passive.length > 0);
   const headings = ['table.protocol', 'table.networks'];
@@ -150,11 +128,6 @@ function routingTable(routing) {
   }));
 }
 
-/**
- * Las listas de acceso, con sus reglas en orden y dónde están aplicadas. Las dos cosas
- * hacen falta para saber qué filtra el equipo: una lista sin aplicar no filtra nada, y una
- * interfaz con `ip access-group` de una lista que no existe deja pasar todo.
- */
 function accessListTable(lists) {
   const applied = (entry) => [
     ...entry.inbound.map((name) => `${name} in`),
@@ -198,7 +171,7 @@ export function renderDeviceInspector(container, device, devicesById) {
 
   const header = createElement('header', 'panel-head');
   header.append(
-    createElement('p', 'panel-head__eyebrow', t(`category.${device.category}`)),
+    createElement('p', 'panel-head__kind', t(`category.${device.category}`)),
     createElement('h2', 'panel-head__title', device.name),
   );
   container.append(header);
@@ -249,7 +222,7 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
 
   const header = createElement('header', 'panel-head');
   header.append(
-    createElement('p', 'panel-head__eyebrow', t('panel.summary')),
+    createElement('p', 'panel-head__kind', t('panel.summary')),
     createElement('h2', 'panel-head__title', t('panel.topology')),
   );
   container.append(header);

@@ -25,54 +25,32 @@ import {
   trayPositions,
 } from './graph.js';
 
-// El lienzo más grande que se puede pedir. El techo lo pone Safari en iPhone, que no
-// entrega lienzos de más de dieciséis millones y pico de píxeles y devuelve uno en blanco
-// sin avisar. Un A3 a 300 puntos por pulgada son 17,4 millones, así que sin este tope el
-// PDF más grande salía vacío justo en el navegador que menos se puede probar.
+// Safari en iPhone devuelve un lienzo en blanco, sin error, por encima de ~16,7 Mpx.
 const MAX_CANVAS_PIXELS = 16.7e6;
 
-// Un diagrama es texto fino sobre color plano, justo lo que peor le sienta al JPEG. Con
-// menos calidad que esta, las letras salen con la basura típica del formato alrededor.
+// Texto fino sobre color plano: con menos calidad aparecen artefactos alrededor de las letras.
 const JPEG_QUALITY = 0.95;
 
-// La banda del título mide lo que ocupan sus dos renglones más un respiro. Sólo la parte
-// de los renglones crece con la letra: si creciera el respiro también, agrandar el título
-// le sacaría alto al dibujo sin que se vea mejor nada.
+// Banda del título: los renglones escalan con la letra, el respiro queda fijo.
 const HEADER_TEXT = 52;
 const HEADER_GAP = 22;
 const LEGEND_ROW_HEIGHT = 22;
-// Cuánto sobresale un dispositivo de su centro: arriba el halo, abajo el nombre y la
-// dirección, contando el renglón de más que la dirección puede llegar a usar.
 const NODE_EXTENT = { top: 32, bottom: LABEL_REACH_BELOW + 6 };
 const MARGIN = 40;
 
-// En cuántas unidades se reparte el dibujo cuando la medida de salida está fija. Es lo
-// único que decide el tamaño de todo en la imagen: el diagrama se dibuja en estas
-// unidades y después se multiplica por la escala, así que a menos unidades, más grandes
-// salen los nombres, las direcciones y los iconos. Subir la resolución sube la escala y
-// con ella todo el dibujo, en vez de sumar píxeles al mismo diagrama diminuto.
-//
-// El valor es el punto de partida de la búsqueda, no el resultado: si con ese ancho alguna
-// etiqueta se queda sin lugar, el diseño se ensancha hasta que entren todas.
+// Ancho inicial del espacio de diseño con una medida fija. Menos unidades es texto más
+// grande; si alguna etiqueta no entra, la búsqueda lo ensancha.
 const DESIGN_WIDTH = 2200;
 
-// Cuánto se ensancha el diseño entre un intento y el siguiente, y cuántos intentos como
-// mucho. El paso es fijo y no una fracción del rango: dividir el rango lo volvía grueso
-// justo en las redes grandes, que son las que más lo necesitan, y ahí cada escalón de más
-// es cuerpo de letra perdido. Veinticuatro intentos cubren mil doscientas unidades, de
-// sobra en todo lo probado, y acotan lo que puede tardar una vista previa que se rehace
-// con cada cambio del diálogo.
+// Paso fijo y no fracción del rango: en redes grandes el paso quedaba demasiado grueso.
 const DESIGN_STEP = 50;
 const DESIGN_STEPS = 24;
 
-// Límites del área donde se reparten los dispositivos. El mínimo evita diagramas
-// diminutos; el máximo, archivos de decenas de megapíxeles.
 const MIN_CONTENT_WIDTH = 760;
 const MAX_CONTENT_WIDTH = 4200;
 const MAX_CONTENT_HEIGHT = 3000;
 
-// Medidas de salida fijas. La quinta opción, ajustar al diagrama, no es una medida:
-// se agrega aparte porque significa «el tamaño que el dibujo pida».
+// 'fit' (ajustar al diagrama) se agrega aparte.
 const EXPORT_RESOLUTIONS = {
   hd: { width: 1280, height: 720 },
   fullhd: { width: 1920, height: 1080 },
@@ -87,7 +65,7 @@ export const SIZE_LABELS = Object.fromEntries([
   ...Object.entries({ a4: 'A4', letter: 'Carta', a3: 'A3' }),
 ]);
 
-// Hojas en puntos, apaisadas, y la definición a la que se rasteriza para imprimir.
+// En puntos, apaisadas.
 const PAPER_SIZES = {
   a4: { width: 842, height: 595 },
   letter: { width: 792, height: 612 },
@@ -96,36 +74,21 @@ const PAPER_SIZES = {
 
 export const DEFAULT_PAPER = 'a4';
 
-// El PDF lleva el diagrama como imagen, así que esta es toda la nitidez que va a tener:
-// 300 puntos por pulgada es la definición de imprenta y aguanta ampliar al 300 % en
-// pantalla antes de que se note el píxel. Con 200 el texto se veía blando al acercarse.
+// El PDF lleva el diagrama como imagen; a 200 ppp el texto se veía blando al ampliar.
 const PRINT_DPI = 300;
 
-// El piso de legibilidad se mide sobre la dirección, que es el texto más chico del dibujo
-// y el que trae el dato: el nombre es casi el doble, así que ponerlo sobre el nombre dejaba
-// pasar salidas con direcciones ilegibles. En papel se aguanta un cuerpo bastante menor que
-// en pantalla porque 300 puntos por pulgada resuelven trazos que un monitor no.
+// El piso de legibilidad se mide sobre la dirección, que es el texto más chico.
 const MIN_ADDRESS_POINTS = 2.5;
 const MIN_ADDRESS_SIZE = 7;
 
-// El cuerpo de la dirección es contra el que se mide el piso de legibilidad. Sale del mismo
-// lugar que el resto de la tipografía: el visor y la imagen son el mismo dibujo a distinta
-// escala, y cualquier diferencia acá hace que la descarga no se parezca a lo que se vio.
 const ADDRESS_SIZE = LABEL_TYPE.addressSize;
 
-// Grosor del contorno del color del fondo que va debajo de cada etiqueta, el mismo que
-// en pantalla: sin él, un cable que cruza por detrás del texto lo vuelve ilegible.
 const LABEL_HALO = 3.5;
 
-// Dirección del visor, estampada en cada exportación para que la imagen diga de dónde salió.
 const SITE_URL = 'trenza.pages.dev';
 
-// El marco —título, leyenda, dirección— no depende de cuántos dispositivos haya sino del
-// tamaño de la imagen: los cuerpos de abajo son los de una imagen de este ancho, y en una
-// más grande crecen con ella. Son cinco cadenas que no compiten con nada, así que pueden
-// ocupar lo que necesiten para leerse de un vistazo; el aire que las rodea, no: cada
-// unidad de margen se la saca al dibujo, que es lo que de verdad está apretado. Por eso
-// la letra crece contra un ancho de referencia menor que el del espaciado.
+// El marco (título, leyenda, dirección) escala con el ancho de la imagen, no con el dibujo.
+// La letra crece contra CHROME_WIDTH y los márgenes contra SPACING_WIDTH, que es mayor.
 const CHROME_WIDTH = 1100;
 const SPACING_WIDTH = 1600;
 const MAX_CHROME_ZOOM = 3.5;
@@ -159,11 +122,8 @@ export function suggestExportName(fileName) {
   return (fileName || 'red').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '-').trim() || 'red';
 }
 
-/**
- * Elegir el tamaño de salida obliga a medir el reparto una y otra vez, y ahí cada nombre
- * se consulta miles de veces. Los cuerpos de las etiquetas son fijos, así que dentro de
- * una misma exportación cada cadena se mide una sola vez.
- */
+// Una caché por exportación: en el módulo guardaría medidas hechas antes de que carguen
+// las fuentes.
 function labelMeasurer() {
   const context = document.createElement('canvas').getContext('2d');
   const widths = new Map();
@@ -178,17 +138,12 @@ function labelMeasurer() {
 
   return {
     context,
-    // Lo que no depende del tamaño de salida, guardado por exportación. Ver `measureDiagram`.
     fixed: new Map(),
     nameWidth: (text) => width(LABEL_FONT, text),
     addressWidth: (text) => width(ADDRESS_FONT, text),
   };
 }
 
-/**
- * Reparte la leyenda en columnas de ancho uniforme para que las entradas queden
- * alineadas entre sí, y en varias filas si no entran a lo ancho.
- */
 function planLegend(context, links, availableWidth, chrome) {
   const entries = LEGEND_ENTRIES.filter((entry) => new Set(links.map(threadFor)).has(entry.thread))
     .map((entry) => ({ ...entry, label: t(entry.key) }));
@@ -358,18 +313,12 @@ function drawLegend(context, legend, { palette, chrome, left, top }) {
   });
 }
 
-/**
- * Mide lo que el diagrama necesita: cuánto hay que separar los dispositivos para que
- * las etiquetas no se pisen, y cuánto margen piden el título, la leyenda y la bandeja.
- * De ahí sale el tamaño natural, el más chico en el que el dibujo respira.
- */
+// Tamaño natural: el más chico en el que las etiquetas no se pisan.
 function measureDiagram(model, showInfrastructure, chrome, measure) {
   const context2d = measure.context;
 
-  // La búsqueda del ancho llama a esto una vez por candidato, y sólo el marco cambia entre
-  // uno y otro: qué equipos hay, cuánto separarlos y cuánto sobresale la etiqueta más ancha
-  // salen de los nombres y de las posiciones. Separarlos cuesta un recorrido por cada par
-  // —cinco mil en la red del showcase—, repetido hasta veinticinco veces para dar lo mismo.
+  // Lo que no depende del marco se calcula una vez: spreadScaleFor es O(n²) y esto se
+  // llama una vez por ancho candidato.
   const key = showInfrastructure ? 'con' : 'sin';
   if (!measure.fixed.has(key)) {
     const visible = selectVisible(model, showInfrastructure);
@@ -412,11 +361,8 @@ function measureDiagram(model, showInfrastructure, chrome, measure) {
   return { placed, stray, links, measure, chrome, insets, legend, tray, natural };
 }
 
-/**
- * Coloca el diagrama dentro de un espacio de diseño dado. El marco —título, leyenda y
- * dirección— se ancla a los bordes de ese espacio, no al rectángulo del dibujo: si no,
- * en un lienzo más alto que el diagrama la leyenda queda flotando en el medio.
- */
+// El marco se ancla a los bordes del espacio de diseño y no al dibujo; si no, en un lienzo
+// más alto la leyenda queda flotando en el medio.
 function layoutInto(shape, design) {
   const { chrome } = shape;
   const trayTop = design.height - chrome.margin - shape.legend.height - 16 * chrome.zoom - shape.tray.height;
@@ -439,34 +385,22 @@ function layoutInto(shape, design) {
   const devices = [...shape.placed, ...shape.stray];
   const labels = planLabels(devices, positions, shape.measure);
 
-  // Se dibuja todo. Lo que se mide es qué tan prolijo quedó: cuántos bloques se rozan y
-  // cuántos tuvieron que bajar de renglón. Un bloque corrido no pierde información pero
-  // rompe la alineación, y una fila de equipos iguales con uno más abajo canta.
   const crowded = devices.reduce((total, device) => total + (labels.get(device.id).crowded ? 1 : 0), 0);
   const stepped = devices.reduce((total, device) => total + (labels.get(device.id).offset > 0 ? 1 : 0), 0);
 
   return { ...shape, design, trayTop, positions, labels, devices, crowded, stepped };
 }
 
-/**
- * Qué tan lejos está un reparto de quedar prolijo. Una etiqueta rozando a otra pesa mucho
- * más que una corrida de renglón, pero las dos cuentan: el objetivo es que todos los
- * bloques queden a la misma altura bajo su icono.
- */
+// Una etiqueta encimada pesa 1000 y una bajada de renglón, 1.
 function untidiness(plan) {
   return plan.crowded * 1000 + plan.stepped;
 }
 
-/**
- * Resuelve una exportación: en qué espacio se dibuja el diagrama y a qué escala se lleva
- * a la imagen final.
- */
 function planExport(model, { showInfrastructure, pixels }) {
   const measure = labelMeasurer();
   const shapeFor = (width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure);
 
-  // El marco crece con la imagen, y al crecer pide más margen, lo que corre el tamaño
-  // natural. Dos pasadas alcanzan para que el par se asiente.
+  // El marco pide más margen al crecer y eso cambia el tamaño natural: dos pasadas alcanzan.
   let shape = shapeFor(CHROME_WIDTH);
   for (let pass = 0; pass < 2; pass++) {
     const next = shapeFor(shape.natural.width);
@@ -476,23 +410,15 @@ function planExport(model, { showInfrastructure, pixels }) {
 
   if (!pixels) return { ...layoutInto(shape, shape.natural), scale: 1 };
 
-  // Se arranca del ancho más chico que valga la pena y, si alguna etiqueta se quedó sin
-  // lugar, el diseño se ensancha hasta que entren todas: una dirección a medias no sirve
-  // para nada, y el precio es cuerpo de letra, no información.
-  //
-  // La búsqueda pasa del ancho natural, y no por capricho. El natural se mide con la
-  // proporción que el dibujo pide, pero la salida impone la suya: un diagrama que a lo
-  // ancho no se pisaba, apretado a 16:9, sí. En una red de diez equipos el natural queda
-  // en 1070, por debajo del ancho de referencia, y con el techo ahí la búsqueda se
-  // terminaba en la primera vuelta sin haber probado nada.
+  // La búsqueda puede pasar del ancho natural: el natural se mide con la proporción del
+  // dibujo, y la salida (16:9) impone otra en la que las etiquetas sí pueden pisarse.
   const aspect = pixels.width / pixels.height;
   const planAt = (width) => layoutInto(shapeFor(width), { width, height: width / aspect });
   const floor = Math.min(shape.natural.width, DESIGN_WIDTH);
 
   let best = planAt(floor);
   for (let step = 1; step <= DESIGN_STEPS && untidiness(best) > 0; step++) {
-    // Más ancho no siempre es más prolijo: al estirarse cambia también la separación
-    // vertical, así que se comparan todos y gana el primero que llegue a cero.
+    // No es monótono: más ancho también cambia la separación vertical.
     const candidate = planAt(floor + DESIGN_STEP * step);
     if (untidiness(candidate) < untidiness(best)) best = candidate;
   }
@@ -500,7 +426,7 @@ function planExport(model, { showInfrastructure, pixels }) {
   return { ...best, scale: pixels.width / best.design.width };
 }
 
-/** Medidas de salida que sirven: las que dejan el texto por encima del piso legible. */
+// Sólo las medidas en las que la dirección queda por encima del piso de legibilidad.
 export function offeredSizes(model, { showInfrastructure, format }) {
   const survives = (size) => {
     try {
@@ -527,12 +453,7 @@ export function offeredSizes(model, { showInfrastructure, format }) {
     .concat('fit');
 }
 
-/**
- * Píxeles del lienzo para la medida pedida, o ninguno si el dibujo pone el tamaño. La hoja
- * se rasteriza a 300 puntos por pulgada salvo que eso pase del lienzo más grande que se
- * puede pedir; ahí baja lo justo para entrar, que en un A3 son 294 y no se nota. La medida
- * de la hoja no cambia: el PDF la calcula desde los píxeles que salieron.
- */
+// Las hojas se rasterizan a 300 ppp salvo que pasen de MAX_CANVAS_PIXELS (A3 queda en 294).
 function canvasSizeFor(format, size) {
   if (!size) return null;
   if (format !== 'pdf') return size;
@@ -547,15 +468,10 @@ function canvasSizeFor(format, size) {
   };
 }
 
-/**
- * Dibuja la red completa. Con una medida fija el lienzo mide exactamente eso: el
- * diagrama se reparte en lo que queda y el marco se apoya en los bordes.
- */
 async function renderNetworkToCanvas(model, { showInfrastructure, format, size, transparent, title, palette, language, budget }) {
   await labelFontsReady();
 
-  // Todo el dibujo va dentro de `withLanguage`: la leyenda y el pie se escriben en el
-  // idioma pedido, y además su ancho entra en el cálculo del encuadre.
+  // Dentro de withLanguage también el plan: el ancho de la leyenda depende del idioma.
   return withLanguage(language, () => {
     const pixels = canvasSizeFor(format, size);
     const plan = planExport(model, { showInfrastructure, pixels });
@@ -565,8 +481,7 @@ async function renderNetworkToCanvas(model, { showInfrastructure, format, size, 
     const height = Math.round(design.height * scale);
     if (!budget && width * height > MAX_CANVAS_PIXELS) throw new Error(t('error.tooLarge'));
 
-    // La vista previa sale del mismo plan en un lienzo chico: mismo reparto, mismas
-    // etiquetas, mismo encuadre; lo único que cambia es cuántos píxeles hay debajo.
+    // La vista previa usa el mismo plan en menos píxeles.
     const shrink = budget ? Math.min(1, budget / width) : 1;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(width * shrink);
@@ -581,12 +496,7 @@ async function renderNetworkToCanvas(model, { showInfrastructure, format, size, 
 
     paintDiagram(context, plan, { palette, title });
 
-    /**
-     * Vuelve a pintar el mismo plan en otro lienzo, a la escala de verdad y centrado en un
-     * punto: es lo que mira la lupa. Reaprovechar el plan es lo que lo hace barato, porque
-     * lo caro no es dibujar sino decidir el reparto. Lo que cae fuera del lienzo lo
-     * descarta el propio contexto.
-     */
+    // Para la lupa: repinta el mismo plan a escala real centrado en `at`.
     const magnify = (target, at) => {
       const view = target.getContext('2d');
       view.setTransform(1, 0, 0, 1, 0, 0);
@@ -602,7 +512,7 @@ async function renderNetworkToCanvas(model, { showInfrastructure, format, size, 
   });
 }
 
-/** El mismo dibujo para el lienzo y para el SVG, expresado sobre un contexto 2D. */
+// Sirve para el lienzo y para el SVG (ver svg-context.js).
 function paintDiagram(context, plan, { palette, title }) {
   const { chrome, design } = plan;
 
@@ -651,10 +561,7 @@ async function deflate(bytes) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-/**
- * Arma un PDF de una página con el diagrama como imagen sin pérdida. Se escribe a
- * mano porque es un documento mínimo y no justifica sumar una biblioteca entera.
- */
+// PDF de una página con la imagen en FlateDecode, escrito a mano.
 async function buildPdf(canvas, pointsPerPixel) {
   const { width, height } = canvas;
   const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
@@ -715,7 +622,7 @@ async function buildPdf(canvas, pointsPerPixel) {
   return new Blob(chunks, { type: 'application/pdf' });
 }
 
-/** El SVG sale del tamaño natural del diagrama: escalarlo es tarea de quien lo abra. */
+// El SVG va al tamaño natural.
 async function buildSvg(model, { showInfrastructure, transparent, title, palette, language }) {
   await labelFontsReady();
 
@@ -734,18 +641,12 @@ async function buildSvg(model, { showInfrastructure, transparent, title, palette
   });
 }
 
-/** Traduce la medida elegida en el diálogo al rectángulo de salida, si es que hay una. */
 function sizeFor(format, choice) {
   if (choice === 'fit' || !choice) return null;
   return format === 'pdf' ? PAPER_SIZES[choice] : EXPORT_RESOLUTIONS[choice];
 }
 
-/**
- * El mismo dibujo que se va a descargar, en un lienzo del tamaño que entre en pantalla.
- * Devuelve además la medida real, porque es la que hay que decirle al usuario: en la vista
- * previa dos resoluciones del mismo formato se ven igual, y lo único que las separa es la
- * definición. El SVG y el PDF se previsualizan como lo que son, un vector y una hoja.
- */
+// Devuelve también la medida real, que es lo que distingue dos resoluciones en la vista previa.
 export async function renderNetworkPreview(model, request, budget) {
   const { format, name, size: choice, transparent, showInfrastructure, language, theme } = request;
   const descriptor = EXPORT_FORMATS[format];
@@ -787,7 +688,6 @@ async function createNetworkExport(model, { format, name, size: choice, transpar
     language,
   });
 
-  // La hoja mide lo que pidió el usuario; los píxeles de más sólo suben la definición.
   const paper = format === 'pdf' ? PAPER_SIZES[choice] : null;
   const pointsPerPixel = paper ? paper.width / canvas.width : 0.75;
 

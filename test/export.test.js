@@ -33,8 +33,6 @@ test('el encuadre cubre la red entera y conserva la proporción', () => {
   const frame = frameForNetwork(devices, INSETS, 1);
   const positions = projectIntoRect(devices, frame.content);
 
-  // Todo dispositivo cae dentro del área de contenido, así que sus etiquetas caben
-  // en el margen reservado y ninguna queda cortada contra el borde del lienzo.
   for (const device of devices) {
     const { x, y } = positions.get(device.id);
     assert.ok(x >= INSETS.left && x <= frame.width - INSETS.right, `x fuera del área: ${x}`);
@@ -66,8 +64,7 @@ test('el bloque de etiqueta se corre entero y nunca se deja de dibujar', () => {
 });
 
 test('un dispositivo solo usa su renglón de siempre y no se roza con su propio icono', () => {
-  // El bloque arranca justo debajo del disco. Si esa distancia cae por debajo del radio,
-  // cada nombre choca con su propio icono y el reparto entero se declara apretado.
+  // Si nameTop fuera menor que el radio, cada nombre chocaría con su propio icono.
   const devices = [{ id: 'a', name: 'PC1', interfaces: [{ addresses: [{ address: '10.0.0.1' }] }] }];
   const plan = planLabels(devices, new Map([['a', { x: 0, y: 0 }]]), {
     nameWidth: (text) => text.length * 8,

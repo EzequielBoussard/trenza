@@ -9,9 +9,7 @@
 
 <link rel="canonical" href="https://trenza.pages.dev/">
 
-<!-- Las direcciones de Open Graph van absolutas y no relativas: quien lee estas etiquetas
-     no es el navegador sino el robot de LinkedIn, WhatsApp o Slack, que no resuelve rutas
-     contra la página. Con una relativa la tarjeta sale sin imagen. -->
+<!-- Open Graph con URLs absolutas: los robots de vista previa no resuelven relativas. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Trenza">
 <meta property="og:url" content="https://trenza.pages.dev/">
@@ -29,15 +27,9 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 
-<!-- La tipografía se sirve desde acá, así que no hay nada que precargar de otro dominio.
-     Las caras que hacen falta para el primer dibujado se piden antes de que el navegador
-     llegue a la hoja de estilo: la condensada la usan los nombres del diagrama. -->
 <link rel="preload" href="/fonts/sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/condensed-600-latin.woff2" as="font" type="font/woff2" crossorigin>
-<!-- Las rutas propias van desde la raíz y no relativas al documento: el sitio se sirve en
-     la raíz del dominio y una ruta que no existe devuelve el index, así que con relativas
-     una dirección como /demo/algo buscaría la hoja de estilo y el módulo un nivel adentro
-     y se comería el index en su lugar. -->
+<!-- Rutas absolutas: con relativas, /demo/ pediría los archivos un nivel más adentro. -->
 <link rel="stylesheet" href="/styles.css">
 <script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),l=localStorage.getItem('trenza.language');if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);}catch(e){}</script>
 </head>
@@ -177,58 +169,59 @@
 
 <main class="workspace" id="workspace" tabindex="-1">
 
-  <!-- Sin JavaScript el visor no hace nada, y como todo el texto lo pone el diccionario, la
-       página salía en blanco con los botones puestos: parecía rota en vez de no soportada.
-       El guion de la cabecera marca el documento y la hoja de estilo esconde esto en cuanto
-       aparece la marca; escrito al revés, un guion bloqueado dejaría el aviso escondido. -->
   <section class="nojs">
     <p lang="en">Trenza runs entirely in the browser, so it needs JavaScript. Nothing is uploaded anywhere: the file is read on your own machine.</p>
     <p lang="es">Trenza corre entero en el navegador, así que necesita JavaScript. No se sube nada a ningún lado: el archivo se lee en tu propia máquina.</p>
   </section>
 
   <section class="intro">
-    <div class="intro__grid">
-      <div class="intro__inner">
-        <p class="intro__eyebrow" data-i18n="intro.eyebrow"></p>
+    <div class="intro__main">
+      <div class="intro__text">
         <h1 class="intro__title" data-i18n="intro.title"></h1>
         <p class="intro__lead" data-i18n-html="intro.lead"></p>
-
         <div class="intro__actions">
           <button type="button" class="button button--primary" data-open-copy data-i18n="intro.choose">Choose a file</button>
-          <button type="button" class="button" data-example data-i18n="intro.example">See an example</button>
+          <button type="button" class="button" data-example data-i18n="intro.example">Open the example</button>
         </div>
         <p class="intro__hint" data-i18n="intro.hint"></p>
       </div>
 
-      <div class="intro__about">
-        <h2 class="intro__about-title" data-i18n="about.title"></h2>
-        <dl class="intro__faq">
-        <div class="intro__faq-item">
-          <dt data-i18n="about.pktTerm"></dt>
-          <dd data-i18n="about.pktBody"></dd>
-        </div>
-        <div class="intro__faq-item">
-          <dt data-i18n="about.pcapTerm"></dt>
-          <dd data-i18n="about.pcapBody"></dd>
-        </div>
-        <div class="intro__faq-item">
-          <dt data-i18n="about.privacyTerm"></dt>
-          <dd data-i18n="about.privacyBody"></dd>
-        </div>
-        <div class="intro__faq-item">
-          <dt data-i18n="about.limitsTerm"></dt>
-          <dd data-i18n="about.limitsBody"></dd>
-        </div>
-        </dl>
-
-        <p class="intro__author">
-          <span data-i18n="about.madeBy"></span>
-          <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard</a>
-          <span aria-hidden="true">·</span>
-          <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub</a>
-        </p>
-      </div>
+      <figure class="intro__shot">
+        <a class="intro__shot-link" href="/demo" data-example>
+          <img class="intro__image intro__image--dark" src="/showcase/preview-dark.webp" width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
+          <img class="intro__image intro__image--light" src="/showcase/preview-light.webp" width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
+        </a>
+        <figcaption class="intro__caption" data-i18n="intro.shotCaption"></figcaption>
+      </figure>
     </div>
+
+    <dl class="intro__notes">
+      <div>
+        <dt data-i18n="about.pktTerm"></dt>
+        <dd data-i18n="about.pktBody"></dd>
+      </div>
+      <div>
+        <dt data-i18n="about.pcapTerm"></dt>
+        <dd data-i18n="about.pcapBody"></dd>
+      </div>
+      <div>
+        <dt data-i18n="about.privacyTerm"></dt>
+        <dd data-i18n="about.privacyBody"></dd>
+      </div>
+      <div>
+        <dt data-i18n="about.limitsTerm"></dt>
+        <dd data-i18n="about.limitsBody"></dd>
+      </div>
+    </dl>
+
+    <footer class="intro__footer">
+      <p>
+        <span data-i18n="about.madeBy"></span>
+        <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard</a>.
+        <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub</a>
+      </p>
+      <p data-i18n="about.disclaimer"></p>
+    </footer>
   </section>
 
   <aside class="rail" data-rail></aside>
@@ -238,12 +231,8 @@
 </main>
 
 <div class="dropveil" data-dropveil aria-hidden="true"><span data-i18n="intro.drop"></span></div>
-<div class="theme-sweep" data-theme-sweep aria-hidden="true"></div>
 
-<!-- Los veinte módulos que importa `app.js` se descubren recién cuando el navegador lee el
-     que los importa, así que se pedían en cascada: cuatro niveles de profundidad, un viaje de
-     ida y vuelta cada uno. Declarados acá se piden todos juntos desde la primera línea del
-     documento. Si alguno deja de importarse, sacarlo de esta lista. -->
+<!-- Evita la cascada de imports (4 niveles). Tiene que coincidir con el grafo de app.js. -->
 <link rel="modulepreload" href="/src/i18n.js">
 <link rel="modulepreload" href="/src/theme.js">
 <link rel="modulepreload" href="/src/download.js">

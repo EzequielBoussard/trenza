@@ -3,9 +3,6 @@ import { getLocale, t } from '../i18n.js';
 
 const PAGE_SIZE = 300;
 
-// Cuánto mueve cada tecla en la tabla. El salto de página es de veinte filas y no de la
-// tanda entera: con trescientas, `RePág` deja la fila enfocada donde ya no se ve de dónde
-// venía, que es lo mismo que perderse.
 const ROW_STEPS = {
   ArrowDown: 1,
   ArrowUp: -1,
@@ -15,10 +12,7 @@ const ROW_STEPS = {
   End: Infinity,
 };
 
-/**
- * Las columnas de la tabla, en orden, con de dónde sale el valor por el que se ordena.
- * `text` marca las que se comparan como texto; el resto, como número.
- */
+// `text`: se ordena como texto; el resto, como número.
 const COLUMNS = [
   { key: 'table.number', of: (packet) => packet.index },
   { key: 'table.time', of: (packet) => packet.timestamp },
@@ -29,30 +23,15 @@ const COLUMNS = [
   { key: 'table.detail', of: (packet) => packet.summary, text: true },
 ];
 
-/**
- * La comparación de texto va con orden numérico, y eso es lo que hace falta acá: sin él
- * `192.168.1.10` va antes que `192.168.1.2`, porque compara dígito a dígito. Con él compara
- * cada tramo de números por su valor, que es justo lo que uno espera de una dirección.
- */
+// numeric: true, para que 192.168.1.2 vaya antes que 192.168.1.10.
 const collator = () => new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 
-/**
- * Los campos por los que busca el filtro, que son los mismos que después se resaltan. Se
- * miran de a uno y no pegados en una sola cadena: pegados, `icmp 192` coincidía en la
- * juntura entre el protocolo y el origen, y la fila salía sin una sola marca encima, sin
- * que se pudiera ver por qué estaba ahí. Si una fila aparece, algo tiene resaltado.
- */
+// Se buscan campo por campo: concatenados, "icmp 192" coincidía entre dos columnas y la
+// fila aparecía sin nada resaltado.
 const SEARCHED = ['protocol', 'source', 'destination', 'summary'];
 
-/**
- * Los campos buscables de cada paquete en minúscula, armados la primera vez que alguien
- * filtra y guardados después. Sin esto, cada tecla los rehace: en una captura de cien mil
- * paquetes son cuatrocientas mil conversiones por pulsación, y se nota al escribir. Se
- * arman recién al filtrar, así que quien no filtra no los paga.
- *
- * Van todos seguidos en un solo arreglo, cuatro por paquete, y no en un arreglo por
- * paquete: cien mil arreglos de cuatro cuestan más en armarse que las cadenas que guardan.
- */
+// Campos en minúscula, armados al primer filtrado. Un solo arreglo plano (4 por paquete):
+// 100k arreglos chicos costaban más que las cadenas.
 function haystacksFor(packets) {
   const haystacks = new Array(packets.length * SEARCHED.length);
 
@@ -74,7 +53,6 @@ function createElement(tag, className, textContent) {
   return node;
 }
 
-/** Parte el texto por el término buscado y marca los tramos que coinciden. */
 function highlighted(text, needle) {
   const value = String(text ?? '');
   if (!needle) return document.createTextNode(value);
@@ -121,15 +99,11 @@ export class PacketTableView {
     this.searched = '';
   }
 
-  /** Los paquetes elegidos, en el orden en que están en la captura. */
   getSelection() {
     return this.packets.filter((packet) => this.selected.has(packet.index));
   }
 
-  /**
-   * Selección al estilo de una planilla: un clic elige uno, con Mayúsculas se toma
-   * el tramo desde el último elegido y con Control o Comando se suma o se quita uno.
-   */
+  // Como en una planilla: Mayúsculas toma el tramo, Ctrl/Cmd suma o quita uno.
   choose(packet, event) {
     const position = this.visible.indexOf(packet);
 
@@ -150,7 +124,6 @@ export class PacketTableView {
     this.onSelect(this.getSelection(), packet);
   }
 
-  /** Restablece una selección guardada, por ejemplo tras cambiar de idioma. */
   select(indices) {
     this.selected = new Set(indices);
     this.anchor = null;
@@ -173,8 +146,7 @@ export class PacketTableView {
     this.filter = '';
     this.sort = null;
     this.selected = new Set();
-    // Los resúmenes vienen traducidos, así que un cambio de idioma trae paquetes nuevos:
-    // lo que se guardó para buscar ya no sirve.
+    // Los resúmenes están traducidos: con otro idioma hay que rearmar los campos.
     this.haystacks = null;
     this.matching = null;
     this.searched = '';
@@ -183,38 +155,24 @@ export class PacketTableView {
 
   setFilter(text) {
     this.filter = text.trim().toLowerCase();
-    // Filtrar esconde filas, y una selección con filas escondidas adentro engaña: el
-    // diálogo seguiría ofreciendo exportar paquetes que no están a la vista. Se limpia, y
-    // se avisa, que si no el resto de la interfaz se queda con la cuenta vieja.
+    // Filtrar limpia la selección: si no, se podrían exportar paquetes que no están a la vista.
     this.selected = new Set();
     this.refresh();
     this.onSelect([], null);
   }
 
-  /**
-   * Un clic por columna recorre tres estados: primero de menor a mayor, después al revés y
-   * después de vuelta al orden de la captura. El tercero hace falta porque ordenar por
-   * cualquier cosa pierde la secuencia, que en una captura es la mitad de la información.
-   */
+  // Ascendente, descendente y de vuelta al orden de la captura.
   sortByColumn(index) {
     const same = this.sort && this.sort.column === index;
     this.sort = same && this.sort.descending ? null : { column: index, descending: Boolean(same) };
 
-    // `draw` rehace la tabla entera, encabezados incluidos, así que el botón que se acaba de
-    // pulsar deja de existir y el foco se cae al documento. Con el teclado eso obliga a
-    // volver con el tabulador desde el principio de la página para ordenar dos veces.
+    // draw() rehace los encabezados, así que el foco se devuelve al botón nuevo.
     const focused = this.container.contains(document.activeElement);
     this.refresh();
     if (focused) this.container.querySelectorAll('thead button')[index].focus();
   }
 
-  /**
-   * Los paquetes que pasan el filtro, por posición en la captura. Cuando el texto nuevo
-   * contiene al anterior no puede reaparecer ninguna fila que ya estaba escondida —si una
-   * cadena contiene `icmp`, contiene `icm`—, así que se filtra el resultado anterior en vez
-   * de la captura entera. Es el caso de escribir de corrido, que es como se usa: en cien mil
-   * paquetes, la primera tecla cuesta una pasada y las siguientes, lo que quedó vivo.
-   */
+  // Si el texto nuevo contiene al anterior, se filtra sobre el resultado anterior.
   filtered() {
     if (!this.filter) {
       this.matching = null;
@@ -248,11 +206,7 @@ export class PacketTableView {
     return matching.map((index) => this.packets[index]);
   }
 
-  /**
-   * Filtra y ordena, en ese orden, y vuelve a dibujar. Las dos cosas salen siempre de la
-   * misma pasada: hacerlas por separado dejaba una tabla ordenada que al filtrar volvía al
-   * orden de la captura, o al revés.
-   */
+  // Filtrar y ordenar van siempre juntos; por separado, uno deshacía al otro.
   refresh() {
     const filtered = this.filtered();
 
@@ -269,9 +223,7 @@ export class PacketTableView {
       ? ((a, b) => this.collator.compare(String(of(a) ?? ''), String(of(b) ?? '')))
       : ((a, b) => of(a) - of(b));
 
-    // Se copia porque `sort` ordena en el lugar, y sin la copia el orden de la captura se
-    // perdería para siempre en la primera ordenada. Es estable, así que los empates
-    // conservan la secuencia original.
+    // Copia: sort ordena en el lugar y se perdería el orden de la captura.
     return [...packets].sort((a, b) => compare(a, b) * direction);
   }
 
@@ -279,10 +231,7 @@ export class PacketTableView {
     this.container.replaceChildren();
 
     const table = createElement('table', 'table table--packets');
-    // Rejilla y no tabla común: en una tabla común el renglón no admite `aria-selected` y el
-    // lector de pantalla no lo dice, así que la selección quedaba sólo en el color. Con
-    // `grid`, las celdas pasan solas a `gridcell` y el recorrido con las flechas es el que
-    // el lector espera.
+    // grid: en una tabla común aria-selected no aplica a las filas.
     table.setAttribute('role', 'grid');
     table.setAttribute('aria-multiselectable', 'true');
     const head = createElement('thead');
@@ -293,12 +242,10 @@ export class PacketTableView {
       const heading = createElement('th');
       const sorting = this.sort && this.sort.column === index;
 
-      // El encabezado es un botón de verdad y no un `th` con un `click` encima: así se
-      // llega con el tabulador y el lector de pantalla dice que se puede ordenar.
       const button = createElement('button', 'sortable', label);
       button.type = 'button';
       button.setAttribute('aria-label', t('table.sortBy', { column: label }));
-      // La flecha va siempre, vacía si no ordena por acá: así ordenar no corre los títulos.
+      // El span va siempre, aunque esté vacío, para que ordenar no mueva los títulos.
       button.append(createElement('span', 'sortable__mark', sorting ? (this.sort.descending ? '▾' : '▴') : ''));
 
       heading.setAttribute('aria-sort', sorting ? (this.sort.descending ? 'descending' : 'ascending') : 'none');
@@ -335,8 +282,7 @@ export class PacketTableView {
     for (const packet of slice) {
       const row = createElement('tr', 'packet-row');
       row.dataset.index = String(packet.index);
-      // Una sola fila entra en el recorrido del tabulador y las flechas mueven entre ellas.
-      // Con cien mil paquetes, una parada por fila deja la tabla sin salida.
+      // Tabindex móvil: una sola parada para toda la tabla.
       row.tabIndex = -1;
       row.classList.toggle('is-selected', this.selected.has(packet.index));
       row.setAttribute('aria-selected', String(this.selected.has(packet.index)));
@@ -350,8 +296,7 @@ export class PacketTableView {
         createElement('td', 'table__mono', String(packet.originalLength)),
         cell('table__detail', packet.summary, this.filter),
       );
-      // Mayúsculas al hacer clic selecciona texto por defecto; con un rango de filas
-      // en juego, eso deja media tabla resaltada por debajo de la selección real.
+      // Shift+clic selecciona texto por defecto.
       row.addEventListener('mousedown', (event) => {
         if (event.shiftKey) event.preventDefault();
       });
@@ -364,11 +309,7 @@ export class PacketTableView {
     if (!this.body.querySelector('[tabindex="0"]')) this.body.firstElementChild.tabIndex = 0;
   }
 
-  /**
-   * El teclado en la tabla: las flechas mueven de fila, Entrar elige. Con Mayúsculas o
-   * Control, Entrar hace lo mismo que el clic —tomar el tramo, o sumar y quitar de a uno—
-   * porque `choose` lee esas teclas del evento y a un evento de teclado le sobran.
-   */
+  // Enter con Shift o Ctrl se comporta como el clic: choose() lee las teclas del evento.
   navigate(event) {
     const row = event.target.closest('.packet-row');
     if (!row) return;
@@ -392,9 +333,7 @@ export class PacketTableView {
       : step === -Infinity ? 0
       : row.sectionRowIndex + step;
 
-    // Las filas se dibujan de a tandas al desplazarse; bajando con el teclado, la siguiente
-    // puede no existir todavía. `End` va a la última dibujada por la misma razón: armar
-    // cien mil filas de una para llegar al final congelaría la pantalla.
+    // Las filas se dibujan por tandas. End va a la última dibujada, no a la última del archivo.
     if (to >= rows.length) {
       this.appendRows();
       to = Math.min(to, rows.length - 1);
@@ -414,7 +353,7 @@ export function renderPacketInspector(container, packet) {
 
   const header = createElement('header', 'panel-head');
   header.append(
-    createElement('p', 'panel-head__eyebrow', t('panel.packet', { index: packet.index })),
+    createElement('p', 'panel-head__kind', t('panel.packet', { index: packet.index })),
     createElement('h2', 'panel-head__title', packet.protocol),
   );
   container.append(header);
@@ -441,7 +380,7 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
 
   const header = createElement('header', 'panel-head');
   header.append(
-    createElement('p', 'panel-head__eyebrow', t('panel.summary')),
+    createElement('p', 'panel-head__kind', t('panel.summary')),
     createElement('h2', 'panel-head__title', title ?? t('panel.capture')),
   );
   container.append(header);
@@ -456,16 +395,12 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
   const span = packets.length > 1 ? packets[packets.length - 1].timestamp - packets[0].timestamp : 0;
   const entries = [
     [t('panel.format'), capture.container],
-    // De qué enlace salió la captura: decide cómo se lee cada paquete, y es lo primero
-    // que hay que mirar cuando el desglose no dice lo que uno esperaba.
     [t('panel.linkLayer'), linkTypeName(capture.linkType)],
     [t('panel.packets'), String(packets.length)],
     [t('panel.totalBytes'), bytes.toLocaleString(getLocale())],
     [t('panel.duration'), span > 0 ? `${span.toFixed(3)} s` : '—'],
   ];
 
-  // El corte se cuenta acá y no sólo en la barra de estado: es un dato del archivo, y es
-  // donde alguien va a mirar cuando la cuenta de paquetes le parezca corta.
   if (capture.truncated > 0) {
     entries.push([t('panel.truncated'), t('panel.truncatedValue', { bytes: capture.truncated })]);
   }

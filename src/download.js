@@ -1,4 +1,3 @@
-/** Entrega un archivo al usuario sin pasar por ningún servidor. */
 export function download(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

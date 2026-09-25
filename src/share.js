@@ -1,9 +1,6 @@
 import { t } from './i18n.js';
 
-/**
- * Lee de la dirección actual el archivo que hay que abrir, si es que hay alguno.
- * El visor no publica archivos: sólo sabe descargar uno que ya esté en la web.
- */
+// Baja el archivo de ?src=, si lo hay. El visor no sube nada: sólo abre lo que ya está publicado.
 export async function readSourceFromLocation() {
   const remote = new URLSearchParams(location.search).get('src');
   if (!remote) return null;
@@ -27,11 +24,7 @@ export async function readSourceFromLocation() {
   };
 }
 
-/**
- * El último tramo de la ruta, ya sin codificar. Una dirección puede traer un `%` suelto
- * que no forma ninguna secuencia válida, y ahí `decodeURIComponent` lanza: el archivo se
- * descargó bien y quedarse sin abrirlo por el nombre sería absurdo, así que vale el crudo.
- */
+// Con un `%` suelto decodeURIComponent lanza; en ese caso queda el nombre sin decodificar.
 function fileNameFrom(url) {
   const last = url.pathname.split('/').pop();
   try {

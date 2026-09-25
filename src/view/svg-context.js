@@ -10,13 +10,9 @@ function parseFont(shorthand) {
 
 const ANCHORS = { left: 'start', center: 'middle', right: 'end' };
 
-/**
- * Un contexto con la misma superficie que el 2D del lienzo, pero que en vez de pintar
- * píxeles acumula elementos SVG. Así el diagrama se dibuja una sola vez y las dos
- * salidas no pueden separarse.
- */
-// Las mismas propiedades que expone el contexto 2D, redirigidas al estado propio:
-// asignarlas sin más dejaría el dibujo con los valores por defecto.
+// Imita la API de CanvasRenderingContext2D pero arma SVG. El diagrama se dibuja con el
+// mismo código para PNG y SVG.
+
 const PROPERTIES = ['fillStyle', 'strokeStyle', 'lineWidth', 'lineCap', 'lineJoin', 'globalAlpha', 'font', 'textAlign'];
 
 export class SvgContext {
@@ -66,9 +62,7 @@ export class SvgContext {
 
   beginPath() {
     this.path = [];
-    // El círculo pendiente también se descarta, como en el contexto 2D. Sin esto, un
-    // `arc` seguido de `fill` sin `stroke` dejaría el círculo colgado y el siguiente
-    // trazo de cualquier otra figura lo volvería a dibujar.
+    // Igual que en el contexto 2D, beginPath descarta el círculo pendiente.
     this.circle = null;
   }
 
@@ -85,9 +79,6 @@ export class SvgContext {
     this.path = [];
   }
 
-  // La transparencia del relleno se escribe aparte del color, como la del trazo: hoy todo
-  // lo que se rellena va opaco, pero si mañana no lo fuera, el SVG lo ignoraría en silencio
-  // y saldría distinto del lienzo. Los dos dibujos no pueden separarse.
   fillAttributes() {
     const { fillStyle, globalAlpha } = this.state;
     return `fill="${fillStyle}"${globalAlpha < 1 ? ` fill-opacity="${round(globalAlpha)}"` : ''}`;
@@ -147,17 +138,12 @@ export class SvgContext {
   }
 }
 
-// El resto del código usa el mismo verbo para las dos salidas.
 export function strokeGlyph(context, data) {
   if (context.strokePathData) context.strokePathData(data);
   else context.stroke(new Path2D(data));
 }
 
-/**
- * Texto con contorno del color del fondo por debajo del relleno, para que se lea aunque
- * le pase un cable por encima. El SVG lo resuelve con `paint-order`; el lienzo, pintando
- * primero el contorno y el relleno después, que es lo mismo en dos pasadas.
- */
+// Contorno del color del fondo debajo del relleno, para que el texto se lea sobre un cable.
 export function haloText(context, content, x, y) {
   if (context.strokePathData) context.fillText(content, x, y, true);
   else {
