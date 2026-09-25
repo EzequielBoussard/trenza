@@ -56,12 +56,22 @@ const FOCUS_MARGIN = 80;
 const VIEW_INSETS = { top: 70, bottom: LABEL_REACH_BELOW + 6 };
 const VIEW_SIDE_MARGIN = 40;
 
-const MIN_SCALE = 0.35;
+// Por debajo de 0,5 el diagrama entero ya entra con aire de sobra; alejar más sólo lo achica.
+const MIN_SCALE = 0.5;
 const MAX_SCALE = 6;
 
 // Constante de tiempo, en ms, de la animación de los botones de zoom. La rueda y el
 // pellizco no se animan porque se sienten con retraso.
 const GLIDE_TAU = 45;
+
+// La vuelta al límite después de soltar es más lenta, para que se lea como un rebote.
+const SNAP_TAU = 90;
+
+// Radio del aro del nodo más un respiro: al menos un equipo tiene que verse entero.
+const NODE_REACH = 36;
+
+// Hasta cuántos píxeles se puede estirar la vista más allá del límite al arrastrar.
+const OVERSCROLL = 70;
 
 // Una muesca de rueda manda deltaY 100 y acerca ×1,17.
 const WHEEL_SENSITIVITY = 0.0016;
@@ -435,8 +445,17 @@ export class TopologyView {
   }
 
   attachNavigation(svg) {
-    let dragging = null;
+    // Un puntero arrastra, dos pellizcan. `raw` es la vista sin límite que va pidiendo el
+    // gesto; lo que se muestra es esa vista frenada contra el límite.
+    const pointers = new Map();
     let origin = null;
+    let raw = null;
+    let spread = null;
+
+    const spreadOf = () => {
+      const [a, b] = pointers.values();
+      return { distance: Math.hypot(a.x - b.x, a.y - b.y), clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 };
+    };
 
     // Los eventos de rueda se acumulan y se aplican una vez por cuadro: getScreenCTM fuerza
     // un recálculo de layout en cada llamada.
@@ -445,6 +464,7 @@ export class TopologyView {
       const { factor, focus } = turning;
       turning = null;
       this.zoomTo(this.target.scale * factor, focus);
+      this.target = this.clampView(this.target);
       this.settle();
     };
 
@@ -461,7 +481,8 @@ export class TopologyView {
       turning.focus = this.pointerInScene(event, turning.matrix);
     }, { passive: false });
 
-    // Safari manda gesture* además de wheel. Sin esto acerca la página entera.
+    // Safari manda gesture* además de wheel; sin esto acerca la página entera. En iOS el
+    // pellizco ya llega como dos punteros, así que acá sólo se atiende el del trackpad.
     let pinch = 1;
     svg.addEventListener('gesturestart', (event) => {
       event.preventDefault();
@@ -469,39 +490,73 @@ export class TopologyView {
     });
     svg.addEventListener('gesturechange', (event) => {
       event.preventDefault();
-      this.zoomTo(this.target.scale * (event.scale / pinch), this.pointerInScene(event));
-      this.settle();
+      if (pointers.size < 2) {
+        this.zoomTo(this.target.scale * (event.scale / pinch), this.pointerInScene(event));
+        this.target = this.clampView(this.target);
+        this.settle();
+      }
       pinch = event.scale;
     });
 
     svg.addEventListener('pointerdown', (event) => {
       if (event.target.closest('.node')) return;
-      dragging = { x: event.clientX, y: event.clientY };
-      origin = dragging;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       svg.setPointerCapture(event.pointerId);
       svg.classList.add('is-panning');
+
+      if (pointers.size === 1) {
+        // Si todavía estaba volviendo al límite, se agarra desde donde se ve.
+        this.target = { ...this.transform };
+        this.settle();
+        raw = { ...this.target };
+        origin = { x: event.clientX, y: event.clientY };
+      } else {
+        origin = null;
+        spread = spreadOf();
+      }
     });
 
     svg.addEventListener('pointermove', (event) => {
-      if (!dragging) return;
+      const last = pointers.get(event.pointerId);
+      if (!last) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
       // La escala sale de la matriz: con otra proporción, el ancho del elemento no sirve.
       const ratio = 1 / svg.getScreenCTM().a;
-      this.target.x += (event.clientX - dragging.x) * ratio;
-      this.target.y += (event.clientY - dragging.y) * ratio;
-      dragging = { x: event.clientX, y: event.clientY };
+      if (pointers.size === 1) {
+        raw.x += (event.clientX - last.x) * ratio;
+        raw.y += (event.clientY - last.y) * ratio;
+      } else {
+        const next = spreadOf();
+        raw.x += (next.clientX - spread.clientX) * ratio;
+        raw.y += (next.clientY - spread.clientY) * ratio;
+        if (spread.distance > 0) raw = this.zoomView(raw, raw.scale * (next.distance / spread.distance), this.pointerInScene(next));
+        spread = next;
+      }
+      this.target = this.stretchView(raw, ratio);
       this.settle();
     });
 
     // Soltar sin moverse más de 5 px, fuera de un nodo, limpia la selección.
     const endDrag = (event) => {
+      if (!pointers.delete(event.pointerId)) return;
+      if (pointers.size === 1) spread = null;
+      if (pointers.size > 0) return;
+
       const click = origin
         && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < 5
         && !event.target.closest('.node');
 
-      dragging = null;
       origin = null;
+      raw = null;
       svg.classList.remove('is-panning');
       if (click) this.onClear();
+
+      const limited = this.clampView(this.target);
+      if (limited.x !== this.target.x || limited.y !== this.target.y) {
+        this.target = limited;
+        this.glide(SNAP_TAU);
+      }
     };
     svg.addEventListener('pointerup', endDrag);
     svg.addEventListener('pointercancel', endDrag);
@@ -512,29 +567,66 @@ export class TopologyView {
       .matrixTransform(matrix ?? this.svg.getScreenCTM().inverse());
   }
 
-  // Acerca dejando quieto `focus`. Se calcula sobre el destino para que dos ruedas seguidas
-  // se sumen en vez de pelearse con la animación.
-  zoomTo(scale, focus) {
-    const previous = this.target.scale;
+  // Acerca dejando quieto `focus`.
+  zoomView(view, scale, focus) {
     const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
-    if (next === previous) return false;
-
     const anchor = focus ?? { x: this.frame.width / 2, y: this.frame.height / 2 };
-    const ratio = next / previous;
-    this.target = {
-      x: anchor.x - (anchor.x - this.target.x) * ratio,
-      y: anchor.y - (anchor.y - this.target.y) * ratio,
+    const ratio = next / view.scale;
+    return {
+      x: anchor.x - (anchor.x - view.x) * ratio,
+      y: anchor.y - (anchor.y - view.y) * ratio,
       scale: next,
     };
+  }
+
+  // Se calcula sobre el destino para que dos ruedas seguidas se sumen en vez de pelearse
+  // con la animación.
+  zoomTo(scale, focus) {
+    const next = this.zoomView(this.target, scale, focus);
+    if (next.scale === this.target.scale) return false;
+    this.target = next;
     return true;
   }
 
   zoomBy(factor) {
-    if (this.zoomTo(this.target.scale * factor)) this.glide();
+    if (!this.zoomTo(this.target.scale * factor)) return;
+    this.target = this.clampView(this.target);
+    this.glide();
+  }
+
+  // La vista más cercana a `view` en la que al menos un equipo se ve entero. El conjunto de
+  // vistas válidas es la unión de un rectángulo por equipo, así que se prueba contra cada uno.
+  clampView(view) {
+    if (!this.positions || !this.frame) return view;
+    const margin = NODE_REACH * view.scale;
+    const within = (value, low, high) => Math.min(high, Math.max(low, value));
+
+    let best = null;
+    for (const point of this.positions.values()) {
+      const x = within(view.x, margin - point.x * view.scale, this.frame.width - margin - point.x * view.scale);
+      const y = within(view.y, margin - point.y * view.scale, this.frame.height - margin - point.y * view.scale);
+      const distance = Math.hypot(x - view.x, y - view.y);
+      if (distance === 0) return view;
+      if (!best || distance < best.distance) best = { x, y, distance };
+    }
+    return { x: best.x, y: best.y, scale: view.scale };
+  }
+
+  // Pasado el límite la vista sigue al dedo cada vez menos, hasta OVERSCROLL píxeles.
+  // `ratio` convierte píxeles de pantalla en unidades del lienzo.
+  stretchView(view, ratio) {
+    const limited = this.clampView(view);
+    const reach = OVERSCROLL * ratio;
+    const resist = (excess) => Math.sign(excess) * reach * (1 - 1 / (Math.abs(excess) / reach + 1));
+    return {
+      x: limited.x + resist(view.x - limited.x),
+      y: limited.y + resist(view.y - limited.y),
+      scale: view.scale,
+    };
   }
 
   // Avance exponencial por tiempo, no por cuadro: igual a 60 Hz que a 144.
-  glide() {
+  glide(tau = GLIDE_TAU) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       this.settle();
       return;
@@ -543,7 +635,7 @@ export class TopologyView {
 
     let last = performance.now();
     const step = (now) => {
-      const share = 1 - Math.exp(-(now - last) / GLIDE_TAU);
+      const share = 1 - Math.exp(-(now - last) / tau);
       last = now;
 
       const done = ['x', 'y', 'scale'].every((axis) => Math.abs(this.target[axis] - this.transform[axis]) < 0.01);

@@ -18,6 +18,7 @@ const DICTIONARIES = {
     'action.language': 'Language',
     'action.theme': 'Switch theme',
     'action.skip': 'Skip to the viewer',
+    'action.home': 'Trenza, back to the start page',
     'theme.dark': 'Dark',
     'theme.light': 'Light',
 
@@ -267,6 +268,7 @@ const DICTIONARIES = {
     'action.language': 'Idioma',
     'action.theme': 'Cambiar de tema',
     'action.skip': 'Ir al visor',
+    'action.home': 'Trenza, volver al inicio',
     'theme.dark': 'Oscuro',
     'theme.light': 'Claro',
 

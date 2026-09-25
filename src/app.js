@@ -19,6 +19,7 @@ const elements = {
   fileName: document.querySelector('[data-file-name]'),
   fileInput: document.querySelector('[data-file-input]'),
   reset: document.querySelector('[data-reset]'),
+  home: document.querySelector('[data-home]'),
   open: document.querySelector('[data-open]'),
   openCopy: document.querySelector('[data-open-copy]'),
   themeToggle: document.querySelector('[data-theme-toggle]'),
@@ -413,24 +414,44 @@ function wireLanguage() {
   });
 }
 
+function closeFile() {
+  state.file = null;
+  state.kind = null;
+  state.model = null;
+  state.capture = null;
+  state.selectedDeviceId = null;
+  delete document.body.dataset.loaded;
+  delete document.body.dataset.view;
+  elements.fileName.textContent = '';
+  clearStage();
+  elements.rail.replaceChildren();
+  elements.panel.replaceChildren();
+  elements.fileInput.value = '';
+  // A la raíz: si quedara /demo, recargar volvería a abrir el ejemplo.
+  history.replaceState(null, '', '/');
+  refreshTitle();
+  setStatus('status.idle');
+}
+
+// Reinicia la animación aunque ya estuviera corriendo.
+function weave(home) {
+  home.classList.remove('is-weaving');
+  void home.offsetWidth;
+  home.classList.add('is-weaving');
+}
+
 function wireActions() {
-  elements.reset.addEventListener('click', () => {
-    state.file = null;
-    state.kind = null;
-    state.model = null;
-    state.capture = null;
-    state.selectedDeviceId = null;
-    delete document.body.dataset.loaded;
-    delete document.body.dataset.view;
-    elements.fileName.textContent = '';
-    clearStage();
-    elements.rail.replaceChildren();
-    elements.panel.replaceChildren();
-    elements.fileInput.value = '';
-    // A la raíz: si quedara /demo, recargar volvería a abrir el ejemplo.
-    history.replaceState(null, '', '/');
-    refreshTitle();
-    setStatus('status.idle');
+  elements.reset.addEventListener('click', closeFile);
+
+  // El logo es un enlace a / para que funcione sin JavaScript y en otra pestaña.
+  elements.home.addEventListener('click', (event) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    weave(elements.home);
+    closeFile();
+  });
+  elements.home.addEventListener('animationend', (event) => {
+    if (event.animationName === 'name-flash') elements.home.classList.remove('is-weaving');
   });
 
   document.addEventListener('keydown', (event) => {
