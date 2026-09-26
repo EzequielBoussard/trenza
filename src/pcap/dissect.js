@@ -380,17 +380,18 @@ export function dissectPacket(packet) {
       destination = network.layer.destination;
       protocol = IP_PROTOCOLS[network.protocol] || `IP/${network.protocol}`;
 
-      // El resumen de la capa de red va en la última rama para no armarlo y pisarlo.
+      // El resumen de la capa de red va en la última rama para no armarlo y pisarlo. Cuando
+      // la columna muestra el servicio, el transporte va al resumen para que "tcp" lo filtre.
       if (network.protocol === 6) {
         const tcp = dissectTcp(bytes, network.next, network.payloadLength);
         layers.push(tcp);
         protocol = tcp.service || 'TCP';
-        summary = tcp.summary;
+        summary = tcp.service ? `TCP ${tcp.summary}` : tcp.summary;
       } else if (network.protocol === 17) {
         const udp = dissectUdp(bytes, network.next);
         layers.push(udp);
         protocol = udp.service || 'UDP';
-        summary = udp.summary;
+        summary = udp.service ? `UDP ${udp.summary}` : udp.summary;
       } else if (network.protocol === 1 || network.protocol === 58) {
         const icmp = dissectIcmp(bytes, network.next, network.protocol === 58 ? 6 : 4);
         layers.push(icmp);

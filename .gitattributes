@@ -1,6 +1,4 @@
-# Todo el texto se guarda y se saca con saltos de línea de Unix. No es cosmético: si
-# `_headers` llegara con retornos de carro, cada valor de cabecera terminaría con uno
-# pegado y la política de seguridad se rompería sin que nada lo avise.
+# LF en todo: un `_headers` con CRLF deja un \r al final de cada cabecera y rompe la CSP.
 * text=auto eol=lf
 
 *.pkt binary
@@ -10,3 +8,4 @@
 *.png binary
 *.ico binary
 *.woff2 binary
+*.webp binary

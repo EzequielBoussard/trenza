@@ -73,6 +73,9 @@ const NODE_REACH = 36;
 // Hasta cuántos píxeles se puede estirar la vista más allá del límite al arrastrar.
 const OVERSCROLL = 70;
 
+// Movimiento, en píxeles, por debajo del cual soltar cuenta como clic.
+const CLICK_SLOP = 5;
+
 // Una muesca de rueda manda deltaY 100 y acerca ×1,17.
 const WHEEL_SENSITIVITY = 0.0016;
 
@@ -451,6 +454,16 @@ export class TopologyView {
     let origin = null;
     let raw = null;
     let spread = null;
+    let panning = false;
+
+    // Sobre un equipo el arrastre empieza recién pasados CLICK_SLOP píxeles, para que tocarlo
+    // siga siendo elegirlo. La captura va al empezar: con ella el clic ya no llega al equipo.
+    const startPan = () => {
+      if (panning) return;
+      panning = true;
+      for (const id of pointers.keys()) svg.setPointerCapture(id);
+      svg.classList.add('is-panning');
+    };
 
     const spreadOf = () => {
       const [a, b] = pointers.values();
@@ -499,26 +512,28 @@ export class TopologyView {
     });
 
     svg.addEventListener('pointerdown', (event) => {
-      if (event.target.closest('.node')) return;
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      svg.setPointerCapture(event.pointerId);
-      svg.classList.add('is-panning');
 
       if (pointers.size === 1) {
         // Si todavía estaba volviendo al límite, se agarra desde donde se ve.
         this.target = { ...this.transform };
         this.settle();
         raw = { ...this.target };
-        origin = { x: event.clientX, y: event.clientY };
+        origin = { x: event.clientX, y: event.clientY, onNode: Boolean(event.target.closest('.node')) };
+        if (!origin.onNode) startPan();
       } else {
-        origin = null;
         spread = spreadOf();
+        startPan();
       }
     });
 
     svg.addEventListener('pointermove', (event) => {
       const last = pointers.get(event.pointerId);
       if (!last) return;
+      if (!panning) {
+        if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < CLICK_SLOP) return;
+        startPan();
+      }
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
       // La escala sale de la matriz: con otra proporción, el ancho del elemento no sirve.
@@ -537,18 +552,19 @@ export class TopologyView {
       this.settle();
     });
 
-    // Soltar sin moverse más de 5 px, fuera de un nodo, limpia la selección.
+    // Soltar sin haberse movido, fuera de un equipo, limpia la selección.
     const endDrag = (event) => {
       if (!pointers.delete(event.pointerId)) return;
       if (pointers.size === 1) spread = null;
       if (pointers.size > 0) return;
 
       const click = origin
-        && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < 5
-        && !event.target.closest('.node');
+        && !origin.onNode
+        && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < CLICK_SLOP;
 
       origin = null;
       raw = null;
+      panning = false;
       svg.classList.remove('is-panning');
       if (click) this.onClear();
 
@@ -560,6 +576,8 @@ export class TopologyView {
     };
     svg.addEventListener('pointerup', endDrag);
     svg.addEventListener('pointercancel', endDrag);
+    // Si el navegador suelta la captura por su cuenta, el puntero no puede quedar colgado.
+    svg.addEventListener('lostpointercapture', endDrag);
   }
 
   pointerInScene(event, matrix) {

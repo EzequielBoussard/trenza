@@ -190,8 +190,14 @@
 
       <figure class="intro__shot">
         <a class="intro__shot-link" href="/demo" data-example>
-          <img class="intro__image intro__image--dark" src="/showcase/preview-dark.webp" width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
-          <img class="intro__image intro__image--light" src="/showcase/preview-light.webp" width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
+          <img class="intro__image intro__image--dark" src="/showcase/preview-dark.webp"
+            srcset="/showcase/preview-dark-720.webp 720w, /showcase/preview-dark-1080.webp 1080w, /showcase/preview-dark.webp 1440w"
+            sizes="(max-width: 62rem) calc(100vw - 2rem), 44rem"
+            width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
+          <img class="intro__image intro__image--light" src="/showcase/preview-light.webp"
+            srcset="/showcase/preview-light-720.webp 720w, /showcase/preview-light-1080.webp 1080w, /showcase/preview-light.webp 1440w"
+            sizes="(max-width: 62rem) calc(100vw - 2rem), 44rem"
+            width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
         </a>
         <figcaption class="intro__caption" data-i18n="intro.shotCaption"></figcaption>
       </figure>

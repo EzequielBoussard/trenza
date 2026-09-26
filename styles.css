@@ -916,9 +916,10 @@ html:not([data-js]) .intro {
   color: var(--text-muted);
 }
 
+/* En 400: la mono 500 sólo la usa el exporte, y así la portada no la baja. */
 .intro__lead b {
   font-family: var(--font-mono);
-  font-weight: 500;
+  font-weight: 400;
   color: var(--text);
 }
 
