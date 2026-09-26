@@ -42,8 +42,10 @@ const elements = {
   previewLensCanvas: document.querySelector('[data-preview-lens-canvas]'),
 };
 
-const EXAMPLE_FILE = '/showcase/red-supermercado-2023.pkt';
-const EXAMPLE_NAME = 'red-supermercado-2023.pkt';
+const EXAMPLES = {
+  network: '/showcase/red-supermercado-2023.pkt',
+  capture: '/showcase/captura-ejemplo.pcap',
+};
 
 // Pages devuelve el index para cualquier ruta, así que /demo llega acá y abre el ejemplo.
 const DEMO_PATH = /^\/demo\/?$/;
@@ -79,6 +81,12 @@ function setStatus(key, values = null, tone = 'info') {
   state.status = { key, values, tone };
   elements.status.textContent = t(key, resolveValues(values));
   elements.status.dataset.tone = tone;
+}
+
+// Por data-i18n, para que el cambio de idioma lo vuelva a traducir.
+function labelExport(key) {
+  elements.export.dataset.i18n = key;
+  elements.export.textContent = t(key);
 }
 
 function createElement(tag, className, textContent) {
@@ -220,6 +228,7 @@ async function showNetwork(bytes) {
 
   state.kind = 'network';
   document.body.dataset.view = 'network';
+  labelExport('action.export');
   state.model = model;
   state.variant = decoded.variant;
   state.devicesById = new Map(model.devices.map((device) => [device.id, device]));
@@ -277,6 +286,7 @@ function showPacketSelection(selection, last) {
 function showCapture(bytes) {
   state.kind = 'capture';
   document.body.dataset.view = 'capture';
+  labelExport('action.exportCapture');
   state.capture = decodeCapture(bytes);
   state.packetSelection = [];
 
@@ -372,17 +382,18 @@ function wireFileInput() {
     trigger.addEventListener('click', (event) => {
       if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
       event.preventDefault();
-      openExample();
+      openExample(trigger.dataset.example);
     });
   }
 }
 
-async function openExample() {
+async function openExample(kind = 'network') {
+  const path = EXAMPLES[kind];
   setStatus('status.reading');
   try {
-    const response = await fetch(EXAMPLE_FILE);
+    const response = await fetch(path);
     if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
-    await open(EXAMPLE_NAME, new Uint8Array(await response.arrayBuffer()));
+    await open(path.split('/').pop(), new Uint8Array(await response.arrayBuffer()));
   } catch (error) {
     showFailure(error.message);
   }

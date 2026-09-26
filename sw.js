@@ -10,6 +10,7 @@ const SHELL = [
   '/favicon.svg',
   '/apple-touch-icon.png',
   '/showcase/red-supermercado-2023.pkt',
+  '/showcase/captura-ejemplo.pcap',
   // Sólo el subconjunto latino; latin-ext se guarda si alguna vez se pide.
   '/fonts/sans-latin.woff2',
   '/fonts/condensed-500-latin.woff2',

@@ -258,7 +258,7 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
 }
 
 @media (hover: hover) {
-  .masthead__home:hover .masthead__mark path:last-child { stroke: var(--orange); }
+  .masthead__home:hover .masthead__name { color: var(--orange); }
 }
 
 /* Al volver al inicio la trenza se vuelve a tejer: los dos hilos se dibujan de punta a punta. */
@@ -297,8 +297,9 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   stroke-linecap: round;
 }
 
+/* Los mismos dos hilos que logo.svg y los iconos. */
 .masthead__mark path:first-child { stroke: var(--orange); }
-.masthead__mark path:last-child { stroke: var(--orange-pale); }
+.masthead__mark path:last-child { stroke: var(--blue); }
 
 .masthead__name {
   font-family: var(--font-display);
@@ -714,7 +715,11 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 }
 
 body:not([data-loaded]) [data-reset],
-body:not([data-loaded]) [data-export] { display: none; }
+body:not([data-loaded]) [data-export],
+body:not([data-loaded]) [data-open] { display: none; }
+
+/* En la portada la barra de estado sólo aparece si hay algo que avisar. */
+body:not([data-loaded]) .statusbar:not([data-tone='error']):not([data-tone='warn']) { display: none; }
 
 body:not([data-loaded]) .rail,
 body:not([data-loaded]) .stage,
@@ -1572,4 +1577,6 @@ body[data-dragging] .dropveil { display: grid; }
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
+
+  .intro__actions .button--primary { grid-column: 1 / -1; }
 }

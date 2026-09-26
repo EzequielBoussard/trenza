@@ -26,7 +26,7 @@ No edita ni simula nada: para eso sigue haciendo falta Packet Tracer.
 
 - Abrir un archivo con el botón o arrastrándolo a la página.
 - `?src=<url>` abre un archivo publicado en otro sitio, si ese servidor permite CORS (por ejemplo `raw.githubusercontent.com`). Sólo se aceptan direcciones `https`.
-- `/demo` abre la red de ejemplo de `showcase/`.
+- `/demo` abre la red de ejemplo de `showcase/`. La portada también ofrece una captura de ejemplo.
 - Funciona sin conexión después de la primera visita y se puede instalar como aplicación.
 
 ## Cómo se lee un `.pkt`
@@ -50,7 +50,7 @@ No hay dependencias ni paso de compilación: son módulos ES servidos tal cual.
 npm test
 ```
 
-Las pruebas (44, con `node:test`) cubren el descifrado, los parsers de pcap y de configuración IOS, el reparto del diagrama y las traducciones. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas (46, con `node:test`) cubren el descifrado, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones y los dos archivos de ejemplo. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/
@@ -60,6 +60,7 @@ src/
   pcap/         lectura de capturas, disección por capas y exportación
   view/         diagrama, reparto de etiquetas, exportación, inspector, tabla de paquetes
 sw.js           caché para uso sin conexión
+scripts/        generador de la captura de ejemplo
 test/           pruebas con node:test
 ```
 
@@ -77,6 +78,6 @@ Está probado con archivos de Packet Tracer 7.3.0, 7.3.1, 8.2.1 y 9.0.1 (14 rede
 
 El código es MIT (ver `LICENSE`).
 
-La tipografía de `fonts/` es IBM Plex, bajo la SIL Open Font License 1.1 (`fonts/LICENSE.txt`). La red de `showcase/` es un trabajo propio de un curso de redes.
+La tipografía de `fonts/` es IBM Plex, bajo la SIL Open Font License 1.1 (`fonts/LICENSE.txt`). La red de `showcase/` es un trabajo propio de un curso de redes. La captura de ejemplo es sintética: la arma `scripts/captura-ejemplo.mjs` con direcciones reservadas para documentación, así que no sale de ninguna red real.
 
 Trenza es un proyecto independiente, sin relación con Cisco ni respaldo de su parte. Cisco y Packet Tracer son marcas registradas de Cisco Systems, Inc. El proyecto no incluye software, iconos ni contenido de Cisco: los símbolos del diagrama son propios.
