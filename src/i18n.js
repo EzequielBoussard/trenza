@@ -24,7 +24,7 @@ const DICTIONARIES = {
     'theme.light': 'Light',
 
     'intro.title': 'Viewer for Packet Tracer files and network captures',
-    'intro.lead': 'Open a {pkt} or {pka} file to see the topology, interfaces and configuration of each device, or a {pcap} or {pcapng} file to go through the packets. The file is read in your browser and is not uploaded anywhere.',
+    'intro.lead': 'Open a {pkt}, {pka} or {pkz} file to see the topology, interfaces and configuration of each device, or a {pcap} or {pcapng} file to go through the packets. The file is read in your browser and is not uploaded anywhere.',
     'intro.choose': 'Choose a file',
     'intro.exampleNetwork': 'Example network',
     'intro.exampleCapture': 'Example capture',
@@ -59,8 +59,8 @@ const DICTIONARIES = {
     'status.exportFailed': 'Export failed: {reason}',
     'status.linkFailed': 'The file in the link could not be opened: {reason}',
 
-    'variant.modern': 'Packet Tracer 6.2 or later',
-    'variant.legacy': 'Before Packet Tracer 6.2',
+    'variant.modern': 'Twofish in EAX mode',
+    'variant.legacy': 'None (old format)',
 
     'unit.devices#one': '{count} device',
     'unit.devices#other': '{count} devices',
@@ -90,7 +90,7 @@ const DICTIONARIES = {
     'panel.connections': 'Connections',
     'panel.file': 'File',
     'panel.version': 'Packet Tracer version',
-    'panel.variant': 'Saved as',
+    'panel.variant': 'Encryption',
     'panel.unknownVersion': 'unknown',
     'panel.downloadFile': 'Download the original file',
     'panel.gateway': 'Gateway',
@@ -198,6 +198,7 @@ const DICTIONARIES = {
     'error.unknownFormat': 'Unknown format: {format}',
     'error.oldBrowser': 'This browser is too old to open a .pkt file: it needs Safari 16.4, Chrome 80 or Firefox 113',
     'error.decrypt': 'This is not a Packet Tracer .pkt or .pka file, or it is damaged',
+    'error.package': 'The .pkz package does not contain a .pkt or .pka file',
     'error.truncated': 'Truncated compressed block',
     'error.inflate': 'The compressed block is not readable',
     'error.size': 'Unexpected uncompressed size: {actual}, expected {expected}',
@@ -276,7 +277,7 @@ const DICTIONARIES = {
     'theme.light': 'Claro',
 
     'intro.title': 'Visor de archivos de Packet Tracer y capturas de red',
-    'intro.lead': 'Abrí un {pkt} o {pka} para ver la topología, las interfaces y la configuración de cada equipo, o un {pcap} o {pcapng} para recorrer los paquetes. El archivo se lee en el navegador y no se sube a ningún servidor.',
+    'intro.lead': 'Abrí un {pkt}, {pka} o {pkz} para ver la topología, las interfaces y la configuración de cada equipo, o un {pcap} o {pcapng} para recorrer los paquetes. El archivo se lee en el navegador y no se sube a ningún servidor.',
     'intro.choose': 'Elegir un archivo',
     'intro.exampleNetwork': 'Red de ejemplo',
     'intro.exampleCapture': 'Captura de ejemplo',
@@ -311,8 +312,8 @@ const DICTIONARIES = {
     'status.exportFailed': 'No se pudo exportar: {reason}',
     'status.linkFailed': 'No se pudo abrir el archivo del enlace: {reason}',
 
-    'variant.modern': 'Packet Tracer 6.2 o posterior',
-    'variant.legacy': 'Anterior a Packet Tracer 6.2',
+    'variant.modern': 'Twofish en modo EAX',
+    'variant.legacy': 'Ninguno (formato viejo)',
 
     'unit.devices#one': '{count} dispositivo',
     'unit.devices#other': '{count} dispositivos',
@@ -342,7 +343,7 @@ const DICTIONARIES = {
     'panel.connections': 'Conexiones',
     'panel.file': 'Archivo',
     'panel.version': 'Versión de Packet Tracer',
-    'panel.variant': 'Guardado como',
+    'panel.variant': 'Cifrado',
     'panel.unknownVersion': 'desconocida',
     'panel.downloadFile': 'Descargar el archivo original',
     'panel.gateway': 'Puerta de enlace',
@@ -450,6 +451,7 @@ const DICTIONARIES = {
     'error.unknownFormat': 'Formato desconocido: {format}',
     'error.oldBrowser': 'Este navegador es demasiado viejo para abrir un .pkt: hace falta Safari 16.4, Chrome 80 o Firefox 113',
     'error.decrypt': 'Este archivo no es un .pkt ni un .pka de Packet Tracer, o está dañado',
+    'error.package': 'El paquete .pkz no contiene un archivo .pkt ni .pka',
     'error.truncated': 'Bloque comprimido truncado',
     'error.inflate': 'El bloque comprimido no se puede leer',
     'error.size': 'Tamaño descomprimido inesperado: {actual}, se esperaban {expected}',
@@ -613,6 +615,7 @@ export function translateDocument(root = document) {
     node.innerHTML = t(node.dataset.i18nHtml, {
       pkt: '<b>.pkt</b>',
       pka: '<b>.pka</b>',
+      pkz: '<b>.pkz</b>',
       pcap: '<b>.pcap</b>',
       pcapng: '<b>.pcapng</b>',
     });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deflateSync } from 'node:zlib';
+import { deflateRawSync, deflateSync } from 'node:zlib';
 import { setLanguage } from '../src/i18n.js';
 import { decodePacketTracerFile } from '../src/pkt/decode.js';
 
@@ -27,6 +27,42 @@ test('lee un archivo con el formato heredado', async () => {
 
   assert.equal(decoded.variant, 'legacy');
   assert.equal(new TextDecoder().decode(decoded.xml), xml);
+});
+
+// Un ZIP mínimo con una sola entrada comprimida, como el .pkz que guarda Packet Tracer.
+function buildPackage(name, content) {
+  const data = deflateRawSync(content);
+  const fileName = Buffer.from(name);
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(8, 8);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(content.length, 22);
+  local.writeUInt16LE(fileName.length, 26);
+  const central = Buffer.alloc(46);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(8, 10);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(content.length, 24);
+  central.writeUInt16LE(fileName.length, 28);
+  const directoryStart = local.length + fileName.length + data.length;
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length + fileName.length, 12);
+  end.writeUInt32LE(directoryStart, 16);
+  return new Uint8Array(Buffer.concat([local, fileName, data, central, fileName, end]));
+}
+
+test('abre un paquete .pkz', async () => {
+  const xml = '<PACKETTRACER5><VERSION>8.1.0</VERSION></PACKETTRACER5>';
+  const decoded = await decodePacketTracerFile(buildPackage('red.pkt', buildLegacyFile(xml)));
+  assert.equal(new TextDecoder().decode(decoded.xml), xml);
+});
+
+test('un .pkz sin .pkt adentro lo dice', async () => {
+  await assert.rejects(decodePacketTracerFile(buildPackage('foto.png', new Uint8Array(40))), /does not contain/);
 });
 
 test('rechaza un archivo que no es de Packet Tracer', async () => {

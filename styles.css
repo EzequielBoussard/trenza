@@ -257,8 +257,10 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   outline-offset: 2px;
 }
 
+/* Con el puntero encima los hilos se cruzan: cada uno toma el color del otro. */
 @media (hover: hover) {
-  .masthead__home:hover .masthead__name { color: var(--orange); }
+  .masthead__home:hover .masthead__mark path:first-child { stroke: var(--blue); }
+  .masthead__home:hover .masthead__mark path:last-child { stroke: var(--orange); }
 }
 
 /* Al volver al inicio la trenza se vuelve a tejer: los dos hilos se dibujan de punta a punta. */
@@ -298,8 +300,13 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
 }
 
 /* Los mismos dos hilos que logo.svg y los iconos. */
+.masthead__mark path { transition: stroke 240ms ease; }
 .masthead__mark path:first-child { stroke: var(--orange); }
 .masthead__mark path:last-child { stroke: var(--blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  .masthead__mark path { transition: none; }
+}
 
 .masthead__name {
   font-family: var(--font-display);

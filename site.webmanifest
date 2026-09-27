@@ -48,6 +48,7 @@
       "action": "/",
       "accept": {
         "application/octet-stream": [".pkt", ".pka"],
+        "application/zip": [".pkz"],
         "application/vnd.tcpdump.pcap": [".pcap", ".cap"],
         "application/x-pcapng": [".pcapng"]
       }

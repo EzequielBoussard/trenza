@@ -48,6 +48,7 @@ const EXAMPLES = {
 };
 
 // Pages devuelve el index para cualquier ruta, así que /demo llega acá y abre el ejemplo.
+// Cualquier otra ruta se muestra como "/", conservando ?src=.
 const DEMO_PATH = /^\/demo\/?$/;
 
 const state = {
@@ -478,6 +479,10 @@ async function start() {
   wireActions();
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
+
+  if (location.pathname !== '/' && !DEMO_PATH.test(location.pathname)) {
+    history.replaceState(null, '', `/${location.search}${location.hash}`);
+  }
 
   let source = null;
   try {

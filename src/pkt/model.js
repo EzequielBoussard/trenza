@@ -59,6 +59,8 @@ function vlansFromEngine(engine) {
 }
 
 function interfacesFromPorts(engine) {
+  // Hasta 5.x la puerta de enlace es del equipo y no de cada puerto.
+  const deviceGateway = childText(engine, 'GATEWAY');
   const interfaces = [];
   for (const port of engine.getElementsByTagName('PORT')) {
     const ip = childText(port, 'IP');
@@ -68,7 +70,7 @@ function interfacesFromPorts(engine) {
       name: '',
       addresses: ip ? [{ address: ip, mask: childText(port, 'SUBNET') }] : [],
       mac,
-      gateway: childText(port, 'PORT_GATEWAY'),
+      gateway: childText(port, 'PORT_GATEWAY') || deviceGateway,
       description: '',
       enabled: true,
     });
@@ -76,12 +78,12 @@ function interfacesFromPorts(engine) {
   return interfaces;
 }
 
-function readDevice(deviceNode) {
+// Hasta 5.x no hay SAVE_REF_ID: los enlaces nombran a cada equipo por su posición en la lista.
+function readDevice(deviceNode, index) {
   const engine = childNamed(deviceNode, 'ENGINE');
   if (!engine) return null;
 
-  const id = childText(engine, 'SAVE_REF_ID');
-  if (!id) return null;
+  const id = childText(engine, 'SAVE_REF_ID') || String(index);
 
   const typeNode = childNamed(engine, 'TYPE');
   const typeText = typeNode ? typeNode.textContent.trim() : '';
@@ -147,7 +149,7 @@ export function buildNetworkModel(xmlText) {
   const linksNode = childNamed(network, 'LINKS');
 
   const devices = devicesNode
-    ? childrenNamed(devicesNode, 'DEVICE').map(readDevice).filter(Boolean)
+    ? childrenNamed(devicesNode, 'DEVICE').map((node, index) => readDevice(node, index)).filter(Boolean)
     : [];
   const links = linksNode ? childrenNamed(linksNode, 'LINK').map(readLink).filter(Boolean) : [];
 

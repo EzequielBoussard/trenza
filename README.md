@@ -1,6 +1,8 @@
 # Trenza
 
-Visor web de sólo lectura para archivos `.pkt` y `.pka` de Cisco Packet Tracer y capturas `.pcap` y `.pcapng`. Descifra el archivo y dibuja la topología en el navegador; el archivo no se sube a ningún servidor.
+[![Pruebas](https://github.com/EzequielBoussard/trenza/actions/workflows/pruebas.yml/badge.svg)](https://github.com/EzequielBoussard/trenza/actions/workflows/pruebas.yml)
+
+Visor web de sólo lectura para archivos `.pkt`, `.pka` y `.pkz` de Cisco Packet Tracer y capturas `.pcap` y `.pcapng`. Descifra el archivo y dibuja la topología en el navegador; el archivo no se sube a ningún servidor.
 
 **Demo:** [trenza.pages.dev/demo](https://trenza.pages.dev/demo) abre una red de ejemplo de 71 equipos.
 
@@ -8,7 +10,7 @@ Visor web de sólo lectura para archivos `.pkt` y `.pka` de Cisco Packet Tracer 
 
 ## Qué hace
 
-Con un `.pkt` o `.pka`:
+Con un `.pkt`, `.pka` o `.pkz`:
 
 - Dibuja la topología lógica con las posiciones guardadas en el archivo.
 - Muestra cada equipo con sus interfaces y direcciones, VLAN, rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y la `running-config`.
@@ -31,14 +33,14 @@ No edita ni simula nada: para eso sigue haciendo falta Packet Tracer.
 
 ## Cómo se lee un `.pkt`
 
-El formato no está documentado. Desde la versión 6.2, Packet Tracer guarda el XML interno así, y el visor deshace los pasos en orden inverso:
+El formato no está documentado. Packet Tracer guarda el XML interno así, y el visor deshace los pasos en orden inverso:
 
 1. Ofuscación exterior: el archivo invertido y cada byte con XOR contra un valor que depende de la posición y del largo.
 2. Twofish en modo EAX, con clave y nonce fijos: 16 bytes `0x89` y 16 bytes `0x10`.
 3. Ofuscación interior: otra máscara por posición sobre el texto descifrado.
 4. zlib, con el tamaño descomprimido en los primeros 4 bytes.
 
-Los archivos anteriores a 6.2 sólo tienen los pasos 3 y 4. El formato lo documentaron antes [pka2xml](https://github.com/mircodz/pka2xml) y [ptexplorer](https://github.com/axcheron/ptexplorer); Trenza reimplementa la lectura en JavaScript para que corra en el navegador. Twofish está escrito a mano porque WebCrypto no lo incluye, y se prueba contra los vectores del paper original.
+Hay un formato más viejo que sólo tiene los pasos 3 y 4, y el visor también lo lee; un archivo guardado con 5.3.3 ya viene cifrado. Un `.pkz` es un ZIP con el `.pkt` adentro. Hasta la versión 5.x los equipos no tienen identificador y los enlaces los nombran por su posición en la lista. El formato lo documentaron antes [pka2xml](https://github.com/mircodz/pka2xml) y [ptexplorer](https://github.com/axcheron/ptexplorer); Trenza reimplementa la lectura en JavaScript para que corra en el navegador. Twofish está escrito a mano porque WebCrypto no lo incluye, y se prueba contra los vectores del paper original.
 
 El resto de los datos sale del XML y de la `running-config` de cada equipo. Las VLAN, por ejemplo, hay que cruzarlas: el XML guarda número y nombre, y la configuración dice qué puerto pertenece a cuál.
 
@@ -50,7 +52,7 @@ No hay dependencias ni paso de compilación: son módulos ES servidos tal cual.
 npm test
 ```
 
-Las pruebas (46, con `node:test`) cubren el descifrado, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones y los dos archivos de ejemplo. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas (48, con `node:test`) cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones y los dos archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/
@@ -70,9 +72,9 @@ Las decisiones de diseño, con lo que se midió para tomarlas, están en [`docs/
 
 ## Compatibilidad
 
-Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`.
+Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
-Está probado con archivos de Packet Tracer 7.3.0, 7.3.1, 8.2.1 y 9.0.1 (14 redes de entre 3 y 72 equipos). Falta probar archivos reales de las versiones 6.2 a 7.2 y del formato anterior a 6.2, que sólo se probó con archivos generados. Las listas de acceso se probaron con configuraciones escritas a mano, porque ninguno de los archivos reales tenía una.
+Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 72 equipos, y con los mismos guardados como `.pkz`. El formato sin cifrar sólo se probó con archivos generados. Las listas de acceso se probaron con configuraciones escritas a mano, porque ninguno de los archivos reales tenía una.
 
 ## Licencia
 

@@ -4,9 +4,9 @@ import { decryptTwofishEax } from './eax.js';
 const FILE_KEY = new Uint8Array(16).fill(137);
 const FILE_NONCE = new Uint8Array(16).fill(16);
 
-async function inflate(data) {
-  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate'));
+async function inflate(data, format = 'deflate') {
   try {
+    const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream(format));
     return new Uint8Array(await new Response(stream).arrayBuffer());
   } catch {
     // El navegador reporta el error de zlib como error de red ("Failed to fetch").
@@ -52,12 +52,42 @@ async function decodeModern(bytes) {
   return inflateWithSizeHeader(deobfuscateInner(decrypted));
 }
 
-// Los archivos anteriores a Packet Tracer 6.2 no llevan capa de cifrado.
+// El formato más viejo no lleva la capa de cifrado. Un archivo de 5.3.3 ya viene cifrado.
 async function decodeLegacy(bytes) {
   return inflateWithSizeHeader(deobfuscateInner(bytes));
 }
 
-export async function decodePacketTracerFile(bytes) {
+const isPackage = (bytes) => bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4;
+
+// Un .pkz es un ZIP con el .pkt adentro, más los archivos que la red tenga incrustados.
+// Se busca la primera entrada .pkt o .pka en el directorio central.
+async function unpackPackage(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let end = bytes.length - 22;
+  while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) end--;
+  if (end < 0) throw new Error(t('error.package'));
+
+  let at = view.getUint32(end + 16, true);
+  for (let entry = view.getUint16(end + 10, true); entry > 0; entry--) {
+    if (view.getUint32(at, true) !== 0x02014b50) break;
+    const method = view.getUint16(at + 10, true);
+    const size = view.getUint32(at + 20, true);
+    const nameLength = view.getUint16(at + 28, true);
+    const name = new TextDecoder().decode(bytes.subarray(at + 46, at + 46 + nameLength));
+
+    if (/\.pk[ta]$/i.test(name) && (method === 0 || method === 8)) {
+      const local = view.getUint32(at + 42, true);
+      const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+      const data = bytes.subarray(start, start + size);
+      return method === 0 ? data : inflate(data, 'deflate-raw');
+    }
+    at += 46 + nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+  }
+  throw new Error(t('error.package'));
+}
+
+export async function decodePacketTracerFile(input) {
+  const bytes = isPackage(input) ? await unpackPackage(input) : input;
   const attempts = [
     { variant: 'modern', decode: decodeModern },
     { variant: 'legacy', decode: decodeLegacy },
