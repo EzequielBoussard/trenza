@@ -21,6 +21,7 @@ const SHELL = [
   '/src/app.js',
   '/src/i18n.js',
   '/src/theme.js',
+  '/src/logo.js',
   '/src/download.js',
   '/src/share.js',
   '/src/pkt/decode.js',

@@ -52,7 +52,7 @@ No hay dependencias ni paso de compilación: son módulos ES servidos tal cual.
 npm test
 ```
 
-Las pruebas (48, con `node:test`) cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones y los dos archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas (50, con `node:test`) cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los dos archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/

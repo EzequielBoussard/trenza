@@ -263,31 +263,25 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   .masthead__home:hover .masthead__mark path:last-child { stroke: var(--orange); }
 }
 
-/* Al volver al inicio la trenza se vuelve a tejer: los dos hilos se dibujan de punta a punta. */
-.masthead__home.is-weaving .masthead__mark path {
-  stroke-dasharray: 1;
-  animation: braid-draw 520ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+/* Al volver al inicio la trenza gira (logo.js) y sus dos colores cruzan el nombre.
+   Con colores forzados el gradiente se anula y el texto transparente desaparecería. */
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .masthead__home.is-weaving .masthead__name {
+    background: linear-gradient(100deg, currentColor 42%, var(--orange) 47%, var(--blue) 53%, currentColor 58%) 100% 0 / 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: name-shine 600ms 300ms ease-in-out both;
+  }
 }
 
-.masthead__home.is-weaving .masthead__mark path:last-child { animation-delay: 90ms; }
-.masthead__home.is-weaving .masthead__name { animation: name-flash 700ms ease-out; }
-
-@keyframes braid-draw {
-  from { stroke-dashoffset: 1; }
-  to { stroke-dashoffset: 0; }
+@keyframes name-shine {
+  to { background-position: 0 0; }
 }
 
-@keyframes name-flash {
-  from { color: var(--orange); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .masthead__home.is-weaving .masthead__mark path,
-  .masthead__home.is-weaving .masthead__name { animation: none; }
-}
-
+/* El mismo dibujo que logo.svg y los iconos, recortado al trazo. */
 .masthead__mark {
-  width: 30px;
+  width: 28px;
   height: 22px;
 }
 
@@ -295,11 +289,10 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   width: 100%;
   height: 100%;
   fill: none;
-  stroke-width: 2.4;
+  stroke-width: 52;
   stroke-linecap: round;
 }
 
-/* Los mismos dos hilos que logo.svg y los iconos. */
 .masthead__mark path { transition: stroke 240ms ease; }
 .masthead__mark path:first-child { stroke: var(--orange); }
 .masthead__mark path:last-child { stroke: var(--blue); }

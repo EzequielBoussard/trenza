@@ -10,6 +10,7 @@ import { readSourceFromLocation } from './share.js';
 import { wireExportDialog } from './view/export-dialog.js';
 import { download } from './download.js';
 import { applyTheme, getTheme, toggleTheme } from './theme.js';
+import { weave } from './logo.js';
 
 const elements = {
   stage: document.querySelector('[data-stage]'),
@@ -445,13 +446,6 @@ function closeFile() {
   setStatus('status.idle');
 }
 
-// Reinicia la animación aunque ya estuviera corriendo.
-function weave(home) {
-  home.classList.remove('is-weaving');
-  void home.offsetWidth;
-  home.classList.add('is-weaving');
-}
-
 function wireActions() {
   elements.reset.addEventListener('click', closeFile);
 
@@ -463,7 +457,7 @@ function wireActions() {
     closeFile();
   });
   elements.home.addEventListener('animationend', (event) => {
-    if (event.animationName === 'name-flash') elements.home.classList.remove('is-weaving');
+    if (event.animationName === 'name-shine') elements.home.classList.remove('is-weaving');
   });
 
   document.addEventListener('keydown', (event) => {
