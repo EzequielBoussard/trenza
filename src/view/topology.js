@@ -82,6 +82,9 @@ const WHEEL_SENSITIVITY = 0.0016;
 // El pellizco del trackpad llega como rueda con Ctrl y deltas mucho más chicos.
 const PINCH_SENSITIVITY = 0.01;
 
+// Tope por evento: con Ctrl, una muesca de mouse (100) daba ×2,7 con la ganancia del pellizco.
+const WHEEL_NOTCH = 100 * WHEEL_SENSITIVITY;
+
 
 function element(name, attributes = {}) {
   const node = document.createElementNS(SVG_NS, name);
@@ -474,23 +477,29 @@ export class TopologyView {
     // un recálculo de layout en cada llamada.
     let turning = null;
     const applyTurn = () => {
-      const { factor, focus } = turning;
+      const { factor, focus, shift } = turning;
       turning = null;
-      this.zoomTo(this.target.scale * factor, focus);
-      this.target = this.clampView(this.target);
+      if (factor !== 1) this.zoomTo(this.target.scale * factor, focus);
+      this.target = this.clampView({ ...this.target, x: this.target.x + shift });
       this.settle();
     };
 
     svg.addEventListener('wheel', (event) => {
       event.preventDefault();
-      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : 1);
-      const gain = event.ctrlKey ? PINCH_SENSITIVITY : WHEEL_SENSITIVITY;
+      const lines = event.deltaMode === 1 ? 16 : 1;
 
       if (!turning) {
-        turning = { factor: 1, focus: null, matrix: svg.getScreenCTM().inverse() };
+        turning = { factor: 1, focus: null, shift: 0, matrix: svg.getScreenCTM().inverse() };
         requestAnimationFrame(applyTurn);
       }
-      turning.factor *= Math.exp(-delta * gain);
+      // Con Alt la rueda desplaza a lo ancho.
+      if (event.altKey) {
+        turning.shift -= (event.deltaY + event.deltaX) * lines * turning.matrix.a;
+        return;
+      }
+      const gain = event.ctrlKey ? PINCH_SENSITIVITY : WHEEL_SENSITIVITY;
+      const turn = Math.min(WHEEL_NOTCH, Math.max(-WHEEL_NOTCH, event.deltaY * lines * gain));
+      turning.factor *= Math.exp(-turn);
       turning.focus = this.pointerInScene(event, turning.matrix);
     }, { passive: false });
 

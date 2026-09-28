@@ -68,8 +68,6 @@ test/           pruebas con node:test
 
 Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define la política de seguridad de contenido: todo tiene que venir del mismo origen y el script en línea del `<head>` va con hash, así que si se modifica hay que recalcular el `sha256` en `_headers`.
 
-Las decisiones de diseño, con lo que se midió para tomarlas, están en [`docs/decisiones.md`](docs/decisiones.md).
-
 ## Compatibilidad
 
 Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.

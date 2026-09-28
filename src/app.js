@@ -456,9 +456,6 @@ function wireActions() {
     weave(elements.home);
     closeFile();
   });
-  elements.home.addEventListener('animationend', (event) => {
-    if (event.animationName === 'name-shine') elements.home.classList.remove('is-weaving');
-  });
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !elements.exportDialog.open) clearSelection();

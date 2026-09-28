@@ -118,6 +118,8 @@
   --text: #e4e8f0;
   --text-muted: #98a2b6;
   --text-faint: #858da0;
+  --text-strong: #ffffff;
+  --text-glow: rgb(255 255 255 / 0.4);
   --on-accent: #1a0f07;
 
   --orange: #e4763c;
@@ -154,6 +156,8 @@
   --text: #151a22;
   --text-muted: #545d6d;
   --text-faint: #5f6776;
+  --text-strong: #000000;
+  --text-glow: transparent;
   --on-accent: #ffffff;
 
   --orange: #a84e14;
@@ -225,7 +229,8 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
 
 .masthead {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'brand file actions prefs';
   align-items: center;
   gap: 1.5rem;
   padding: 0.75rem 1.25rem;
@@ -236,6 +241,7 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
 }
 
 .masthead__brand {
+  grid-area: brand;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -250,6 +256,7 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   border-radius: var(--radius);
   color: inherit;
   text-decoration: none;
+  transition: filter 200ms ease;
 }
 
 .masthead__home:focus-visible {
@@ -257,32 +264,29 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   outline-offset: 2px;
 }
 
-/* Con el puntero encima los hilos se cruzan: cada uno toma el color del otro. */
+/* Con el puntero encima, logo y nombre se encienden. */
 @media (hover: hover) {
-  .masthead__home:hover .masthead__mark path:first-child { stroke: var(--blue); }
-  .masthead__home:hover .masthead__mark path:last-child { stroke: var(--orange); }
+  .masthead__home:hover { filter: drop-shadow(0 0 6px var(--text-glow)); }
+  .masthead__home:hover .masthead__mark { filter: brightness(1.25); }
+  .masthead__home:hover .masthead__name { color: var(--text-strong); }
 }
 
-/* Al volver al inicio la trenza gira (logo.js) y sus dos colores cruzan el nombre.
+/* Al volver al inicio los colores de los hilos cruzan el nombre; el paso lo lleva logo.js.
    Con colores forzados el gradiente se anula y el texto transparente desaparecería. */
-@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  .masthead__home.is-weaving .masthead__name {
-    background: linear-gradient(100deg, currentColor 42%, var(--orange) 47%, var(--blue) 53%, currentColor 58%) 100% 0 / 300% 100%;
+@media (forced-colors: none) {
+  .masthead__name.is-shining {
+    background: linear-gradient(100deg, currentColor 42%, var(--orange) 45% 50%, var(--blue) 50% 55%, currentColor 58%) 0 0 / 300% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: name-shine 600ms 300ms ease-in-out both;
   }
-}
-
-@keyframes name-shine {
-  to { background-position: 0 0; }
 }
 
 /* El mismo dibujo que logo.svg y los iconos, recortado al trazo. */
 .masthead__mark {
   width: 28px;
   height: 22px;
+  transition: filter 200ms ease;
 }
 
 .masthead__mark svg {
@@ -293,13 +297,8 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   stroke-linecap: round;
 }
 
-.masthead__mark path { transition: stroke 240ms ease; }
 .masthead__mark path:first-child { stroke: var(--orange); }
 .masthead__mark path:last-child { stroke: var(--blue); }
-
-@media (prefers-reduced-motion: reduce) {
-  .masthead__mark path { transition: none; }
-}
 
 .masthead__name {
   font-family: var(--font-display);
@@ -307,6 +306,7 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.01em;
+  transition: color 200ms ease;
 }
 
 .masthead__kind {
@@ -334,6 +334,7 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 }
 
 .masthead__file {
+  grid-area: file;
   display: flex;
   align-items: center;
   min-width: 0;
@@ -402,11 +403,15 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   .theme-icon__rays { transition: none; }
 }
 
-.masthead__actions {
+.masthead__actions,
+.masthead__prefs {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
+
+.masthead__actions { grid-area: actions; justify-content: flex-end; }
+.masthead__prefs { grid-area: prefs; justify-content: flex-end; }
 
 .language {
   padding: 0.4rem 0.5rem;
@@ -714,9 +719,8 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-body:not([data-loaded]) [data-reset],
-body:not([data-loaded]) [data-export],
-body:not([data-loaded]) [data-open] { display: none; }
+body:not([data-loaded]) .masthead__file,
+body:not([data-loaded]) .masthead__actions { display: none; }
 
 /* En la portada la barra de estado sólo aparece si hay algo que avisar. */
 body:not([data-loaded]) .statusbar:not([data-tone='error']):not([data-tone='warn']) { display: none; }
@@ -879,6 +883,7 @@ body:not([data-loaded]) .workspace {
 
 [data-js] .nojs,
 html:not([data-js]) .masthead__actions,
+html:not([data-js]) .masthead__prefs,
 html:not([data-js]) .intro {
   display: none;
 }
@@ -1535,20 +1540,40 @@ body[data-dragging] .dropveil { display: grid; }
     border: 0;
     border-bottom: 1px solid var(--line);
   }
+}
 
+/* Marca a la izquierda y preferencias a la derecha; el archivo abierto, abajo. */
+@media (max-width: 60rem) {
   .masthead {
-    grid-template-columns: 1fr;
-    gap: 0.7rem;
-    justify-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'brand prefs'
+      'file actions';
+    gap: 0.6rem 1rem;
   }
 
-  .masthead__brand,
-  .masthead__file,
+  body:not([data-loaded]) .masthead { grid-template-areas: 'brand prefs'; }
+}
+
+@media (max-width: 40rem) {
+  .masthead {
+    grid-template-areas:
+      'brand prefs'
+      'file file'
+      'actions actions';
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
   .masthead__actions {
-    justify-content: center;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
+}
 
-  .masthead__actions { flex-wrap: wrap; }
+/* Por debajo de 400 px el formato no entra al lado de las preferencias. */
+@media (max-width: 25rem) {
+  .masthead__kind { display: none; }
 }
 
 @media (max-width: 62rem) {

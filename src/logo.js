@@ -3,7 +3,8 @@ const LEFT = 136;
 const TOP = 168;
 const WIDTH = 120;
 const HEIGHT = 176;
-const DURATION = 800;
+const DURATION = 900;
+const SHINE_START = 0.3;
 
 // La S normalizada: x(t) = 1,5t − 1,5t² + t³ e y(t) = 3t² − 2t³.
 const sx = (t) => t * (1.5 - 1.5 * t + t * t);
@@ -47,15 +48,13 @@ export function strandPath(shift, falling) {
 
 let frame = 0;
 
-// La trenza gira una vuelta hacia el nombre; el destello del nombre lo pone la hoja de estilo.
+// La trenza gira una vuelta hacia el nombre y, cuando la vuelta ya va por la mitad, los
+// colores de los hilos lo cruzan. Un solo reloj para las dos cosas: siempre van juntas.
 export function weave(home) {
-  if (frame) return;
-  home.classList.remove('is-weaving');
-  void home.offsetWidth;
-  home.classList.add('is-weaving');
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (frame || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const [first, last] = home.querySelectorAll('path');
+  const name = home.querySelector('.masthead__name');
   const start = performance.now();
   const step = (now) => {
     const progress = Math.min(1, (now - start) / DURATION);
@@ -63,6 +62,11 @@ export function weave(home) {
     const shift = 1 - Math.cos(Math.PI * progress);
     first.setAttribute('d', strandPath(shift, true));
     last.setAttribute('d', strandPath(shift, false));
+
+    const shine = Math.max(0, (progress - SHINE_START) / (1 - SHINE_START));
+    name.classList.toggle('is-shining', shine > 0 && shine < 1);
+    name.style.setProperty('background-position', `${50 + 50 * Math.cos(Math.PI * shine)}% 0`);
+
     frame = progress < 1 ? requestAnimationFrame(step) : 0;
   };
   frame = requestAnimationFrame(step);
