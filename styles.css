@@ -744,31 +744,35 @@ body:not([data-loaded]) .workspace {
   min-height: 0;
   overflow-y: auto;
   background: var(--surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 
 .rail { grid-area: rail; border-right: 1px solid var(--line); }
 .stage { grid-area: stage; }
 .panel { grid-area: panel; border-left: 1px solid var(--line); }
 
-/* Borde de la lista de equipos que se arrastra para cambiarle el ancho (el alto, apiladas). */
+/* Bordes que se arrastran para cambiar el ancho de las columnas (el alto de la lista, apiladas).
+   Van por fuera de la columna, sobre su borde, para no tapar la barra de desplazamiento. */
 .grip {
-  grid-area: rail;
-  justify-self: end;
   z-index: 2;
-  width: 9px;
-  margin-right: -5px;
+  width: 8px;
   cursor: col-resize;
   touch-action: none;
 }
+
+.grip--rail { grid-area: rail; justify-self: end; margin-right: -7px; }
+.grip--panel { grid-area: panel; justify-self: start; margin-left: -7px; }
 
 .grip::after {
   content: '';
   display: block;
   width: 2px;
   height: 100%;
-  margin: 0 auto;
   transition: background 120ms;
 }
+
+.grip--panel::after { margin-left: auto; }
 
 .grip:focus-visible { outline: none; }
 
@@ -814,6 +818,18 @@ body:not([data-loaded]) .workspace {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--line);
+}
+
+/* Con mouse aparecen al entrar al diagrama, o al llegarles con el teclado. En pantallas
+   táctiles no hay puntero que entre, así que quedan siempre. */
+@media (hover: hover) and (pointer: fine) {
+  .zoom {
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+
+  .stage__canvas:hover .zoom,
+  .zoom:focus-within { opacity: 1; }
 }
 
 .zoom__button {
@@ -1190,11 +1206,14 @@ body[data-dragging] .dropveil { display: grid; }
 
 /* Diagrama */
 
+/* Sin selección de texto: al arrastrar desde una etiqueta se marcaba el nombre. */
 .topology {
   width: 100%;
   height: 100%;
   touch-action: none;
   cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .topology.is-panning { cursor: grabbing; }
@@ -1601,7 +1620,10 @@ body[data-dragging] .dropveil { display: grid; }
     border: 0;
   }
 
-  .grip {
+  /* El panel va a lo largo de la página y no tiene alto que cambiar. */
+  .grip--panel { display: none; }
+
+  .grip--rail {
     grid-area: grip;
     justify-self: stretch;
     display: grid;
@@ -1614,7 +1636,7 @@ body[data-dragging] .dropveil { display: grid; }
     cursor: row-resize;
   }
 
-  .grip::after {
+  .grip--rail::after {
     width: 2.5rem;
     height: 4px;
     border-radius: 2px;

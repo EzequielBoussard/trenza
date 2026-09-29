@@ -16,6 +16,7 @@ const elements = {
   stage: document.querySelector('[data-stage]'),
   rail: document.querySelector('[data-rail]'),
   railGrip: document.querySelector('[data-rail-grip]'),
+  panelGrip: document.querySelector('[data-panel-grip]'),
   panel: document.querySelector('[data-panel]'),
   status: document.querySelector('[data-status]'),
   fileName: document.querySelector('[data-file-name]'),
@@ -356,14 +357,20 @@ function wireFileInput() {
     if (file) openFile(file);
   });
 
+  // Sólo lo que trae archivos: arrastrar texto de la propia página no tiene que abrir nada.
+  const carriesFiles = (event) => Boolean(event.dataTransfer?.types.includes('Files'));
   let dragDepth = 0;
   window.addEventListener('dragenter', (event) => {
+    if (!carriesFiles(event)) return;
     event.preventDefault();
     dragDepth += 1;
     document.body.dataset.dragging = 'true';
   });
-  window.addEventListener('dragover', (event) => event.preventDefault());
-  window.addEventListener('dragleave', () => {
+  window.addEventListener('dragover', (event) => {
+    if (carriesFiles(event)) event.preventDefault();
+  });
+  window.addEventListener('dragleave', (event) => {
+    if (!carriesFiles(event)) return;
     dragDepth = Math.max(0, dragDepth - 1);
     if (dragDepth === 0) delete document.body.dataset.dragging;
   });
@@ -410,18 +417,17 @@ function wireTheme() {
   });
 }
 
-const RAIL_KEY = 'trenza.rail';
-
-// La lista de equipos se estira desde su borde: a lo ancho en escritorio y a lo alto cuando las
-// zonas van apiladas. Cada eje guarda su medida; doble clic vuelve a la de fábrica.
-function wireRailGrip() {
-  const grip = elements.railGrip;
+// Las columnas se estiran desde su borde: a lo ancho en escritorio y, la lista, a lo alto cuando
+// las zonas van apiladas. Cada eje guarda su medida; doble clic vuelve a la de fábrica.
+// `sign` es 1 si el borde queda a la derecha de la columna y -1 si queda a la izquierda.
+function wireGrip(grip, pane, name, sign, widths) {
+  const key = `trenza.${name}`;
   const stacked = matchMedia('(max-width: 1180px)');
   const axis = () => (stacked.matches ? 'height' : 'width');
-  const limits = (dimension) => (dimension === 'width' ? [200, 480] : [120, Math.round(innerHeight * 0.7)]);
+  const limits = (dimension) => (dimension === 'width' ? widths : [120, Math.round(innerHeight * 0.7)]);
   let sizes = {};
   try {
-    sizes = JSON.parse(localStorage.getItem(RAIL_KEY)) || {};
+    sizes = JSON.parse(localStorage.getItem(key)) || {};
   } catch {
     // Sin almacenamiento la medida dura lo que la pestaña.
   }
@@ -432,19 +438,19 @@ function wireRailGrip() {
     grip.setAttribute('aria-orientation', dimension === 'width' ? 'vertical' : 'horizontal');
     grip.setAttribute('aria-valuemin', low);
     grip.setAttribute('aria-valuemax', high);
-    grip.setAttribute('aria-valuenow', Math.round(elements.rail.getBoundingClientRect()[dimension]));
+    grip.setAttribute('aria-valuenow', Math.round(pane.getBoundingClientRect()[dimension]));
   };
   const resize = (dimension, value) => {
     const [low, high] = limits(dimension);
     if (value === null) delete sizes[dimension];
     else sizes[dimension] = Math.round(Math.min(high, Math.max(low, value)));
-    if (sizes[dimension]) document.documentElement.style.setProperty(`--rail-${dimension}`, `${sizes[dimension]}px`);
-    else document.documentElement.style.removeProperty(`--rail-${dimension}`);
+    if (sizes[dimension]) document.documentElement.style.setProperty(`--${name}-${dimension}`, `${sizes[dimension]}px`);
+    else document.documentElement.style.removeProperty(`--${name}-${dimension}`);
     show();
   };
   const save = () => {
     try {
-      localStorage.setItem(RAIL_KEY, JSON.stringify(sizes));
+      localStorage.setItem(key, JSON.stringify(sizes));
     } catch {
       // Sin almacenamiento la medida no se guarda.
     }
@@ -456,9 +462,9 @@ function wireRailGrip() {
 
   grip.addEventListener('pointerdown', (event) => {
     const dimension = axis();
-    const start = elements.rail.getBoundingClientRect()[dimension];
+    const start = pane.getBoundingClientRect()[dimension];
     const from = dimension === 'width' ? event.clientX : event.clientY;
-    const move = (moved) => resize(dimension, start + (dimension === 'width' ? moved.clientX : moved.clientY) - from);
+    const move = (moved) => resize(dimension, start + sign * ((dimension === 'width' ? moved.clientX : moved.clientY) - from));
     grip.setPointerCapture(event.pointerId);
     grip.classList.add('is-dragging');
     grip.addEventListener('pointermove', move);
@@ -474,7 +480,7 @@ function wireRailGrip() {
     const step = { ArrowRight: 16, ArrowDown: 16, ArrowLeft: -16, ArrowUp: -16 }[event.key];
     if (!step) return;
     event.preventDefault();
-    resize(dimension, elements.rail.getBoundingClientRect()[dimension] + step);
+    resize(dimension, pane.getBoundingClientRect()[dimension] + sign * step);
     save();
   });
 
@@ -543,7 +549,8 @@ async function start() {
   wireTheme();
   wireFileInput();
   wireActions();
-  wireRailGrip();
+  wireGrip(elements.railGrip, elements.rail, 'rail', 1, [200, 480]);
+  wireGrip(elements.panelGrip, elements.panel, 'panel', -1, [280, 600]);
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 
