@@ -10,7 +10,6 @@ import {
   labelFontsReady,
   partitionDevices,
   planLabels,
-  LAYOUT_STRETCH,
   projectIntoRect,
   selectVisible,
   threadFor,
@@ -37,6 +36,13 @@ const MAX_VIEW_ASPECT = 4.5;
 
 // Cambio de proporción del panel, en logaritmo, a partir del cual se rehace el reparto.
 const RESHAPE_THRESHOLD = 0.12;
+
+// En pantalla se estira más que en el exporte: los paneles de teléfono son altos y las redes,
+// apaisadas. Con 2,5 el ejemplo pasa de 42 % a 59 % del alto a 375 px, con la misma letra.
+const VIEW_STRETCH = 2.5;
+
+// Con la casa se reparte ante cualquier cambio que se note: ahí nadie está mirando de cerca.
+const FIT_TOLERANCE = 0.02;
 
 // El recorrido es una sola fila, así que las cuatro flechas avanzan o retroceden de a uno.
 const ARROW_STEPS = {
@@ -109,11 +115,18 @@ function labelMeasurer() {
   return { nameWidth: measured(LABEL_FONT), addressWidth: measured(ADDRESS_FONT) };
 }
 
+// Una casa para volver a la vista de apertura, con la red entera.
+function homeIcon() {
+  const icon = element('svg', { viewBox: '0 0 24 24', class: 'zoom__icon', 'aria-hidden': 'true', focusable: 'false' });
+  icon.append(element('path', { d: 'M4 11.5 12 4.5l8 7M6.5 9.5v10h4v-5.5h3v5.5h4v-10' }));
+  return icon;
+}
+
 function control(label, title, action) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'zoom__button';
-  button.textContent = label;
+  button.append(label);
   button.title = title;
   button.setAttribute('aria-label', title);
   button.addEventListener('click', action);
@@ -333,6 +346,7 @@ export class TopologyView {
     this.attachNavigation(svg);
     this.resetView();
     if (this.selectedId) this.highlight(this.selectedId);
+    else if (this.thread) this.paintThread();
   }
 
   panelAspect() {
@@ -360,7 +374,7 @@ export class TopologyView {
         y: VIEW_INSETS.top,
         width: trayWidth,
         height: trayTop - VIEW_INSETS.top,
-      }, { stretch: LAYOUT_STRETCH });
+      }, { stretch: VIEW_STRETCH });
       for (const [id, point] of trayPositions(stray, tray, { x: side, y: trayTop, width: trayWidth })) {
         positions.set(id, point);
       }
@@ -391,7 +405,7 @@ export class TopologyView {
     group.append(
       control('+', t('zoom.in'), () => this.zoomBy(1.25)),
       control('−', t('zoom.out'), () => this.zoomBy(1 / 1.25)),
-      control('◱', t('zoom.fit'), () => this.resetView()),
+      control(homeIcon(), t('zoom.fit'), () => this.fit()),
     );
     return group;
   }
@@ -439,11 +453,12 @@ export class TopologyView {
   paintThread() {
     if (!this.svg) return;
 
-    for (const button of this.container.querySelectorAll('.legend__item')) {
+    for (const button of this.legend?.querySelectorAll('.legend__item') ?? []) {
       const own = button.dataset.thread === this.thread;
       button.classList.toggle('is-active', own);
       button.setAttribute('aria-pressed', String(own));
     }
+    this.legend?.classList.toggle('has-active', Boolean(this.thread));
     for (const link of this.svg.querySelectorAll('.link')) {
       link.classList.toggle('is-active', link.classList.contains(`link--${this.thread}`));
     }
@@ -697,6 +712,19 @@ export class TopologyView {
   resetView() {
     this.target = { x: 0, y: 0, scale: 1 };
     this.settle();
+  }
+
+  // El botón de la casa. Si el panel cambió de forma desde el último reparto (giro del
+  // teléfono, vista tocada mientras cambiaba), volver a la vista vieja deja franjas: se reparte.
+  fit() {
+    if (this.last && Math.abs(Math.log(this.panelAspect() / this.aspect)) > FIT_TOLERANCE) {
+      // Repartir rehace los controles: el foco vuelve a la casa nueva.
+      const focused = this.container.contains(document.activeElement);
+      this.render(this.last.model, { showInfrastructure: this.last.showInfrastructure });
+      if (focused) this.container.querySelector('.zoom__button:last-child')?.focus();
+    } else {
+      this.resetView();
+    }
   }
 
   setTabStop(id) {

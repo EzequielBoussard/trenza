@@ -94,5 +94,9 @@ test('el nombre y la dirección no se superponen entre renglones', () => {
 test('el color del enlace sale del cableado y, si falta, del medio', () => {
   assert.equal(threadFor({ wiring: 'eCrossOver', media: 'eCopper' }), 'green');
   assert.equal(threadFor({ wiring: '', media: 'eFiber' }), 'blue');
+  // Así llegan los seriales en los archivos reales: sin tipo de cable.
+  assert.equal(threadFor({ wiring: '', media: 'eSerial' }), 'brown');
+  assert.equal(threadFor({ wiring: '', media: 'eCoaxial' }), 'brown');
+  assert.equal(threadFor({ wiring: '', media: 'eOctal' }), 'neutral');
   assert.equal(threadFor({ wiring: '', media: '' }), 'neutral');
 });

@@ -157,7 +157,7 @@
   --text-muted: #545d6d;
   --text-faint: #5f6776;
   --text-strong: #000000;
-  --text-glow: transparent;
+  --text-glow: rgb(0 0 0 / 0.3);
   --on-accent: #ffffff;
 
   --orange: #a84e14;
@@ -799,6 +799,18 @@ body:not([data-loaded]) .workspace {
   }
 }
 
+.zoom__icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 @media (hover: hover) {
   .zoom__button:hover {
     background: var(--raised);
@@ -821,6 +833,8 @@ body:not([data-loaded]) .workspace {
 }
 
 .legend__item {
+  --thread: var(--neutral);
+  --thread-pale: var(--neutral-pale);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -834,16 +848,27 @@ body:not([data-loaded]) .workspace {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 150ms, box-shadow 150ms;
 }
+
+.legend__item--orange { --thread: var(--orange); --thread-pale: var(--orange-pale); }
+.legend__item--green { --thread: var(--green); --thread-pale: var(--green-pale); }
+.legend__item--blue { --thread: var(--blue); --thread-pale: var(--blue-pale); }
+.legend__item--brown { --thread: var(--brown); --thread-pale: var(--brown-pale); }
 
 @media (hover: hover) {
   .legend__item:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
 }
 
-.legend__item.is-active {
-  background: color-mix(in srgb, var(--orange) 20%, transparent);
+/* El filtro elegido lleva el color de su cable; los demás apagan la muestra. */
+.legend__item.is-active,
+.legend__item.is-active:hover {
+  background: color-mix(in srgb, var(--thread) 22%, transparent);
+  box-shadow: inset 0 0 0 1px var(--thread);
   color: var(--text);
 }
+
+.legend.has-active .legend__item:not(.is-active) .legend__swatch { opacity: 0.35; }
 
 @media (pointer: coarse) {
   .legend { gap: 0.1rem 0.75rem; }
@@ -857,14 +882,10 @@ body:not([data-loaded]) .workspace {
 .legend__swatch {
   width: 20px;
   height: 6px;
-  border-top: 2px solid var(--neutral);
-  border-bottom: 2px solid var(--neutral-pale);
+  border-top: 2px solid var(--thread);
+  border-bottom: 2px solid var(--thread-pale);
+  transition: opacity 150ms;
 }
-
-.legend__item--orange .legend__swatch { border-top-color: var(--orange); border-bottom-color: var(--orange-pale); }
-.legend__item--green .legend__swatch { border-top-color: var(--green); border-bottom-color: var(--green-pale); }
-.legend__item--blue .legend__swatch { border-top-color: var(--blue); border-bottom-color: var(--blue-pale); }
-.legend__item--brown .legend__swatch { border-top-color: var(--brown); border-bottom-color: var(--brown-pale); }
 
 /* Pantalla inicial */
 
