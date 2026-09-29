@@ -20,6 +20,7 @@ const DICTIONARIES = {
     'action.theme': 'Switch theme',
     'action.skip': 'Skip to the viewer',
     'action.home': 'Trenza, back to the start page',
+    'action.resizeList': 'Resize the device list',
     'theme.dark': 'Dark',
     'theme.light': 'Light',
 
@@ -273,6 +274,7 @@ const DICTIONARIES = {
     'action.theme': 'Cambiar de tema',
     'action.skip': 'Ir al visor',
     'action.home': 'Trenza, volver al inicio',
+    'action.resizeList': 'Cambiar el tamaño de la lista de equipos',
     'theme.dark': 'Oscuro',
     'theme.light': 'Claro',
 

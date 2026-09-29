@@ -15,6 +15,7 @@ import { weave } from './logo.js';
 const elements = {
   stage: document.querySelector('[data-stage]'),
   rail: document.querySelector('[data-rail]'),
+  railGrip: document.querySelector('[data-rail-grip]'),
   panel: document.querySelector('[data-panel]'),
   status: document.querySelector('[data-status]'),
   fileName: document.querySelector('[data-file-name]'),
@@ -409,6 +410,80 @@ function wireTheme() {
   });
 }
 
+const RAIL_KEY = 'trenza.rail';
+
+// La lista de equipos se estira desde su borde: a lo ancho en escritorio y a lo alto cuando las
+// zonas van apiladas. Cada eje guarda su medida; doble clic vuelve a la de fábrica.
+function wireRailGrip() {
+  const grip = elements.railGrip;
+  const stacked = matchMedia('(max-width: 1180px)');
+  const axis = () => (stacked.matches ? 'height' : 'width');
+  const limits = (dimension) => (dimension === 'width' ? [200, 480] : [120, Math.round(innerHeight * 0.7)]);
+  let sizes = {};
+  try {
+    sizes = JSON.parse(localStorage.getItem(RAIL_KEY)) || {};
+  } catch {
+    // Sin almacenamiento la medida dura lo que la pestaña.
+  }
+
+  const show = () => {
+    const dimension = axis();
+    const [low, high] = limits(dimension);
+    grip.setAttribute('aria-orientation', dimension === 'width' ? 'vertical' : 'horizontal');
+    grip.setAttribute('aria-valuemin', low);
+    grip.setAttribute('aria-valuemax', high);
+    grip.setAttribute('aria-valuenow', Math.round(elements.rail.getBoundingClientRect()[dimension]));
+  };
+  const resize = (dimension, value) => {
+    const [low, high] = limits(dimension);
+    if (value === null) delete sizes[dimension];
+    else sizes[dimension] = Math.round(Math.min(high, Math.max(low, value)));
+    if (sizes[dimension]) document.documentElement.style.setProperty(`--rail-${dimension}`, `${sizes[dimension]}px`);
+    else document.documentElement.style.removeProperty(`--rail-${dimension}`);
+    show();
+  };
+  const save = () => {
+    try {
+      localStorage.setItem(RAIL_KEY, JSON.stringify(sizes));
+    } catch {
+      // Sin almacenamiento la medida no se guarda.
+    }
+  };
+
+  for (const dimension of ['width', 'height']) if (sizes[dimension]) resize(dimension, sizes[dimension]);
+  stacked.addEventListener('change', show);
+  grip.addEventListener('focus', show);
+
+  grip.addEventListener('pointerdown', (event) => {
+    const dimension = axis();
+    const start = elements.rail.getBoundingClientRect()[dimension];
+    const from = dimension === 'width' ? event.clientX : event.clientY;
+    const move = (moved) => resize(dimension, start + (dimension === 'width' ? moved.clientX : moved.clientY) - from);
+    grip.setPointerCapture(event.pointerId);
+    grip.classList.add('is-dragging');
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('lostpointercapture', () => {
+      grip.removeEventListener('pointermove', move);
+      grip.classList.remove('is-dragging');
+      save();
+    }, { once: true });
+  });
+
+  grip.addEventListener('keydown', (event) => {
+    const dimension = axis();
+    const step = { ArrowRight: 16, ArrowDown: 16, ArrowLeft: -16, ArrowUp: -16 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    resize(dimension, elements.rail.getBoundingClientRect()[dimension] + step);
+    save();
+  });
+
+  grip.addEventListener('dblclick', () => {
+    resize(axis(), null);
+    save();
+  });
+}
+
 // Se llama después de translateDocument, que pisa el título.
 function refreshTitle() {
   document.title = state.file ? `${state.file.name} · Trenza` : t('app.title');
@@ -468,6 +543,7 @@ async function start() {
   wireTheme();
   wireFileInput();
   wireActions();
+  wireRailGrip();
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 

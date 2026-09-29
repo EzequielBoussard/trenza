@@ -88,9 +88,11 @@ const WHEEL_SENSITIVITY = 0.0016;
 // El pellizco del trackpad llega como rueda con Ctrl y deltas mucho más chicos.
 const PINCH_SENSITIVITY = 0.01;
 
-// Tope por evento: con Ctrl, una muesca de mouse (100) daba ×2,7 con la ganancia del pellizco.
+// Tope por evento: con Ctrl, la muesca de un mouse (100) usaría la ganancia del pellizco.
 const WHEEL_NOTCH = 100 * WHEEL_SENSITIVITY;
 
+// Separación de la trama de fondo, en píxeles, con la vista de apertura.
+const GRID_SPACING = 28;
 
 function element(name, attributes = {}) {
   const node = document.createElementNS(SVG_NS, name);
@@ -168,6 +170,8 @@ export class TopologyView {
     // Hay que guardar la referencia: si no, el observador se recolecta y deja de avisar.
     this.shapeWatcher = new ResizeObserver(() => {
       if (!this.last || !this.aspect) return;
+      this.measurePixels();
+      this.applyTransform();
       const { x, y, scale } = this.target;
       if (x !== 0 || y !== 0 || scale !== 1) return;
       if (Math.abs(Math.log(this.panelAspect() / this.aspect)) < RESHAPE_THRESHOLD) return;
@@ -342,6 +346,15 @@ export class TopologyView {
     this.devices = devices;
     this.positions = positions;
     this.frame = { width, height };
+    // El centro del lienzo entra en el rectángulo: la vista de apertura tiene que ser válida.
+    const points = [...positions.values(), { x: width / 2, y: height / 2 }];
+    this.bounds = {
+      minX: Math.min(...points.map((point) => point.x)),
+      maxX: Math.max(...points.map((point) => point.x)),
+      minY: Math.min(...points.map((point) => point.y)),
+      maxY: Math.max(...points.map((point) => point.y)),
+    };
+    this.measurePixels();
 
     this.attachNavigation(svg);
     this.resetView();
@@ -636,17 +649,29 @@ export class TopologyView {
     this.glide();
   }
 
-  // La vista más cercana a `view` en la que al menos un equipo se ve entero. El conjunto de
-  // vistas válidas es la unión de un rectángulo por equipo, así que se prueba contra cada uno.
+  // La vista más cercana a `view` en la que al menos un equipo se ve entero y el centro de la
+  // pantalla cae dentro de la red. Es la unión de un rectángulo por equipo, recortado por el de
+  // la red; cada recorte contiene la vista centrada en su equipo, así que ninguno queda vacío.
   clampView(view) {
     if (!this.positions || !this.frame) return view;
-    const margin = NODE_REACH * view.scale;
+    const { scale } = view;
+    const { width, height } = this.frame;
+    const { minX, maxX, minY, maxY } = this.bounds;
+    const margin = NODE_REACH * scale;
     const within = (value, low, high) => Math.min(high, Math.max(low, value));
 
     let best = null;
     for (const point of this.positions.values()) {
-      const x = within(view.x, margin - point.x * view.scale, this.frame.width - margin - point.x * view.scale);
-      const y = within(view.y, margin - point.y * view.scale, this.frame.height - margin - point.y * view.scale);
+      const x = within(
+        view.x,
+        Math.max(margin - point.x * scale, width / 2 - maxX * scale),
+        Math.min(width - margin - point.x * scale, width / 2 - minX * scale),
+      );
+      const y = within(
+        view.y,
+        Math.max(margin - point.y * scale, height / 2 - maxY * scale),
+        Math.min(height - margin - point.y * scale, height / 2 - minY * scale),
+      );
       const distance = Math.hypot(x - view.x, y - view.y);
       if (distance === 0) return view;
       if (!best || distance < best.distance) best = { x, y, distance };
@@ -707,6 +732,19 @@ export class TopologyView {
     if (!this.scene) return;
     const { x, y, scale } = this.transform;
     this.scene.setAttribute('transform', `translate(${x} ${y}) scale(${scale})`);
+
+    // Propiedades del contenedor y no variables: una variable se hereda y recalcula el SVG entero.
+    const { ratio, left, top } = this.pixels;
+    const spacing = GRID_SPACING * scale;
+    this.container.style.setProperty('background-size', `${spacing}px ${spacing}px`);
+    this.container.style.setProperty('background-position', `${left + x * ratio}px ${top + y * ratio}px`);
+  }
+
+  // Píxeles por unidad del lienzo y dónde empieza, con la franja que deja `meet` si sobra panel.
+  measurePixels() {
+    const { width, height } = this.svg.getBoundingClientRect();
+    const ratio = Math.min(width / this.frame.width, height / this.frame.height) || 1;
+    this.pixels = { ratio, left: (width - this.frame.width * ratio) / 2, top: (height - this.frame.height * ratio) / 2 };
   }
 
   resetView() {
@@ -714,8 +752,8 @@ export class TopologyView {
     this.settle();
   }
 
-  // El botón de la casa. Si el panel cambió de forma desde el último reparto (giro del
-  // teléfono, vista tocada mientras cambiaba), volver a la vista vieja deja franjas: se reparte.
+  // El botón de la casa. Si el panel cambió de forma desde el último reparto, volver a la vista
+  // vieja dejaría franjas vacías: se reparte de nuevo.
   fit() {
     if (this.last && Math.abs(Math.log(this.panelAspect() / this.aspect)) > FIT_TOLERANCE) {
       // Repartir rehace los controles: el foco vuelve a la casa nueva.
