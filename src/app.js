@@ -117,10 +117,13 @@ function renderDeviceList() {
   const checkbox = createElement('input');
   checkbox.type = 'checkbox';
   checkbox.checked = state.showInfrastructure;
+  // Sólo se redibuja la lista: rehacer la columna borraba la búsqueda y el foco de la casilla.
   checkbox.addEventListener('change', () => {
     state.showInfrastructure = checkbox.checked;
+    const selected = state.devicesById.get(state.selectedDeviceId);
+    if (!state.showInfrastructure && selected?.category === 'infrastructure') clearSelection();
     state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
-    renderDeviceList();
+    draw(search.value);
   });
   toggle.append(checkbox, createElement('span', null, t('rail.infrastructure')));
   heading.append(toggle);
@@ -135,13 +138,12 @@ function renderDeviceList() {
   const list = createElement('ul', 'device-list');
   elements.rail.append(list);
 
-  const visible = state.showInfrastructure
-    ? state.model.devices
-    : state.model.devices.filter((device) => device.category !== 'infrastructure');
-
   const draw = (term) => {
     list.replaceChildren();
     const needle = term.trim().toLowerCase();
+    const visible = state.showInfrastructure
+      ? state.model.devices
+      : state.model.devices.filter((device) => device.category !== 'infrastructure');
     const matches = visible.filter((device) => {
       if (!needle) return true;
       const addresses = device.interfaces.flatMap((entry) => entry.addresses).map((entry) => entry.address);

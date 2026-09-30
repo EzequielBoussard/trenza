@@ -21,8 +21,10 @@ import {
   selectVisible,
   spreadScaleFor,
   threadFor,
+  tidiestWidth,
   trayPlan,
   trayPositions,
+  untidiness,
 } from './graph.js';
 
 // Safari en iPhone devuelve un lienzo en blanco, sin error, por encima de ~16,7 Mpx.
@@ -42,7 +44,7 @@ const MARGIN = 40;
 // grande; si alguna etiqueta no entra, la búsqueda lo ensancha.
 const DESIGN_WIDTH = 2200;
 
-// Paso fijo y no fracción del rango: en redes grandes el paso quedaba demasiado grueso.
+// Paso fijo: como fracción del rango, en redes grandes queda demasiado grueso.
 const DESIGN_STEP = 50;
 const DESIGN_STEPS = 24;
 
@@ -363,7 +365,7 @@ function measureDiagram(model, showInfrastructure, chrome, measure) {
 
 // El marco se ancla a los bordes del espacio de diseño y no al dibujo; si no, en un lienzo
 // más alto la leyenda queda flotando en el medio.
-function layoutInto(shape, design) {
+function layoutInto(shape, design, limit) {
   const { chrome } = shape;
   const trayTop = design.height - chrome.margin - shape.legend.height - 16 * chrome.zoom - shape.tray.height;
   const content = {
@@ -383,21 +385,14 @@ function layoutInto(shape, design) {
   }
 
   const devices = [...shape.placed, ...shape.stray];
-  const labels = planLabels(devices, positions, shape.measure);
+  const labels = planLabels(devices, positions, shape.measure, limit);
+  if (!labels) return null;
 
   const crowded = devices.reduce((total, device) => total + (labels.get(device.id).crowded ? 1 : 0), 0);
-  const stepped = devices.reduce((total, device) => total + (labels.get(device.id).offset > 0 ? 1 : 0), 0);
-
-  return { ...shape, design, trayTop, positions, labels, devices, crowded, stepped };
+  return { ...shape, design, trayTop, positions, labels, devices, crowded, untidiness: untidiness(labels) };
 }
 
-// Una etiqueta encimada pesa 1000 y una bajada de renglón, 1.
-function untidiness(plan) {
-  return plan.crowded * 1000 + plan.stepped;
-}
-
-function planExport(model, { showInfrastructure, pixels }) {
-  const measure = labelMeasurer();
+function planExport(model, { showInfrastructure, pixels, measure = labelMeasurer() }) {
   const shapeFor = (width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure);
 
   // El marco pide más margen al crecer y eso cambia el tamaño natural: dos pasadas alcanzan.
@@ -413,25 +408,24 @@ function planExport(model, { showInfrastructure, pixels }) {
   // La búsqueda puede pasar del ancho natural: el natural se mide con la proporción del
   // dibujo, y la salida (16:9) impone otra en la que las etiquetas sí pueden pisarse.
   const aspect = pixels.width / pixels.height;
-  const planAt = (width) => layoutInto(shapeFor(width), { width, height: width / aspect });
+  const planAt = (width, limit) => layoutInto(shapeFor(width), { width, height: width / aspect }, limit);
   const floor = Math.min(shape.natural.width, DESIGN_WIDTH);
 
-  let best = planAt(floor);
-  for (let step = 1; step <= DESIGN_STEPS && untidiness(best) > 0; step++) {
-    // No es monótono: más ancho también cambia la separación vertical.
-    const candidate = planAt(floor + DESIGN_STEP * step);
-    if (untidiness(candidate) < untidiness(best)) best = candidate;
-  }
+  // No es monótono: más ancho también cambia la separación vertical, así que se prueban todos.
+  const widths = Array.from({ length: DESIGN_STEPS + 1 }, (_, step) => floor + DESIGN_STEP * step);
+  const best = tidiestWidth(widths, planAt);
 
   return { ...best, scale: pixels.width / best.design.width };
 }
 
 // Sólo las medidas en las que la dirección queda por encima del piso de legibilidad.
 export function offeredSizes(model, { showInfrastructure, format }) {
+  // Un medidor para todas las medidas: lo que no depende del marco se calcula una sola vez.
+  const measure = labelMeasurer();
   const survives = (size) => {
     try {
       const pixels = canvasSizeFor(format, size);
-      const { scale } = planExport(model, { showInfrastructure, pixels });
+      const { scale } = planExport(model, { showInfrastructure, pixels, measure });
       return format === 'pdf'
         ? ADDRESS_SIZE * scale * 72 / PRINT_DPI >= MIN_ADDRESS_POINTS
         : ADDRESS_SIZE * scale >= MIN_ADDRESS_SIZE;
@@ -441,7 +435,7 @@ export function offeredSizes(model, { showInfrastructure, format }) {
   };
 
   try {
-    measureDiagram(model, showInfrastructure, chromeFor(CHROME_WIDTH), labelMeasurer());
+    measureDiagram(model, showInfrastructure, chromeFor(CHROME_WIDTH), measure);
   } catch {
     return [];
   }

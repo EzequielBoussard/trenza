@@ -1,4 +1,4 @@
-// Cada hilo de logo.svg son dos tramos en S de 120 × 176, con los controles a mitad del tramo.
+// Cada hilo de logo.svg son 2 tramos en S de 120 × 176, con los controles a mitad del tramo.
 const LEFT = 136;
 const TOP = 168;
 const WIDTH = 120;
@@ -21,7 +21,7 @@ function paramAt(x) {
 
 const round = (value) => Math.round(value * 10) / 10;
 
-/** El hilo corrido `shift` tramos a la derecha y recortado a los dos tramos del logo. */
+/** El hilo corrido `shift` tramos a la derecha y recortado a los 2 tramos del logo. */
 export function strandPath(shift, falling) {
   let path = '';
   for (let k = Math.floor(-shift); k < 2 - shift; k++) {
@@ -48,8 +48,8 @@ export function strandPath(shift, falling) {
 
 let frame = 0;
 
-// La trenza gira una vuelta hacia el nombre y, cuando la vuelta ya va por la mitad, los
-// colores de los hilos lo cruzan. Un solo reloj para las dos cosas: siempre van juntas.
+// La trenza gira una vuelta hacia el nombre y, desde SHINE_START, los colores de los hilos lo
+// cruzan. Un solo reloj para la vuelta y el barrido, así van siempre juntos.
 export function weave(home) {
   if (frame || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -58,7 +58,7 @@ export function weave(home) {
   const start = performance.now();
   const step = (now) => {
     const progress = Math.min(1, (now - start) / DURATION);
-    // Una vuelta son dos tramos; con el coseno arranca y frena sin salto.
+    // Una vuelta son 2 tramos; con el coseno arranca y frena sin salto.
     const shift = 1 - Math.cos(Math.PI * progress);
     first.setAttribute('d', strandPath(shift, true));
     last.setAttribute('d', strandPath(shift, false));

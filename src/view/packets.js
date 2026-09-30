@@ -26,12 +26,12 @@ const COLUMNS = [
 // numeric: true, para que 192.168.1.2 vaya antes que 192.168.1.10.
 const collator = () => new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 
-// Se buscan campo por campo: concatenados, "icmp 192" coincidía entre dos columnas y la
-// fila aparecía sin nada resaltado.
+// Se buscan campo por campo: concatenados, "icmp 192" coincide entre 2 columnas y la fila
+// aparece sin nada resaltado.
 const SEARCHED = ['protocol', 'source', 'destination', 'summary'];
 
 // Campos en minúscula, armados al primer filtrado. Un solo arreglo plano (4 por paquete):
-// 100k arreglos chicos costaban más que las cadenas.
+// 100k arreglos chicos cuestan más que las cadenas.
 function haystacksFor(packets) {
   const haystacks = new Array(packets.length * SEARCHED.length);
 

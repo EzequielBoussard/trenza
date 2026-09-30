@@ -206,7 +206,7 @@ export const LABEL_FONT = `600 ${LABEL_TYPE.nameSize}px ${CONDENSED}`;
 export const ADDRESS_FONT = `500 ${LABEL_TYPE.addressSize}px ${CONDENSED}`;
 
 // document.fonts.ready no carga una familia que nadie pidió todavía, así que se piden por
-// nombre. Sin esto un exporte hecho antes del primer dibujado medía con la alternativa.
+// nombre. Sin esto un exporte hecho antes del primer dibujado mide con la alternativa.
 export async function labelFontsReady() {
   if (!document.fonts) return;
   try {
@@ -227,12 +227,16 @@ export const LABEL_REACH_BELOW = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOC
 export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3.5 } = {}) {
   let required = 0;
 
-  for (let i = 0; i < devices.length; i++) {
-    for (let j = i + 1; j < devices.length; j++) {
-      const a = devices[i];
-      const b = devices[j];
+  // Por altura: un par con más separación vertical que verticalGap / required ya no puede
+  // subir el máximo, y a partir de ahí tampoco los que siguen.
+  const sorted = [...devices].sort((a, b) => a.y - b.y);
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const a = sorted[i];
+      const b = sorted[j];
       const dx = Math.abs(a.x - b.x);
-      const dy = Math.abs(a.y - b.y);
+      const dy = b.y - a.y;
+      if (required > 0 && dy >= verticalGap / required) break;
       if (dx === 0 && dy === 0) continue;
 
       const byX = dx > 0 ? (halfWidthOf(a) + halfWidthOf(b) + LABEL_GEOMETRY.gap * 2) / dx : Infinity;
@@ -273,14 +277,35 @@ export function halfLabelWidth(device, measure) {
   return labelBox(device, measure).half;
 }
 
-// Más allá de esta distancia vertical dos dispositivos no pueden chocar, así que cada uno
-// se prueba sólo contra sus vecinos.
+// Más allá de esta distancia vertical dos dispositivos no pueden chocar.
 const NEIGHBOURHOOD = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOCK_SLOTS.length - 1]
   + LABEL_GEOMETRY.discRadius;
 
+// Una etiqueta encimada pesa 1000 y una bajada de renglón, 1.
+export function untidiness(plan) {
+  let total = 0;
+  for (const spot of plan.values()) total += (spot.crowded ? 1000 : 0) + (spot.offset > 0 ? 1 : 0);
+  return total;
+}
+
+// El ancho más chico con todas las etiquetas en su renglón; si no hay, el de menor desorden.
+// La primera pasada corta cada intento en la primera etiqueta corrida, que suele estar arriba.
+export function tidiestWidth(widths, attempt) {
+  for (const width of widths) {
+    const tidy = attempt(width, 1);
+    if (tidy) return tidy;
+  }
+  // Ninguno prolijo: del más ancho al más angosto, que el mejor aparece antes y poda más. Con el
+  // límite en empate + 1, entre empatados gana el más angosto, igual que antes.
+  let best = null;
+  for (const width of [...widths].reverse()) best = attempt(width, best ? best.untidiness + 1 : Infinity) ?? best;
+  return best;
+}
+
 // Asigna un renglón a cada bloque. Si no hay ninguno libre queda en el suyo marcado como
 // `crowded`; nunca se esconde. Ojo: offset 0 es un valor válido, comparar contra null.
-export function planLabels(devices, positions, measure) {
+// Con `limit` devuelve null apenas el desorden lo alcanza: la búsqueda descarta ese ancho.
+export function planLabels(devices, positions, measure, limit = Infinity) {
   const overlaps = (box, other) =>
     box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1;
 
@@ -300,7 +325,20 @@ export function planLabels(devices, positions, measure) {
   const discs = ordered.map((device) => positions.get(device.id));
   const reserved = new Array(ordered.length);
   const plan = new Map();
-  let first = 0;
+  let penalty = 0;
+
+  // Celdas del ancho del choque más largo posible: cada bloque se prueba sólo contra las 9
+  // vecinas. Sin ellas, una fila de 100 equipos a la misma altura se prueba entera con cada uno.
+  let reach = 0;
+  for (const device of ordered) reach = Math.max(reach, labelBox(device, measure).half);
+  const cellWidth = 2 * (reach + LABEL_GEOMETRY.gap) + LABEL_GEOMETRY.discRadius;
+  const cellOf = (x, y) => [Math.floor(x / cellWidth), Math.floor(y / NEIGHBOURHOOD)];
+  const cells = new Map();
+  discs.forEach(({ x, y }, index) => {
+    const key = cellOf(x, y).join();
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(index);
+  });
 
   for (let i = 0; i < ordered.length; i++) {
     const device = ordered[i];
@@ -309,10 +347,11 @@ export function planLabels(devices, positions, measure) {
     const half = box.half + LABEL_GEOMETRY.gap;
     const bottom = box.bottom;
 
-    // Ventana de vecinos: se recorre en orden de altura, así que el borde de arriba sólo avanza.
-    while (first < i && discs[first].y < y - NEIGHBOURHOOD) first++;
-    let last = i;
-    while (last + 1 < ordered.length && discs[last + 1].y <= y + NEIGHBOURHOOD) last++;
+    const [column, row] = cellOf(x, y);
+    const near = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) near.push(...(cells.get(`${column + dx},${row + dy}`) ?? []));
+    }
 
     const boxAt = (offset) => ({
       x1: x - half,
@@ -321,13 +360,7 @@ export function planLabels(devices, positions, measure) {
       y2: y + bottom + offset,
     });
 
-    const collides = (box) => {
-      for (let j = first; j <= last; j++) {
-        if (touchesDisc(box, discs[j])) return true;
-        if (j < i && overlaps(box, reserved[j])) return true;
-      }
-      return false;
-    };
+    const collides = (box) => near.some((j) => touchesDisc(box, discs[j]) || (j < i && overlaps(box, reserved[j])));
 
     const free = BLOCK_SLOTS.find((offset) => !collides(boxAt(offset)));
     const offset = free ?? 0;
@@ -335,6 +368,9 @@ export function planLabels(devices, positions, measure) {
     // Se reserva aunque haya quedado encimada: se dibuja igual.
     reserved[i] = boxAt(offset);
     plan.set(device.id, { offset, crowded: free === undefined });
+
+    penalty += (free === undefined ? 1000 : 0) + (offset > 0 ? 1 : 0);
+    if (penalty >= limit) return null;
   }
 
   return plan;

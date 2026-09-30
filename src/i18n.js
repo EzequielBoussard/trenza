@@ -573,7 +573,7 @@ function pluralFor(locale, count) {
 }
 
 // Plantillas ya partidas en literales y nombres: interpolar con regex en cada resumen
-// costaba 53 ms en una captura de 100k paquetes.
+// cuesta 53 ms en una captura de 100k paquetes.
 const templates = new Map();
 
 function fill(text, values) {

@@ -13,8 +13,10 @@ import {
   projectIntoRect,
   selectVisible,
   threadFor,
+  tidiestWidth,
   trayPlan,
   trayPositions,
+  untidiness,
 } from './graph.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -376,7 +378,7 @@ export class TopologyView {
     for (const device of devices) reach = Math.max(reach, halfLabelWidth(device, this.measure));
     const side = Math.ceil(reach) + VIEW_SIDE_MARGIN;
 
-    const attempt = (width) => {
+    const attempt = (width, limit) => {
       const height = Math.round(width / aspect);
       const trayWidth = width - side * 2;
       const tray = trayPlan(stray, trayWidth);
@@ -392,24 +394,13 @@ export class TopologyView {
         positions.set(id, point);
       }
 
-      const plan = planLabels(devices, positions, this.measure);
-
-      // Una etiqueta encimada pesa 1000 y una bajada de renglón, 1.
-      const untidiness = devices.reduce((total, device) => {
-        const spot = plan.get(device.id);
-        return total + (spot.crowded ? 1000 : 0) + (spot.offset > 0 ? 1 : 0);
-      }, 0);
-
-      return { width, height, positions, plan, tray, trayTop, side, untidiness };
+      const plan = planLabels(devices, positions, this.measure, limit);
+      return plan && { width, height, positions, plan, tray, trayTop, side, untidiness: untidiness(plan) };
     };
 
-    // Gana el primer ancho prolijo, que es el más chico. Si ninguno llega a 0, el de menor puntaje.
-    let best = attempt(MIN_VIEW_WIDTH);
-    for (let width = MIN_VIEW_WIDTH + VIEW_STEP; width <= MAX_VIEW_WIDTH && best.untidiness > 0; width += VIEW_STEP) {
-      const candidate = attempt(width);
-      if (candidate.untidiness < best.untidiness) best = candidate;
-    }
-    return best;
+    const widths = [];
+    for (let width = MIN_VIEW_WIDTH; width <= MAX_VIEW_WIDTH; width += VIEW_STEP) widths.push(width);
+    return tidiestWidth(widths, attempt);
   }
 
   buildControls() {

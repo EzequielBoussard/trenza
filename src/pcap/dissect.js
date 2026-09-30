@@ -348,7 +348,7 @@ function dissectLink(linkType, bytes) {
 }
 
 // Un paquete truncado devuelve las capas que se pudieron leer. Los campos de cada capa se
-// arman al pedirlos: con 100k paquetes armarlos de entrada costaba 1,4 s.
+// arman al pedirlos: con 100k paquetes armarlos de entrada cuesta 1,4 s.
 export function dissectPacket(packet) {
   const bytes = packet.bytes;
   const layers = [];
