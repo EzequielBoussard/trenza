@@ -403,6 +403,15 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   .theme-icon__rays { transition: none; }
 }
 
+/* Fundido al cambiar de tema o de idioma (crossfade en app.js). Lo compone el navegador como
+   dos imágenes de la página, así que cuesta lo mismo a cualquier tamaño de pantalla. */
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease-out;
+}
+
 .masthead__actions,
 .masthead__prefs {
   display: flex;

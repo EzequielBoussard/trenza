@@ -411,12 +411,19 @@ async function openExample(kind = 'network') {
   }
 }
 
+// Tema e idioma cambian con un fundido corto de la página entera. Sin View Transitions, o con
+// movimiento reducido, el cambio es inmediato.
+function crossfade(change) {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) change();
+  else document.startViewTransition(change);
+}
+
 function wireTheme() {
   applyTheme(getTheme());
-  elements.themeToggle.addEventListener('click', () => {
+  elements.themeToggle.addEventListener('click', () => crossfade(() => {
     toggleTheme();
     if (state.kind === 'network') paintNetwork();
-  });
+  }));
 }
 
 // Las columnas se estiran desde su borde: a lo ancho en escritorio y, la lista, a lo alto cuando
@@ -499,7 +506,7 @@ function refreshTitle() {
 
 function wireLanguage() {
   elements.language.value = getLanguage();
-  elements.language.addEventListener('change', () => {
+  elements.language.addEventListener('change', () => crossfade(() => {
     setLanguage(elements.language.value);
     translateDocument();
     refreshTitle();
@@ -507,7 +514,7 @@ function wireLanguage() {
     if (state.status.key) setStatus(state.status.key, state.status.values, state.status.tone);
     if (state.kind === 'network') paintNetwork();
     if (state.kind === 'capture') paintCapture();
-  });
+  }));
 }
 
 function closeFile() {

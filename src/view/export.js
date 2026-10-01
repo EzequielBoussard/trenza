@@ -392,29 +392,33 @@ function layoutInto(shape, design, limit) {
   return { ...shape, design, trayTop, positions, labels, devices, crowded, untidiness: untidiness(labels) };
 }
 
-function planExport(model, { showInfrastructure, pixels, measure = labelMeasurer() }) {
-  const shapeFor = (width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure);
-
-  // El marco pide más margen al crecer y eso cambia el tamaño natural: dos pasadas alcanzan.
+// El marco pide más margen al crecer y eso cambia el tamaño natural: dos pasadas alcanzan.
+function settledShape(shapeFor) {
   let shape = shapeFor(CHROME_WIDTH);
   for (let pass = 0; pass < 2; pass++) {
     const next = shapeFor(shape.natural.width);
     if (next.chrome.zoom === shape.chrome.zoom) break;
     shape = next;
   }
+  return shape;
+}
 
+// La búsqueda puede pasar del ancho natural: el natural se mide con la proporción del dibujo,
+// y la salida (16:9) impone otra en la que las etiquetas sí pueden pisarse. No es monótona:
+// más ancho también cambia la separación vertical, así que se prueban todos.
+function designWidths(shape) {
+  const floor = Math.min(shape.natural.width, DESIGN_WIDTH);
+  return Array.from({ length: DESIGN_STEPS + 1 }, (_, step) => floor + DESIGN_STEP * step);
+}
+
+function planExport(model, { showInfrastructure, pixels, measure = labelMeasurer() }) {
+  const shapeFor = (width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure);
+  const shape = settledShape(shapeFor);
   if (!pixels) return { ...layoutInto(shape, shape.natural), scale: 1 };
 
-  // La búsqueda puede pasar del ancho natural: el natural se mide con la proporción del
-  // dibujo, y la salida (16:9) impone otra en la que las etiquetas sí pueden pisarse.
   const aspect = pixels.width / pixels.height;
   const planAt = (width, limit) => layoutInto(shapeFor(width), { width, height: width / aspect }, limit);
-  const floor = Math.min(shape.natural.width, DESIGN_WIDTH);
-
-  // No es monótono: más ancho también cambia la separación vertical, así que se prueban todos.
-  const widths = Array.from({ length: DESIGN_STEPS + 1 }, (_, step) => floor + DESIGN_STEP * step);
-  const best = tidiestWidth(widths, planAt);
-
+  const best = tidiestWidth(designWidths(shape), planAt);
   return { ...best, scale: pixels.width / best.design.width };
 }
 
@@ -422,23 +426,31 @@ function planExport(model, { showInfrastructure, pixels, measure = labelMeasurer
 export function offeredSizes(model, { showInfrastructure, format }) {
   // Un medidor para todas las medidas: lo que no depende del marco se calcula una sola vez.
   const measure = labelMeasurer();
+  let widths;
+  try {
+    widths = designWidths(settledShape((width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure)));
+  } catch {
+    return [];
+  }
+
+  // La escala baja con el ancho de diseño: si el más angosto no se lee, ninguno; si el más
+  // ancho se lee, cualquiera. Sólo en el medio hace falta buscar el ancho de verdad.
   const survives = (size) => {
-    try {
-      const pixels = canvasSizeFor(format, size);
-      const { scale } = planExport(model, { showInfrastructure, pixels, measure });
+    const pixels = canvasSizeFor(format, size);
+    const readable = (designWidth) => {
+      const scale = pixels.width / designWidth;
       return format === 'pdf'
         ? ADDRESS_SIZE * scale * 72 / PRINT_DPI >= MIN_ADDRESS_POINTS
         : ADDRESS_SIZE * scale >= MIN_ADDRESS_SIZE;
+    };
+    if (!readable(widths[0])) return false;
+    if (readable(widths[widths.length - 1])) return true;
+    try {
+      return readable(planExport(model, { showInfrastructure, pixels, measure }).design.width);
     } catch {
       return false;
     }
   };
-
-  try {
-    measureDiagram(model, showInfrastructure, chromeFor(CHROME_WIDTH), measure);
-  } catch {
-    return [];
-  }
 
   const candidates = format === 'pdf' ? PAPER_SIZES : EXPORT_RESOLUTIONS;
   return Object.entries(candidates)
