@@ -1611,7 +1611,8 @@ body[data-dragging] .dropveil { display: grid; }
     grid-template-areas: 'rail' 'grip' 'stage' 'panel';
   }
 
-  .stage { height: min(60vh, 30rem); }
+  /* Con el teléfono acostado, 60vh deja el diagrama en 190 px. */
+  .stage { height: clamp(16rem, 60vh, 30rem); }
 
   /* La leyenda va arriba: el diagrama no deja desplazar la página y abajo quedaba fuera. */
   .stage { grid-template-rows: auto minmax(0, 1fr); }
