@@ -1073,12 +1073,13 @@ html:not([data-js]) .intro {
   font-size: 0.85rem;
 }
 
-.intro__notes dt {
-  margin-bottom: 0.3rem;
+.intro__term {
+  margin: 0 0 0.3rem;
+  font-size: inherit;
   font-weight: 600;
 }
 
-.intro__notes dd {
+.intro__body {
   margin: 0;
   color: var(--text-muted);
 }
@@ -1115,11 +1116,14 @@ body[data-dragging] .dropveil { display: grid; }
 
 /* Lista lateral */
 
+/* Título y casilla en un renglón; si la columna es angosta, la casilla baja. */
 .rail__head {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem 1rem 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.75rem 1rem 0.5rem;
 }
 
 .rail__title {
@@ -1134,7 +1138,7 @@ body[data-dragging] .dropveil { display: grid; }
 
 .rail__search {
   width: calc(100% - 2rem);
-  margin: 0 1rem 0.75rem;
+  margin: 0 1rem 0.5rem;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1160,12 +1164,27 @@ body[data-dragging] .dropveil { display: grid; }
   cursor: pointer;
 }
 
-/* Alto táctil de 44 px para las filas de la lista, el buscador y las casillas. */
+/* Alto táctil de 44 px para el buscador y las casillas; las filas de la lista, 40. */
 @media (pointer: coarse) {
   .toggle,
   .checkbox,
-  .rail__search,
-  .device-chip { min-height: 44px; }
+  .rail__search { min-height: 44px; }
+
+  .device-chip {
+    min-height: 40px;
+    align-items: center;
+  }
+}
+
+/* Los datos van más juntos que la prosa de la portada. */
+.device-chip,
+.rail__hint,
+.statusbar,
+.legend,
+.facts,
+.table,
+.connections {
+  line-height: 1.35;
 }
 
 .device-list {
@@ -1644,9 +1663,10 @@ body[data-dragging] .dropveil { display: grid; }
     border-bottom: 1px solid var(--line);
   }
 
+  /* En un teléfono parado, 28vh deja ver el diagrama desde la primera pantalla. */
   .rail {
     height: var(--rail-height, auto);
-    max-height: var(--rail-height, 22rem);
+    max-height: var(--rail-height, clamp(12rem, 28vh, 22rem));
     border: 0;
   }
 
@@ -1702,9 +1722,15 @@ body[data-dragging] .dropveil { display: grid; }
       'brand prefs'
       'file file'
       'actions actions';
+    gap: 0.45rem 1rem;
+    padding-block: 0.6rem;
     padding-left: max(1rem, env(safe-area-inset-left));
     padding-right: max(1rem, env(safe-area-inset-right));
   }
+
+  .statusbar { padding-inline: 1rem; }
+  .panel-head { padding: 0.9rem 1rem 0.6rem; }
+  .panel-section { padding: 0.75rem 1rem; }
 
   .masthead__actions {
     flex-wrap: wrap;

@@ -281,7 +281,6 @@ export class TopologyView {
         // Tabindex móvil: una sola parada para todo el diagrama, las flechas mueven entre equipos.
         tabindex: '-1',
         role: 'button',
-        'aria-pressed': 'false',
         'aria-label': address
           ? `${device.name}, ${t(`category.${device.category}`)}, ${address.address}`
           : `${device.name}, ${t(`category.${device.category}`)}`,
@@ -823,7 +822,8 @@ export class TopologyView {
     for (const node of this.svg.querySelectorAll('.node')) {
       const own = node.dataset.id === id;
       node.classList.toggle('is-selected', own);
-      node.setAttribute('aria-pressed', String(own));
+      if (own) node.setAttribute('aria-current', 'true');
+      else node.removeAttribute('aria-current');
       node.classList.toggle('is-neighbour', !own && neighbours.has(node.dataset.id));
       node.classList.toggle('is-dimmed', !neighbours.has(node.dataset.id));
     }
@@ -839,7 +839,7 @@ export class TopologyView {
     this.paintThread();
     for (const node of this.svg.querySelectorAll('.node')) {
       node.classList.remove('is-selected', 'is-neighbour', 'is-dimmed');
-      node.setAttribute('aria-pressed', 'false');
+      node.removeAttribute('aria-current');
     }
   }
 }

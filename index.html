@@ -49,7 +49,7 @@
       </span>
       <span class="masthead__name">Trenza</span>
     </a>
-    <span class="masthead__kind">
+    <span class="masthead__kind" aria-hidden="true">
       <span class="masthead__format" data-format="network">.pkt</span>
       <span class="masthead__divider" aria-hidden="true"></span>
       <span class="masthead__format" data-format="capture">.pcap</span>
@@ -86,8 +86,8 @@
       </svg>
     </button>
     <select class="language" data-language data-i18n-label="action.language">
-      <option value="en">English</option>
-      <option value="es">Español</option>
+      <option value="en" lang="en">English</option>
+      <option value="es" lang="es">Español</option>
     </select>
   </div>
 </header>
@@ -126,8 +126,8 @@
         <label class="field" data-language-field>
           <span class="field__label" data-i18n="export.language">Language</span>
           <select class="field__input" name="language">
-            <option value="en">English</option>
-            <option value="es">Español</option>
+            <option value="en" lang="en">English</option>
+            <option value="es" lang="es">Español</option>
           </select>
         </label>
 
@@ -208,30 +208,30 @@
       </figure>
     </div>
 
-    <dl class="intro__notes">
-      <div>
-        <dt data-i18n="about.pktTerm"></dt>
-        <dd data-i18n="about.pktBody"></dd>
-      </div>
-      <div>
-        <dt data-i18n="about.pcapTerm"></dt>
-        <dd data-i18n="about.pcapBody"></dd>
-      </div>
-      <div>
-        <dt data-i18n="about.privacyTerm"></dt>
-        <dd data-i18n="about.privacyBody"></dd>
-      </div>
-      <div>
-        <dt data-i18n="about.limitsTerm"></dt>
-        <dd data-i18n="about.limitsBody"></dd>
-      </div>
-    </dl>
+    <div class="intro__notes">
+      <section>
+        <h2 class="intro__term" data-i18n="about.pktTerm"></h2>
+        <p class="intro__body" data-i18n="about.pktBody"></p>
+      </section>
+      <section>
+        <h2 class="intro__term" data-i18n="about.pcapTerm"></h2>
+        <p class="intro__body" data-i18n="about.pcapBody"></p>
+      </section>
+      <section>
+        <h2 class="intro__term" data-i18n="about.privacyTerm"></h2>
+        <p class="intro__body" data-i18n="about.privacyBody"></p>
+      </section>
+      <section>
+        <h2 class="intro__term" data-i18n="about.limitsTerm"></h2>
+        <p class="intro__body" data-i18n="about.limitsBody"></p>
+      </section>
+    </div>
 
     <footer class="intro__footer">
       <p>
         <span data-i18n="about.madeBy"></span>
-        <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard</a>.
-        <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub</a>
+        <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard<span class="visually-hidden" data-i18n="action.newTab"></span></a>.
+        <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub<span class="visually-hidden" data-i18n="action.newTab"></span></a>
       </p>
       <p data-i18n="about.disclaimer"></p>
     </footer>

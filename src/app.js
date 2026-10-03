@@ -204,7 +204,8 @@ function markChips(id) {
   for (const chip of chips) {
     const own = chip.dataset.id === id;
     chip.classList.toggle('is-selected', own);
-    chip.setAttribute('aria-pressed', String(own));
+    if (own) chip.setAttribute('aria-current', 'true');
+    else chip.removeAttribute('aria-current');
     chip.tabIndex = chip === stop ? 0 : -1;
   }
 }
@@ -452,10 +453,17 @@ function crossfade(change) {
   else document.startViewTransition(change);
 }
 
+// "Tema claro, presionado": el lector dice cuál está puesto, cosa que el icono sólo muestra.
+function markTheme() {
+  elements.themeToggle.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'light'));
+}
+
 function wireTheme() {
   applyTheme(getTheme());
+  markTheme();
   elements.themeToggle.addEventListener('click', () => crossfade(() => {
     toggleTheme();
+    markTheme();
     if (state.kind === 'network') paintNetwork();
   }));
 }
