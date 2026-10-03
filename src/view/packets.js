@@ -234,6 +234,7 @@ export class PacketTableView {
     // grid: en una tabla común aria-selected no aplica a las filas.
     table.setAttribute('role', 'grid');
     table.setAttribute('aria-multiselectable', 'true');
+    table.setAttribute('aria-label', t('panel.packets'));
     const head = createElement('thead');
     const headRow = createElement('tr');
 

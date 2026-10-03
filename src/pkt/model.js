@@ -78,8 +78,31 @@ function interfacesFromPorts(engine) {
   return interfaces;
 }
 
+const PLACE_ROOT = '0';
+const PLACE_DEVICE = '6';
+
+// Cada nodo de la vista física por su UUID: ciudad, edificio, armario, rack, mesa, equipo.
+function readPlaces(root) {
+  const places = new Map();
+  const workspace = root.getElementsByTagName('PHYSICALWORKSPACE')[0];
+  if (!workspace) return places;
+  for (const node of workspace.getElementsByTagName('NODE')) {
+    const uuid = childText(node, 'UUID_STR');
+    if (uuid) places.set(uuid, { type: childText(node, 'TYPE'), name: childText(node, 'NAME') });
+  }
+  return places;
+}
+
+// El equipo guarda la ruta de UUID desde Intercity hasta sí mismo; se nombra lo del medio.
+export function locationOf(path, places) {
+  return path.split(',')
+    .map((uuid) => places.get(uuid.trim()))
+    .filter((place) => place && place.type !== PLACE_ROOT && place.type !== PLACE_DEVICE)
+    .map((place) => place.name);
+}
+
 // Hasta 5.x no hay SAVE_REF_ID: los enlaces nombran a cada equipo por su posición en la lista.
-function readDevice(deviceNode, index) {
+function readDevice(deviceNode, index, places) {
   const engine = childNamed(deviceNode, 'ENGINE');
   if (!engine) return null;
 
@@ -109,6 +132,7 @@ function readDevice(deviceNode, index) {
     category,
     x: logical ? Number(childText(logical, 'X')) || 0 : 0,
     y: logical ? Number(childText(logical, 'Y')) || 0 : 0,
+    location: workspace ? locationOf(childText(workspace, 'PHYSICAL'), places) : [],
     interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
     vlans: readVlans(configLines, configured, vlansFromEngine(engine)),
     routes: readRoutes(configLines),
@@ -132,6 +156,8 @@ function readLink(linkNode) {
     media: childText(linkNode, 'TYPE'),
     wiring: childText(cable, 'TYPE'),
     functional: childText(cable, 'FUNCTIONAL') !== 'false',
+    // En metros; hasta 5.x viene en 0.
+    length: Number(childText(cable, 'LENGTH')) || 0,
   };
 }
 
@@ -148,8 +174,9 @@ export function buildNetworkModel(xmlText) {
   const devicesNode = childNamed(network, 'DEVICES');
   const linksNode = childNamed(network, 'LINKS');
 
+  const places = readPlaces(root);
   const devices = devicesNode
-    ? childrenNamed(devicesNode, 'DEVICE').map((node, index) => readDevice(node, index)).filter(Boolean)
+    ? childrenNamed(devicesNode, 'DEVICE').map((node, index) => readDevice(node, index, places)).filter(Boolean)
     : [];
   const links = linksNode ? childrenNamed(linksNode, 'LINK').map(readLink).filter(Boolean) : [];
 
@@ -157,8 +184,9 @@ export function buildNetworkModel(xmlText) {
   const connected = links.filter((link) => byId.has(link.from) && byId.has(link.to));
 
   for (const link of connected) {
-    byId.get(link.from).links.push({ port: link.fromPort, peerId: link.to, peerPort: link.toPort });
-    byId.get(link.to).links.push({ port: link.toPort, peerId: link.from, peerPort: link.fromPort });
+    const { length } = link;
+    byId.get(link.from).links.push({ port: link.fromPort, peerId: link.to, peerPort: link.toPort, length });
+    byId.get(link.to).links.push({ port: link.toPort, peerId: link.from, peerPort: link.fromPort, length });
   }
 
   return {

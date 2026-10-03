@@ -110,8 +110,9 @@ function looksLikeCapture(name, bytes) {
 function renderDeviceList() {
   elements.rail.replaceChildren();
 
+  labelGrip('action.resizeList');
   const heading = createElement('div', 'rail__head');
-  heading.append(createElement('h2', 'rail__title', t('rail.devices')));
+  heading.append(railTitle('rail.devices'));
 
   const toggle = createElement('label', 'toggle');
   const checkbox = createElement('input');
@@ -155,7 +156,6 @@ function renderDeviceList() {
       const button = createElement('button', `device-chip device-chip--${device.category}`);
       button.type = 'button';
       button.dataset.id = device.id;
-      button.classList.toggle('is-selected', device.id === state.selectedDeviceId);
       button.append(
         createElement('span', 'device-chip__name', device.name),
         createElement('span', 'device-chip__meta', t(`category.${device.category}`)),
@@ -168,10 +168,45 @@ function renderDeviceList() {
     if (matches.length === 0) {
       list.append(createElement('li', 'empty-note', t('rail.noMatches')));
     }
+    markChips(state.selectedDeviceId);
   };
+
+  // Una sola parada del tabulador, como el diagrama: 70 equipos no se recorren de a uno.
+  list.addEventListener('keydown', (event) => {
+    const chips = [...list.querySelectorAll('.device-chip')];
+    const from = chips.indexOf(document.activeElement);
+    const to = { ArrowDown: from + 1, ArrowUp: from - 1, Home: 0, End: chips.length - 1 }[event.key];
+    if (from < 0 || !chips[to]) return;
+    event.preventDefault();
+    chips[from].tabIndex = -1;
+    chips[to].tabIndex = 0;
+    chips[to].focus();
+  });
 
   search.addEventListener('input', () => draw(search.value));
   draw('');
+}
+
+function railTitle(key) {
+  const title = createElement('h2', 'rail__title', t(key));
+  title.id = 'rail-title';
+  return title;
+}
+
+function labelGrip(key) {
+  elements.railGrip.dataset.i18nLabel = key;
+  elements.railGrip.setAttribute('aria-label', t(key));
+}
+
+function markChips(id) {
+  const chips = [...elements.rail.querySelectorAll('.device-chip')];
+  const stop = chips.find((chip) => chip.dataset.id === id) ?? chips[0];
+  for (const chip of chips) {
+    const own = chip.dataset.id === id;
+    chip.classList.toggle('is-selected', own);
+    chip.setAttribute('aria-pressed', String(own));
+    chip.tabIndex = chip === stop ? 0 : -1;
+  }
 }
 
 function selectDevice(id) {
@@ -180,16 +215,14 @@ function selectDevice(id) {
   state.selectedDeviceId = id;
   state.topology.focus(id);
   renderDeviceInspector(elements.panel, device, state.devicesById);
-  for (const chip of elements.rail.querySelectorAll('.device-chip')) {
-    chip.classList.toggle('is-selected', chip.dataset.id === id);
-  }
+  markChips(id);
 }
 
 function clearSelection() {
   if (state.kind !== 'network') return;
   state.selectedDeviceId = null;
   state.topology.clearSelection();
-  for (const chip of elements.rail.querySelectorAll('.device-chip')) chip.classList.remove('is-selected');
+  markChips(null);
   showNetworkSummary();
 }
 
@@ -259,8 +292,9 @@ function paintCapture() {
   if (state.packetSelection.length > 0) state.packetTable.select(state.packetSelection);
 
   elements.rail.replaceChildren();
+  labelGrip('action.resizeFilter');
   const heading = createElement('div', 'rail__head');
-  heading.append(createElement('h2', 'rail__title', t('rail.filter')));
+  heading.append(railTitle('rail.filter'));
   elements.rail.append(heading);
 
   const search = createElement('input', 'rail__search');

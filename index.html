@@ -56,7 +56,7 @@
     </span>
   </div>
 
-  <p class="masthead__file" data-file-name></p>
+  <h1 class="masthead__file" data-file-name></h1>
 
   <div class="masthead__actions">
     <input type="file" accept=".pkt,.pka,.pkz,.pcap,.pcapng,.cap" hidden data-file-input>
@@ -166,10 +166,10 @@
 
     <p class="dialog__note" data-export-note></p>
 
-    <footer class="dialog__actions">
+    <div class="dialog__actions">
       <button type="button" class="button button--quiet" data-export-cancel data-i18n="action.cancel">Cancel</button>
       <button type="submit" class="button button--primary" data-i18n="export.submit">Export</button>
-    </footer>
+    </div>
   </form>
 </dialog>
 
@@ -237,10 +237,10 @@
     </footer>
   </section>
 
-  <aside class="rail" data-rail></aside>
+  <aside class="rail" data-rail aria-labelledby="rail-title"></aside>
   <div class="grip grip--rail" data-rail-grip role="separator" tabindex="0" data-i18n-label="action.resizeList"></div>
   <section class="stage" data-stage></section>
-  <aside class="panel" data-panel></aside>
+  <aside class="panel" data-panel data-i18n-label="panel.label"></aside>
   <div class="grip grip--panel" data-panel-grip role="separator" tabindex="0" data-i18n-label="action.resizePanel"></div>
 
 </main>

@@ -1,4 +1,4 @@
-import { t } from '../i18n.js';
+import { getLocale, t } from '../i18n.js';
 
 function createElement(tag, className, textContent) {
   const node = document.createElement(tag);
@@ -144,17 +144,30 @@ function accessListTable(lists) {
   );
 }
 
+// El lector de pantalla dice "conectado a" en vez de nombrar la flecha.
+function arrow() {
+  const node = createElement('span', 'connections__arrow');
+  const glyph = createElement('span', null, '↔');
+  glyph.setAttribute('aria-hidden', 'true');
+  node.append(glyph, createElement('span', 'visually-hidden', t('panel.connectedTo')));
+  return node;
+}
+
 function connectionList(device, devicesById) {
+  const meters = new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 });
   const list = createElement('ul', 'connections');
   for (const connection of device.links) {
     const peer = devicesById.get(connection.peerId);
     const item = createElement('li', 'connections__item');
     item.append(
       createElement('span', 'connections__port', connection.port || t('panel.unnamedPort')),
-      createElement('span', 'connections__arrow', '↔'),
+      arrow(),
       createElement('span', 'connections__peer', peer ? peer.name : t('panel.unknownPeer')),
       createElement('span', 'connections__peer-port', connection.peerPort || ''),
     );
+    if (connection.length > 0) {
+      item.append(createElement('span', 'connections__length', `${meters.format(connection.length)} m`));
+    }
     list.append(item);
   }
   return list;
@@ -183,6 +196,7 @@ export function renderDeviceInspector(container, device, devicesById) {
     [t('panel.links'), String(device.links.length)],
   ];
   if (gateway) identity.push([t('panel.gateway'), gateway]);
+  if (device.location.length > 0) identity.push([t('panel.location'), device.location.join(' › ')]);
 
   container.append(section(t('panel.identity'), definitionList(identity)));
 

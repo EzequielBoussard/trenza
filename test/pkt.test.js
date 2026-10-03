@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { deflateRawSync, deflateSync } from 'node:zlib';
 import { setLanguage } from '../src/i18n.js';
 import { decodePacketTracerFile } from '../src/pkt/decode.js';
+import { locationOf } from '../src/pkt/model.js';
 
 // Los mensajes que se comparan abajo son los del idioma por defecto.
 setLanguage('en');
 
-// Formato anterior a 6.2: se puede generar sin cifrar.
+// El formato heredado no lleva Twofish: se puede generar acá.
 function buildLegacyFile(xml) {
   const payload = deflateSync(Buffer.from(xml, 'utf8'));
   const withHeader = Buffer.alloc(4 + payload.length);
@@ -73,4 +74,16 @@ test('rechaza un archivo que no es de Packet Tracer', async () => {
 test('detecta un archivo truncado', async () => {
   const truncated = buildLegacyFile('<PACKETTRACER5/>').subarray(0, 3);
   await assert.rejects(decodePacketTracerFile(truncated), /not a Packet Tracer/);
+});
+
+test('la ubicación física nombra lo que hay entre Intercity y el equipo', () => {
+  const places = new Map([
+    ['{a}', { type: '0', name: 'Intercity' }],
+    ['{b}', { type: '1', name: 'Montevideo' }],
+    ['{c}', { type: '2', name: 'Sede' }],
+    ['{d}', { type: '4', name: 'Rack' }],
+    ['{e}', { type: '6', name: 'R1' }],
+  ]);
+  assert.deepEqual(locationOf('{a},{b},{c},{d},{e}', places), ['Montevideo', 'Sede', 'Rack']);
+  assert.deepEqual(locationOf('', places), []);
 });
