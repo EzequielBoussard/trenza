@@ -26,6 +26,7 @@ const elements = {
   open: document.querySelector('[data-open]'),
   openCopy: document.querySelector('[data-open-copy]'),
   themeToggle: document.querySelector('[data-theme-toggle]'),
+  introTitle: document.querySelector('.intro__title'),
   sizeField: document.querySelector('[data-size-field]'),
   sizeLabel: document.querySelector('[data-size-label]'),
   scopeField: document.querySelector('[data-scope-field]'),
@@ -156,6 +157,8 @@ function renderDeviceList() {
       const button = createElement('button', `device-chip device-chip--${device.category}`);
       button.type = 'button';
       button.dataset.id = device.id;
+      // El lector junta los dos textos sin pausa ("PC16Terminal"); la coma los separa.
+      button.setAttribute('aria-label', `${device.name}, ${t(`category.${device.category}`)}`);
       button.append(
         createElement('span', 'device-chip__name', device.name),
         createElement('span', 'device-chip__meta', t(`category.${device.category}`)),
@@ -347,6 +350,7 @@ function showCapture(bytes) {
 }
 
 async function open(name, bytes) {
+  const trigger = document.activeElement;
   state.file = { name, bytes };
   state.kind = null;
   state.model = null;
@@ -355,6 +359,7 @@ async function open(name, bytes) {
   elements.fileName.textContent = name;
   refreshTitle();
   document.body.dataset.loaded = 'true';
+  rescueFocus(trigger, elements.fileName);
   setStatus('status.reading');
 
   try {
@@ -368,6 +373,15 @@ async function open(name, bytes) {
   } catch (error) {
     showFailure(error.message);
   }
+}
+
+// El botón que abrió o cerró el archivo puede haber desaparecido y el foco caería en cualquier
+// lado. Al cargar la página no había foco que perder.
+function rescueFocus(trigger, target) {
+  if (!trigger || trigger === document.body) return;
+  const focused = document.activeElement;
+  if (focused && focused !== document.body && focused.getClientRects().length > 0) return;
+  target.focus();
 }
 
 function showFailure(message) {
@@ -560,6 +574,7 @@ function wireLanguage() {
 }
 
 function closeFile() {
+  const trigger = document.activeElement;
   state.file = null;
   state.kind = null;
   state.model = null;
@@ -576,6 +591,7 @@ function closeFile() {
   history.replaceState(null, '', '/');
   refreshTitle();
   setStatus('status.idle');
+  rescueFocus(trigger, elements.introTitle);
 }
 
 function wireActions() {

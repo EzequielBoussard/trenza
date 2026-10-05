@@ -18,7 +18,7 @@ const DICTIONARIES = {
     'action.cancel': 'Cancel',
     'action.language': 'Language',
     'action.theme': 'Light theme',
-    'action.newTab': '(opens in a new tab)',
+    'action.newTab': ', opens in a new tab',
     'action.skip': 'Skip to the viewer',
     'action.home': 'Trenza, back to the start page',
     'action.resizeList': 'Resize the device list',
@@ -278,7 +278,7 @@ const DICTIONARIES = {
     'action.cancel': 'Cancelar',
     'action.language': 'Idioma',
     'action.theme': 'Tema claro',
-    'action.newTab': '(se abre en otra pestaña)',
+    'action.newTab': ', se abre en otra pestaña',
     'action.skip': 'Ir al visor',
     'action.home': 'Trenza, volver al inicio',
     'action.resizeList': 'Cambiar el tamaño de la lista de equipos',
@@ -537,7 +537,15 @@ function storedLanguage() {
   }
 }
 
-let current = storedLanguage() || DEFAULT_LANGUAGE;
+// Sin elección guardada, el primer idioma del navegador que haya traducido. El guion de la
+// cabecera de index.html hace la misma cuenta para no pintar primero en inglés.
+function browserLanguage() {
+  if (typeof document === 'undefined') return null;
+  const preferred = navigator.languages?.length ? navigator.languages : [navigator.language ?? ''];
+  return preferred.map((tag) => tag.slice(0, 2)).find((code) => DICTIONARIES[code]) ?? null;
+}
+
+let current = storedLanguage() || browserLanguage() || DEFAULT_LANGUAGE;
 
 export function getLanguage() {
   return current;

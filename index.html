@@ -32,7 +32,7 @@
 <link rel="preload" href="/fonts/condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!-- Rutas absolutas: con relativas, /demo/ pediría los archivos un nivel más adentro. -->
 <link rel="stylesheet" href="/styles.css">
-<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),l=localStorage.getItem('trenza.language');if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);}catch(e){}</script>
+<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),s=localStorage.getItem('trenza.language'),n=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).map(function(x){return x.slice(0,2);}).filter(function(x){return x==='es'||x==='en';})[0],l=s==='es'||s==='en'?s:n;if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);}catch(e){}</script>
 </head>
 <body>
 
@@ -56,7 +56,7 @@
     </span>
   </div>
 
-  <h1 class="masthead__file" data-file-name></h1>
+  <h1 class="masthead__file" data-file-name tabindex="-1"></h1>
 
   <div class="masthead__actions">
     <input type="file" accept=".pkt,.pka,.pkz,.pcap,.pcapng,.cap" hidden data-file-input>
@@ -94,10 +94,10 @@
 
 <p class="statusbar" data-status role="status"></p>
 
-<dialog class="dialog" data-export-dialog aria-labelledby="export-title">
-  <form class="dialog__form" data-export-form>
+<dialog class="dialog" data-export-dialog aria-labelledby="export-title" aria-describedby="export-lead">
+  <form class="dialog__form" data-export-form role="none">
     <h2 class="dialog__title" id="export-title" data-i18n="export.title">Export the diagram</h2>
-    <p class="dialog__lead" data-i18n="export.lead"></p>
+    <p class="dialog__lead" id="export-lead" data-i18n="export.lead"></p>
 
     <div class="dialog__body">
       <div class="dialog__fields">
@@ -183,7 +183,7 @@
   <section class="intro">
     <div class="intro__main">
       <div class="intro__text">
-        <h1 class="intro__title" data-i18n="intro.title"></h1>
+        <h1 class="intro__title" data-i18n="intro.title" tabindex="-1"></h1>
         <p class="intro__lead" data-i18n-html="intro.lead"></p>
         <div class="intro__actions">
           <button type="button" class="button button--primary" data-open-copy data-i18n="intro.choose">Choose a file</button>
