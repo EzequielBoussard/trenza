@@ -79,6 +79,7 @@ const DICTIONARIES = {
     'rail.infrastructure': 'Include infrastructure',
     'rail.searchDevices': 'Search by name or address',
     'rail.noMatches': 'No matches.',
+    'rail.matches': '{shown} of {total}',
     'rail.filter': 'Filter',
     'rail.searchPackets': 'Protocol, address or text',
     'rail.filterHint': 'The filter searches protocol, addresses and description. It is not Wireshark syntax.',
@@ -175,6 +176,8 @@ const DICTIONARIES = {
 
     'export.title': 'Export the diagram',
     'export.lead': 'The whole network is exported, regardless of the current zoom.',
+    'export.titleCapture': 'Export the capture',
+    'export.leadCapture': 'Every packet is exported, regardless of the filter.',
     'export.name': 'File name',
     'export.format': 'Format',
     'export.resolution': 'Resolution',
@@ -339,6 +342,7 @@ const DICTIONARIES = {
     'rail.infrastructure': 'Incluir infraestructura',
     'rail.searchDevices': 'Buscar por nombre o dirección',
     'rail.noMatches': 'Sin coincidencias.',
+    'rail.matches': '{shown} de {total}',
     'rail.filter': 'Filtro',
     'rail.searchPackets': 'Protocolo, dirección o texto',
     'rail.filterHint': 'El filtro busca en protocolo, direcciones y descripción. No usa la sintaxis de Wireshark.',
@@ -435,6 +439,8 @@ const DICTIONARIES = {
 
     'export.title': 'Exportar el diagrama',
     'export.lead': 'Se exporta la red entera, sin importar el zoom actual.',
+    'export.titleCapture': 'Exportar la captura',
+    'export.leadCapture': 'Se exportan todos los paquetes, sin importar el filtro.',
     'export.name': 'Nombre del archivo',
     'export.format': 'Formato',
     'export.resolution': 'Resolución',

@@ -29,7 +29,7 @@ export function toCsv(packets, { origin }) {
   return new Blob([`﻿${text}\r\n`], { type: 'text/csv;charset=utf-8' });
 }
 
-// pcap clásico y no pcapng: alcanza con un tipo de enlace por paquete.
+// Pcap clásico: alcanza con un tipo de enlace por paquete.
 export function toPcap(packets) {
   const linkType = packets.length > 0 ? packets[0].linkType : 1;
   const usable = packets.filter((packet) => packet.linkType === linkType);

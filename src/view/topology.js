@@ -21,8 +21,8 @@ import {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// Ancho del lienzo en unidades de diseño. Se usa el más chico en el que las etiquetas no se
-// pisan; el zoom después sólo agranda, no vuelve a repartir.
+// Ancho del lienzo en unidades de diseño: el más chico en el que las etiquetas no se pisan.
+// Después el zoom sólo agranda; el reparto queda fijo.
 const MIN_VIEW_WIDTH = 900;
 const MAX_VIEW_WIDTH = 5200;
 
@@ -46,7 +46,7 @@ const VIEW_STRETCH = 2.5;
 // Con la casa se reparte ante cualquier cambio que se note: ahí nadie está mirando de cerca.
 const FIT_TOLERANCE = 0.02;
 
-// El recorrido es una sola fila, así que las cuatro flechas avanzan o retroceden de a uno.
+// El recorrido es una sola fila, así que las 4 flechas avanzan o retroceden de a uno.
 const ARROW_STEPS = {
   ArrowRight: 1,
   ArrowDown: 1,
@@ -182,7 +182,7 @@ export class TopologyView {
     this.shapeWatcher.observe(this.container);
   }
 
-  // Una vista reemplazada seguía recibiendo avisos del observador y volvía a poner su leyenda.
+  // Sin desconectar el observador, una vista reemplazada vuelve a poner su leyenda.
   destroy() {
     this.shapeWatcher.disconnect();
     if (this.legend) this.legend.remove();
@@ -206,13 +206,13 @@ export class TopologyView {
     this.legend = this.buildLegend(links);
     if (this.legend) this.legendHost.append(this.legend);
 
-    // Los equipos sueltos van a una bandeja al pie. Uno solo lejos del resto achicaba toda la red.
+    // Los equipos sueltos van a una bandeja al pie: uno solo lejos del resto achica toda la red.
     const { placed, stray } = partitionDevices(visible, links);
     const devices = [...placed, ...stray];
     this.aspect = this.panelAspect();
     const { width, height, positions, plan, tray, trayTop, side } = this.layoutFor(placed, stray, this.aspect);
 
-    // `group` y no `img`, para que el lector de pantalla pueda recorrer los equipos.
+    // `group`: el lector de pantalla puede entrar y recorrer los equipos.
     const svg = element('svg', {
       viewBox: `0 0 ${width} ${height}`,
       class: 'topology',
@@ -331,7 +331,7 @@ export class TopologyView {
     });
     this.nodes = nodes;
 
-    // Las flechas siguen el orden de lectura, no el de dibujo.
+    // Las flechas siguen el orden de lectura: por filas, de izquierda a derecha.
     this.order = devices
       .map((device) => ({ id: device.id, ...positions.get(device.id) }))
       .sort((a, b) => a.y - b.y || a.x - b.x)
@@ -469,7 +469,7 @@ export class TopologyView {
   }
 
   attachNavigation(svg) {
-    // Un puntero arrastra, dos pellizcan. `raw` es la vista sin límite que va pidiendo el
+    // Un puntero arrastra, 2 pellizcan. `raw` es la vista sin límite que va pidiendo el
     // gesto; lo que se muestra es esa vista frenada contra el límite.
     const pointers = new Map();
     let origin = null;
@@ -522,7 +522,7 @@ export class TopologyView {
     }, { passive: false });
 
     // Safari manda gesture* además de wheel; sin esto acerca la página entera. En iOS el
-    // pellizco ya llega como dos punteros, así que acá sólo se atiende el del trackpad.
+    // pellizco ya llega como 2 punteros, así que acá sólo se atiende el del trackpad.
     let pinch = 1;
     svg.addEventListener('gesturestart', (event) => {
       event.preventDefault();
@@ -624,7 +624,7 @@ export class TopologyView {
     };
   }
 
-  // Se calcula sobre el destino para que dos ruedas seguidas se sumen en vez de pelearse
+  // Se calcula sobre el destino para que 2 ruedas seguidas se sumen en vez de pelearse
   // con la animación.
   zoomTo(scale, focus) {
     const next = this.zoomView(this.target, scale, focus);
@@ -639,9 +639,8 @@ export class TopologyView {
     this.glide();
   }
 
-  // La vista más cercana a `view` en la que al menos un equipo se ve entero y el centro de la
-  // pantalla cae dentro de la red. Es la unión de un rectángulo por equipo, recortado por el de
-  // la red; cada recorte contiene la vista centrada en su equipo, así que ninguno queda vacío.
+  // La vista más cercana a `view` con al menos un equipo entero y el centro de la pantalla dentro
+  // de la red: el rectángulo de cada equipo recortado por el de la red, y el más cercano.
   clampView(view) {
     if (!this.positions || !this.frame) return view;
     const { scale } = view;
@@ -682,7 +681,7 @@ export class TopologyView {
     };
   }
 
-  // Avance exponencial por tiempo, no por cuadro: igual a 60 Hz que a 144.
+  // Avance exponencial medido en tiempo: igual a 60 Hz que a 144.
   glide(tau = GLIDE_TAU) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       this.settle();
@@ -723,7 +722,7 @@ export class TopologyView {
     const { x, y, scale } = this.transform;
     this.scene.setAttribute('transform', `translate(${x} ${y}) scale(${scale})`);
 
-    // Propiedades del contenedor y no variables: una variable se hereda y recalcula el SVG entero.
+    // Propiedades del contenedor: una variable CSS se heredaría y recalcularía el SVG entero.
     const { ratio, left, top } = this.pixels;
     const spacing = GRID_SPACING * scale;
     this.container.style.setProperty('background-size', `${spacing}px ${spacing}px`);

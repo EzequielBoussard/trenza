@@ -89,7 +89,7 @@ const LABEL_HALO = 3.5;
 
 const SITE_URL = 'trenza.pages.dev';
 
-// El marco (título, leyenda, dirección) escala con el ancho de la imagen, no con el dibujo.
+// El marco (título, leyenda, dirección) escala con el ancho de la imagen, aunque el dibujo se achique.
 // La letra crece contra CHROME_WIDTH y los márgenes contra SPACING_WIDTH, que es mayor.
 const CHROME_WIDTH = 1100;
 const SPACING_WIDTH = 1600;
@@ -363,8 +363,8 @@ function measureDiagram(model, showInfrastructure, chrome, measure) {
   return { placed, stray, links, measure, chrome, insets, legend, tray, natural };
 }
 
-// El marco se ancla a los bordes del espacio de diseño y no al dibujo; si no, en un lienzo
-// más alto la leyenda queda flotando en el medio.
+// El marco se ancla a los bordes del espacio de diseño: anclado al dibujo, en un lienzo más
+// alto la leyenda quedaría flotando en el medio.
 function layoutInto(shape, design, limit) {
   const { chrome } = shape;
   const trayTop = design.height - chrome.margin - shape.legend.height - 16 * chrome.zoom - shape.tray.height;
@@ -392,7 +392,7 @@ function layoutInto(shape, design, limit) {
   return { ...shape, design, trayTop, positions, labels, devices, crowded, untidiness: untidiness(labels) };
 }
 
-// El marco pide más margen al crecer y eso cambia el tamaño natural: dos pasadas alcanzan.
+// El marco pide más margen al crecer y eso cambia el tamaño natural: 2 pasadas alcanzan.
 function settledShape(shapeFor) {
   let shape = shapeFor(CHROME_WIDTH);
   for (let pass = 0; pass < 2; pass++) {
@@ -403,9 +403,8 @@ function settledShape(shapeFor) {
   return shape;
 }
 
-// La búsqueda puede pasar del ancho natural: el natural se mide con la proporción del dibujo,
-// y la salida (16:9) impone otra en la que las etiquetas sí pueden pisarse. No es monótona:
-// más ancho también cambia la separación vertical, así que se prueban todos.
+// Pasa del ancho natural porque la salida (16:9) impone otra proporción donde las etiquetas
+// pueden pisarse. No es monótona: más ancho cambia también la separación vertical.
 function designWidths(shape) {
   const floor = Math.min(shape.natural.width, DESIGN_WIDTH);
   return Array.from({ length: DESIGN_STEPS + 1 }, (_, step) => floor + DESIGN_STEP * step);
@@ -652,7 +651,7 @@ function sizeFor(format, choice) {
   return format === 'pdf' ? PAPER_SIZES[choice] : EXPORT_RESOLUTIONS[choice];
 }
 
-// Devuelve también la medida real, que es lo que distingue dos resoluciones en la vista previa.
+// Devuelve también la medida real, que es lo que distingue 2 resoluciones en la vista previa.
 export async function renderNetworkPreview(model, request, budget) {
   const { format, name, size: choice, transparent, showInfrastructure, language, theme } = request;
   const descriptor = EXPORT_FORMATS[format];

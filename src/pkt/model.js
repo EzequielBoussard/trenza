@@ -47,8 +47,8 @@ function classify(typeText, modelText) {
   return 'other';
 }
 
-// Si el switch se configuró desde la interfaz gráfica, las VLAN sólo están en el XML y no
-// en la running-config.
+// Si el switch se configuró desde la interfaz gráfica, las VLAN sólo están en el XML: la
+// running-config no las nombra.
 function vlansFromEngine(engine) {
   const declared = childNamed(engine, 'VLANS');
   if (!declared) return [];
@@ -59,7 +59,7 @@ function vlansFromEngine(engine) {
 }
 
 function interfacesFromPorts(engine) {
-  // Hasta 5.x la puerta de enlace es del equipo y no de cada puerto.
+  // Hasta 5.x hay una sola puerta de enlace para todo el equipo.
   const deviceGateway = childText(engine, 'GATEWAY');
   const interfaces = [];
   for (const port of engine.getElementsByTagName('PORT')) {

@@ -190,6 +190,12 @@ html, body {
   margin: 0;
 }
 
+/* Safari en iPhone agranda el texto por su cuenta al acostar el teléfono. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   display: flex;
   flex-direction: column;
@@ -559,7 +565,7 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   background: var(--ground);
 }
 
-/* Rectangular y no redonda: se miran renglones de texto. Sólo con ratón. */
+/* Rectangular, porque se miran renglones de texto. Sólo con ratón. */
 .lens {
   position: absolute;
   z-index: 2;
@@ -656,7 +662,7 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   font-size: 0.85rem;
 }
 
-/* Con wrap: a 360 px los cuatro formatos no entraban en una fila. */
+/* Con wrap: a 360 px los 4 formatos no entran en una fila. */
 .choice {
   display: flex;
   flex-wrap: wrap;
@@ -857,7 +863,7 @@ body:not([data-loaded]) .workspace {
   cursor: pointer;
 }
 
-/* 40 y no 44: son tres apilados sobre un diagrama que en un teléfono mide unos 380 de alto. */
+/* 40 px: son 3 apilados sobre un diagrama que en un teléfono mide unos 380 de alto. */
 @media (pointer: coarse) {
   .zoom__button {
     width: 2.5rem;
@@ -884,7 +890,7 @@ body:not([data-loaded]) .workspace {
   }
 }
 
-/* Debajo del diagrama y no encima: flotando tapaba equipos de las esquinas. */
+/* Debajo del diagrama: flotando encima tapa equipos de las esquinas. */
 .legend {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, max-content));
@@ -1164,11 +1170,16 @@ body[data-dragging] .dropveil { display: grid; }
   cursor: pointer;
 }
 
-/* Alto táctil de 44 px para el buscador y las casillas; las filas de la lista, 40. */
+/* Alto táctil de 44 px para el buscador y las casillas; las filas de la lista, 40.
+   Con menos de 16 px Safari en iPhone hace zoom sobre el campo al tocarlo. */
 @media (pointer: coarse) {
   .toggle,
   .checkbox,
   .rail__search { min-height: 44px; }
+
+  .rail__search,
+  .field__input,
+  .language { font-size: 16px; }
 
   .device-chip {
     min-height: 40px;
@@ -1355,7 +1366,7 @@ body[data-dragging] .dropveil { display: grid; }
   font-size: 12px;
 }
 
-/* Sin fill-box, en SVG `center` es el centro del lienzo y no el del círculo. */
+/* Sin fill-box, en SVG `center` es el centro del lienzo entero. */
 .node__ring {
   fill: none;
   stroke: var(--orange);
@@ -1638,7 +1649,7 @@ body[data-dragging] .dropveil { display: grid; }
 }
 
 @media (max-width: 1180px) {
-  /* Apiladas, las tres zonas no entran en la pantalla: se desplaza la página. */
+  /* Apiladas, las 3 zonas no entran en la pantalla: se desplaza la página. */
   html, body {
     height: auto;
     min-height: 100%;
@@ -1668,6 +1679,13 @@ body[data-dragging] .dropveil { display: grid; }
     height: var(--rail-height, auto);
     max-height: var(--rail-height, clamp(12rem, 28vh, 22rem));
     border: 0;
+  }
+
+  /* En iPhone vh cuenta también la barra de direcciones; svh es lo que de verdad se ve. Va
+     aparte: dentro de var(), una unidad que el navegador no conoce anula la regla entera. */
+  @supports (height: 1svh) {
+    .stage { height: clamp(16rem, 60svh, 30rem); }
+    .rail { max-height: var(--rail-height, clamp(12rem, 28svh, 22rem)); }
   }
 
   /* El panel va a lo largo de la página y no tiene alto que cambiar. */

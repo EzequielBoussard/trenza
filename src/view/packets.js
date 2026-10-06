@@ -161,6 +161,10 @@ export class PacketTableView {
     this.onSelect([], null);
   }
 
+  count() {
+    return { shown: this.visible.length, total: this.packets.length };
+  }
+
   // Ascendente, descendente y de vuelta al orden de la captura.
   sortByColumn(index) {
     const same = this.sort && this.sort.column === index;
@@ -206,7 +210,7 @@ export class PacketTableView {
     return matching.map((index) => this.packets[index]);
   }
 
-  // Filtrar y ordenar van siempre juntos; por separado, uno deshacía al otro.
+  // Filtrar y ordenar van siempre juntos; por separado, uno deshace al otro.
   refresh() {
     const filtered = this.filtered();
 
@@ -334,7 +338,7 @@ export class PacketTableView {
       : step === -Infinity ? 0
       : row.sectionRowIndex + step;
 
-    // Las filas se dibujan por tandas. End va a la última dibujada, no a la última del archivo.
+    // Las filas se dibujan por tandas: End va a la última dibujada.
     if (to >= rows.length) {
       this.appendRows();
       to = Math.min(to, rows.length - 1);

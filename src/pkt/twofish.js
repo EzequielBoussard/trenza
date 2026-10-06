@@ -62,7 +62,7 @@ function buildPermutation(tables) {
 const Q0 = buildPermutation(Q0_TABLES);
 const Q1 = buildPermutation(Q1_TABLES);
 
-// Una tabla por columna de MDS: el producto matriz-vector se reduce a XOR de cuatro lecturas.
+// Una tabla por columna de MDS: el producto matriz-vector se reduce a XOR de 4 lecturas.
 const MDS_TABLES = (() => {
   const tables = [];
   for (let column = 0; column < 4; column++) {

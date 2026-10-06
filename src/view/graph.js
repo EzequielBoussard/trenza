@@ -1,5 +1,5 @@
-// Símbolos de la convención de diagramas de red: cuatro flechas para el router, dos
-// opuestas para el switch.
+// Símbolos de la convención de diagramas de red: 4 flechas para el router, 2 opuestas para
+// el switch.
 export const CATEGORY_GLYPHS = {
   router: 'M3 12h18M12 3v18M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3',
   switch: 'M4 9h16M20 9l-3-3M20 9l-3 3M20 15H4M4 15l3-3M4 15l3 3',
@@ -190,9 +190,8 @@ const LABEL_GEOMETRY = {
   gap: 5,
 };
 
-// Tipografía de las etiquetas, en unidades de diseño; la comparten el visor y el exporte.
-// La dirección es la caja más ancha y la que fija la separación entre equipos, por eso va
-// en condensada. El tamaño del nombre no cambia el reparto.
+// Tipografía de las etiquetas, compartida por visor y exporte. La dirección es la caja más
+// ancha y fija la separación entre equipos: por eso va en condensada.
 export const LABEL_TYPE = {
   nameSize: 20,
   addressSize: 11,
@@ -248,8 +247,8 @@ export function spreadScaleFor(devices, halfWidthOf, { verticalGap = 76, cap = 3
   return Math.min(cap, required);
 }
 
-// La caché va en el medidor y no en el módulo: un medidor creado antes de que carguen las
-// fuentes mide con la alternativa, y esas medidas no se pueden mezclar con las buenas.
+// La caché vive en cada medidor: uno creado antes de que carguen las fuentes mide con la
+// alternativa, y esas medidas no se pueden mezclar con las buenas.
 function labelBox(device, measure) {
   let boxes = measure.boxes;
   if (!boxes) {
@@ -277,7 +276,7 @@ export function halfLabelWidth(device, measure) {
   return labelBox(device, measure).half;
 }
 
-// Más allá de esta distancia vertical dos dispositivos no pueden chocar.
+// Más allá de esta distancia vertical 2 equipos no pueden chocar.
 const NEIGHBOURHOOD = LABEL_GEOMETRY.addressBottom + BLOCK_SLOTS[BLOCK_SLOTS.length - 1]
   + LABEL_GEOMETRY.discRadius;
 
@@ -295,21 +294,20 @@ export function tidiestWidth(widths, attempt) {
     const tidy = attempt(width, 1);
     if (tidy) return tidy;
   }
-  // Ninguno prolijo: del más ancho al más angosto, que el mejor aparece antes y poda más. Con el
-  // límite en empate + 1, entre empatados gana el más angosto, igual que antes.
+  // Ninguno prolijo: del más ancho al más angosto, donde el mejor aparece pronto y poda más. Con
+  // el límite en empate + 1, entre empatados gana el más angosto.
   let best = null;
   for (const width of [...widths].reverse()) best = attempt(width, best ? best.untidiness + 1 : Infinity) ?? best;
   return best;
 }
 
-// Asigna un renglón a cada bloque. Si no hay ninguno libre queda en el suyo marcado como
-// `crowded`; nunca se esconde. Ojo: offset 0 es un valor válido, comparar contra null.
-// Con `limit` devuelve null apenas el desorden lo alcanza: la búsqueda descarta ese ancho.
+// Un renglón por bloque; sin renglón libre queda en el suyo como `crowded`. El offset 0 vale:
+// comparar contra null. Con `limit` devuelve null apenas el desorden lo alcanza.
 export function planLabels(devices, positions, measure, limit = Infinity) {
   const overlaps = (box, other) =>
     box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1;
 
-  // Contra el círculo, no contra su cuadrado.
+  // Contra el círculo: su cuadrado sobra en las esquinas.
   const touchesDisc = (box, disc) => {
     const dx = disc.x - Math.max(box.x1, Math.min(disc.x, box.x2));
     const dy = disc.y - Math.max(box.y1, Math.min(disc.y, box.y2));

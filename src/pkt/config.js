@@ -31,7 +31,7 @@ export function readInterfaces(configLines) {
     const access = line.match(/^switchport access vlan\s+(\d+)/i);
     if (access) current.vlan = access[1];
 
-    // Router-on-a-stick: la VLAN la da la encapsulación, no el nombre de la subinterfaz.
+    // Router-on-a-stick: la VLAN sale de la encapsulación, diga lo que diga el nombre de la subinterfaz.
     const tagged = line.match(/^encapsulation\s+dot1q\s+(\d+)/i);
     if (tagged) current.dot1q = tagged[1];
 

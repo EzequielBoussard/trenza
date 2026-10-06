@@ -57,7 +57,7 @@ function updateScopeOptions(elements, state) {
   elements.exportForm.elements.scope.value = state.packetSelection.length > 0 ? 'selection' : 'all';
 }
 
-// Lo que no aplica al tipo de archivo o al formato se esconde, no se deshabilita.
+// Lo que no aplica al tipo de archivo o al formato se esconde entero.
 function updateFormatFields(elements, state, preview) {
   const capture = state.kind === 'capture';
 
@@ -87,6 +87,18 @@ function updateFormatFields(elements, state, preview) {
   elements.exportDialog.classList.toggle('dialog--wide', shows);
   if (shows) preview.schedule(state.model, requestFrom(elements, state));
   else preview.stop();
+}
+
+// La clave queda en data-i18n para que cambiar de idioma con el diálogo abierto no la pise.
+function labelDialog(dialog, capture) {
+  const labels = [
+    [dialog.querySelector('.dialog__title'), capture ? 'export.titleCapture' : 'export.title'],
+    [dialog.querySelector('.dialog__lead'), capture ? 'export.leadCapture' : 'export.lead'],
+  ];
+  for (const [node, key] of labels) {
+    node.dataset.i18n = key;
+    node.textContent = t(key);
+  }
 }
 
 function exportCapture(state, setStatus, { name, format, scope, language }) {
@@ -146,7 +158,9 @@ export function wireExportDialog({ elements, state, setStatus }) {
     // Arranca con el idioma y el tema del visor; cambiarlos acá no toca el visor.
     fields.language.value = getLanguage();
     fields.theme.value = currentTheme();
-    if (state.kind === 'capture') updateScopeOptions(elements, state);
+    const capture = state.kind === 'capture';
+    labelDialog(elements.exportDialog, capture);
+    if (capture) updateScopeOptions(elements, state);
     refresh();
     elements.exportDialog.showModal();
     fields.name.select();

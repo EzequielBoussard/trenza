@@ -22,7 +22,7 @@ Con un `.pcap` o `.pcapng`:
 - Desglosa cada paquete por capas y muestra el volcado hexadecimal.
 - Exporta la captura, o los paquetes seleccionados, como CSV o pcap.
 
-No edita ni simula nada: para eso sigue haciendo falta Packet Tracer.
+Es sólo un visor: para editar o simular sigue haciendo falta Packet Tracer.
 
 ## Uso
 
@@ -46,13 +46,13 @@ El resto de los datos sale del XML y de la `running-config` de cada equipo. Las 
 
 ## Desarrollo
 
-No hay dependencias ni paso de compilación: son módulos ES servidos tal cual.
+Son módulos ES servidos tal cual, sin dependencias ni paso de compilación.
 
 ```bash
 npm test
 ```
 
-Las pruebas (51, con `node:test`) cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los dos archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas (51, con `node:test`) cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/

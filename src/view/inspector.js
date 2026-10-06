@@ -77,7 +77,7 @@ function interfaceTable(interfaces) {
   return scrollable(table);
 }
 
-// Agrupada por VLAN y no por puerto: un switch de 24 bocas serían 24 renglones.
+// Agrupada por VLAN: por puerto, un switch de 24 bocas serían 24 renglones.
 function vlanTable(vlans) {
   // La columna de subinterfaces sólo aparece en un router-on-a-stick.
   const routed = vlans.some((vlan) => vlan.routed.length > 0);

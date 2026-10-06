@@ -275,7 +275,7 @@ function etherTypeLabel(value) {
   return ETHERTYPES[value] ? `${hex} (${ETHERTYPES[value]})` : hex;
 }
 
-// El tipo de enlace viene de la captura, no del paquete.
+// El tipo de enlace lo fija la captura entera.
 function dissectLink(linkType, bytes) {
   const layers = [];
   const named = (fields) => layers.push({ name: LINK_TYPES[linkType], fields });

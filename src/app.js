@@ -1,4 +1,4 @@
-import { getLanguage, setLanguage, t, translateDocument } from './i18n.js';
+import { countOf, getLanguage, setLanguage, t, translateDocument } from './i18n.js';
 import { decodePacketTracerFile } from './pkt/decode.js';
 import { buildNetworkModel } from './pkt/model.js';
 import { decodeCapture } from './pcap/decode.js';
@@ -157,7 +157,7 @@ function renderDeviceList() {
       const button = createElement('button', `device-chip device-chip--${device.category}`);
       button.type = 'button';
       button.dataset.id = device.id;
-      // El lector junta los dos textos sin pausa ("PC16Terminal"); la coma los separa.
+      // El lector junta los 2 textos sin pausa ("PC16Terminal"); la coma los separa.
       button.setAttribute('aria-label', `${device.name}, ${t(`category.${device.category}`)}`);
       button.append(
         createElement('span', 'device-chip__name', device.name),
@@ -172,6 +172,7 @@ function renderDeviceList() {
       list.append(createElement('li', 'empty-note', t('rail.noMatches')));
     }
     markChips(state.selectedDeviceId);
+    return { shown: matches.length, total: visible.length };
   };
 
   // Una sola parada del tabulador, como el diagrama: 70 equipos no se recorren de a uno.
@@ -186,8 +187,27 @@ function renderDeviceList() {
     chips[to].focus();
   });
 
-  search.addEventListener('input', () => draw(search.value));
+  const announcer = filterAnnouncer();
+  elements.rail.append(announcer.region);
+  search.addEventListener('input', () => {
+    const { shown, total } = draw(search.value);
+    announcer.say(shown === 0 ? t('rail.noMatches') : t('rail.matches', { shown, total: countOf('devices', total) }));
+  });
   draw('');
+}
+
+// La lista cambia sin mover el foco del buscador: el lector oye cuántos quedan al dejar de tipear.
+function filterAnnouncer() {
+  const region = createElement('p', 'visually-hidden');
+  region.setAttribute('role', 'status');
+  let pending = 0;
+  return {
+    region,
+    say(text) {
+      clearTimeout(pending);
+      pending = setTimeout(() => { region.textContent = text; }, 500);
+    },
+  };
 }
 
 function railTitle(key) {
@@ -305,11 +325,17 @@ function paintCapture() {
   search.type = 'search';
   search.placeholder = t('rail.searchPackets');
   search.setAttribute('aria-label', t('rail.searchPackets'));
-  search.addEventListener('input', () => state.packetTable.setFilter(search.value));
+  const announcer = filterAnnouncer();
+  search.addEventListener('input', () => {
+    state.packetTable.setFilter(search.value);
+    const { shown, total } = state.packetTable.count();
+    announcer.say(shown === 0 ? t('table.noPackets') : t('rail.matches', { shown, total: countOf('packets', total) }));
+  });
   elements.rail.append(
     search,
     createElement('p', 'rail__hint', t('rail.filterHint')),
     createElement('p', 'rail__hint', t('rail.multiselect')),
+    announcer.region,
   );
 
   showPacketSelection(state.packetTable.getSelection(), null);
@@ -401,6 +427,12 @@ async function openFile(file) {
 }
 
 function wireFileInput() {
+  // iPhone y iPad no conocen .pkt ni .pcap y pueden dejarlos en gris en el selector; igual se
+  // revisa el contenido al abrir. Un iPad se presenta como Macintosh, pero con pantalla táctil.
+  if (/iPhone|iPad|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) {
+    elements.fileInput.removeAttribute('accept');
+  }
+
   elements.fileInput.addEventListener('change', () => {
     const [file] = elements.fileInput.files;
     // Si no se vacía, elegir el mismo archivo otra vez no dispara `change`.
@@ -482,9 +514,8 @@ function wireTheme() {
   }));
 }
 
-// Las columnas se estiran desde su borde: a lo ancho en escritorio y, la lista, a lo alto cuando
-// las zonas van apiladas. Cada eje guarda su medida; doble clic vuelve a la de fábrica.
-// `sign` es 1 si el borde queda a la derecha de la columna y -1 si queda a la izquierda.
+// Columnas que se estiran desde su borde (la lista, a lo alto si van apiladas); doble clic vuelve
+// a la medida de fábrica. `sign` es 1 con el borde a la derecha de la columna y -1 a la izquierda.
 function wireGrip(grip, pane, name, sign, widths) {
   const key = `trenza.${name}`;
   const stacked = matchMedia('(max-width: 1180px)');

@@ -45,7 +45,7 @@ export function createExportPreview({ frame, note, lens, lensCanvas }) {
     }
   };
 
-  // La lupa repinta a escala real, no agranda la vista previa: así se ve si el texto se lee.
+  // La lupa repinta a escala real: así se ve si el texto se lee.
   const move = (event) => {
     if (!current) return;
 
