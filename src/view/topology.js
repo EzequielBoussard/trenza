@@ -1,4 +1,4 @@
-import { countOf, t } from '../i18n.js';
+import { countOf, getLocale, t } from '../i18n.js';
 import {
   ADDRESS_FONT,
   CATEGORY_GLYPHS,
@@ -238,9 +238,12 @@ export class TopologyView {
       scene.append(divider);
     }
 
+    const names = new Map(visible.map((device) => [device.id, device.name]));
+    const meters = new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 });
     for (const link of links) {
       const from = positions.get(link.from);
       const to = positions.get(link.to);
+      const thread = threadFor(link);
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const length = Math.hypot(dx, dy) || 1;
@@ -249,11 +252,13 @@ export class TopologyView {
       const offsetY = (dx / length) * 1.6;
 
       const group = element('g', {
-        class: `link link--${threadFor(link)}${link.functional ? '' : ' link--down'}`,
+        class: `link link--${thread}${link.functional ? '' : ' link--down'}`,
         'data-from': link.from,
         'data-to': link.to,
       });
       group.append(
+        // Invisible y ancho: un hilo de 1,4 unidades es imposible de apuntar para ver su aviso.
+        element('line', { class: 'link__hit', x1: from.x, y1: from.y, x2: to.x, y2: to.y }),
         element('line', {
           class: 'link__strand link__strand--solid',
           x1: from.x + offsetX, y1: from.y + offsetY, x2: to.x + offsetX, y2: to.y + offsetY,
@@ -264,8 +269,14 @@ export class TopologyView {
         }),
       );
 
+      const cable = LEGEND_ENTRIES.find((entry) => entry.thread === thread);
+      const details = [
+        `${names.get(link.from)} ${link.fromPort} ↔ ${names.get(link.to)} ${link.toPort}`,
+        t(cable.key),
+      ];
+      if (link.length > 0) details.push(`${meters.format(link.length)} m`);
       const tooltip = element('title');
-      tooltip.textContent = `${link.fromPort} ↔ ${link.toPort}`;
+      tooltip.textContent = details.join(' · ');
       group.append(tooltip);
       linkLayer.append(group);
     }

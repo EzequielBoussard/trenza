@@ -135,6 +135,7 @@ function renderDeviceList() {
   search.type = 'search';
   search.placeholder = t('rail.searchDevices');
   search.setAttribute('aria-label', t('rail.searchDevices'));
+  search.setAttribute('aria-keyshortcuts', '/');
   elements.rail.append(search);
 
   const list = createElement('ul', 'device-list');
@@ -325,6 +326,7 @@ function paintCapture() {
   search.type = 'search';
   search.placeholder = t('rail.searchPackets');
   search.setAttribute('aria-label', t('rail.searchPackets'));
+  search.setAttribute('aria-keyshortcuts', '/');
   const announcer = filterAnnouncer();
   search.addEventListener('input', () => {
     state.packetTable.setFilter(search.value);
@@ -492,11 +494,30 @@ async function openExample(kind = 'network') {
   }
 }
 
-// Tema e idioma cambian con un fundido corto de la página entera. Sin View Transitions, o con
-// movimiento reducido, el cambio es inmediato.
-function crossfade(change) {
-  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) change();
-  else document.startViewTransition(change);
+// El idioma cambia con un fundido corto; el tema nuevo se abre en círculo desde `origin`. Sin
+// View Transitions, o con movimiento reducido, el cambio es inmediato.
+function crossfade(change, origin) {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    change();
+    return;
+  }
+  const root = document.documentElement;
+  root.classList.toggle('is-revealing', Boolean(origin));
+  const transition = document.startViewTransition(change);
+  const done = () => root.classList.remove('is-revealing');
+  transition.finished.then(done, done);
+  if (!origin) return;
+
+  transition.ready.then(() => {
+    const box = origin.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    root.animate(
+      { clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+      { duration: 420, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+    );
+  }).catch(() => {});
 }
 
 // "Tema claro, presionado": el lector dice cuál está puesto, cosa que el icono sólo muestra.
@@ -511,7 +532,7 @@ function wireTheme() {
     toggleTheme();
     markTheme();
     if (state.kind === 'network') paintNetwork();
-  }));
+  }, elements.themeToggle));
 }
 
 // Columnas que se estiran desde su borde (la lista, a lo alto si van apiladas); doble clic vuelve
@@ -638,6 +659,15 @@ function wireActions() {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !elements.exportDialog.open) clearSelection();
+
+    // "/" lleva al buscador de la columna, salvo mientras se escribe en otro campo.
+    const typing = event.target.closest?.('input, select, textarea, [contenteditable]');
+    const search = elements.rail.querySelector('.rail__search');
+    if (event.key === '/' && search && !typing && !event.ctrlKey && !event.metaKey && !event.altKey
+      && !elements.exportDialog.open) {
+      event.preventDefault();
+      search.focus();
+    }
   });
 }
 

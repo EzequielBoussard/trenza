@@ -422,6 +422,13 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   animation-timing-function: ease-out;
 }
 
+/* En el cambio de tema el círculo lo anima app.js; la imagen vieja queda quieta debajo. */
+:root.is-revealing::view-transition-old(root),
+:root.is-revealing::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 .masthead__actions,
 .masthead__prefs {
   display: flex;
@@ -482,6 +489,11 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 .button--wide {
   width: 100%;
   margin-top: 0.75rem;
+}
+
+.button--small {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
 }
 
 .button--primary {
@@ -1266,6 +1278,11 @@ body[data-dragging] .dropveil { display: grid; }
   stroke-linecap: round;
 }
 
+.link__hit {
+  stroke: transparent;
+  stroke-width: 10;
+}
+
 .link__strand--solid { stroke: var(--neutral); }
 .link__strand--pale { stroke: var(--neutral-pale); opacity: 0.5; }
 
@@ -1453,6 +1470,16 @@ body[data-dragging] .dropveil { display: grid; }
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+.panel-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.panel-section__head .panel-section__title { margin: 0; }
 
 .panel-text {
   margin: 0;

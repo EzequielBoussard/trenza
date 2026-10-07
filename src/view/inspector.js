@@ -173,9 +173,38 @@ function connectionList(device, devicesById) {
   return list;
 }
 
-function section(title, content) {
+function section(title, content, action) {
   const wrapper = createElement('section', 'panel-section');
-  wrapper.append(createElement('h3', 'panel-section__title', title), content);
+  const heading = createElement('h3', 'panel-section__title', title);
+  if (action) {
+    const head = createElement('div', 'panel-section__head');
+    head.append(heading, action);
+    wrapper.append(head, content);
+  } else {
+    wrapper.append(heading, content);
+  }
+  return wrapper;
+}
+
+// Seleccionar a mano una configuración larga en un teléfono es casi imposible.
+function copyButton(text) {
+  if (!navigator.clipboard) return null;
+  const wrapper = createElement('span');
+  const button = createElement('button', 'button button--quiet button--small', t('panel.copy'));
+  button.type = 'button';
+  button.setAttribute('aria-label', t('panel.copyConfig'));
+  const said = createElement('span', 'visually-hidden');
+  said.setAttribute('role', 'status');
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = t('panel.copied');
+      said.textContent = t('panel.copiedConfig');
+    } catch {
+      // Sin permiso para el portapapeles el botón queda como estaba.
+    }
+  });
+  wrapper.append(button, said);
   return wrapper;
 }
 
@@ -225,9 +254,10 @@ export function renderDeviceInspector(container, device, devicesById) {
   }
 
   if (device.runningConfig.length > 0) {
+    const text = device.runningConfig.join('\n');
     const code = createElement('pre', 'code-block');
-    code.textContent = device.runningConfig.join('\n');
-    container.append(section('running-config', code));
+    code.textContent = text;
+    container.append(section('running-config', code, copyButton(text)));
   }
 }
 
