@@ -152,6 +152,7 @@ function renderDeviceList() {
       const addresses = device.interfaces.flatMap((entry) => entry.addresses).map((entry) => entry.address);
       return `${device.name} ${device.type} ${addresses.join(' ')}`.toLowerCase().includes(needle);
     });
+    state.topology.markMatches(needle ? new Set(matches.map((device) => device.id)) : null);
 
     for (const device of matches) {
       const item = createElement('li');
@@ -241,6 +242,7 @@ function selectDevice(id) {
   state.topology.focus(id);
   renderDeviceInspector(elements.panel, device, state.devicesById);
   markChips(id);
+  linkDevice(device.name);
 }
 
 function clearSelection() {
@@ -249,6 +251,32 @@ function clearSelection() {
   state.topology.clearSelection();
   markChips(null);
   showNetworkSummary();
+  linkDevice(null);
+}
+
+// Con /demo o ?src= la dirección se puede compartir, y el # nombra el equipo elegido:
+// /demo#Router%20Principal abre el ejemplo con el router marcado.
+function shareable() {
+  return DEMO_PATH.test(location.pathname) || new URLSearchParams(location.search).has('src');
+}
+
+function linkDevice(name) {
+  if (!shareable()) return;
+  const hash = name ? `#${encodeURIComponent(name)}` : '';
+  if (location.hash !== hash) history.replaceState(null, '', `${location.pathname}${location.search}${hash}`);
+}
+
+function selectFromHash() {
+  if (state.kind !== 'network' || !location.hash) return;
+  let name;
+  try {
+    name = decodeURIComponent(location.hash.slice(1));
+  } catch {
+    return;
+  }
+  const device = state.model.devices.find((entry) => entry.name === name);
+  if (!device || (device.category === 'infrastructure' && !state.showInfrastructure)) return;
+  selectDevice(device.id);
 }
 
 function showNetworkSummary() {
@@ -424,8 +452,11 @@ function showFailure(message) {
   elements.rail.replaceChildren();
 }
 
+// Un archivo propio no tiene dirección: si quedara /demo, recargar abriría el ejemplo.
 async function openFile(file) {
-  await open(file.name, new Uint8Array(await file.arrayBuffer()));
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  history.replaceState(null, '', '/');
+  await open(file.name, bytes);
 }
 
 function wireFileInput() {
@@ -482,11 +513,17 @@ function wireFileInput() {
   }
 }
 
+// La red de ejemplo vive en /demo, así recargar o compartir la dirección la vuelve a abrir.
 async function openExample(kind = 'network') {
   const path = EXAMPLES[kind];
+  const there = kind === 'network' ? DEMO_PATH.test(location.pathname) : location.pathname === '/';
+  if (!there) history.replaceState(null, '', kind === 'network' ? '/demo' : '/');
   setStatus('status.reading');
+  // En /demo el guion de la cabecera ya pidió la red, en paralelo con los módulos.
+  const early = kind === 'network' ? window.pendingExample : null;
+  window.pendingExample = null;
   try {
-    const response = await fetch(path);
+    const response = await (early ?? fetch(path));
     if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
     await open(path.split('/').pop(), new Uint8Array(await response.arrayBuffer()));
   } catch (error) {
@@ -691,9 +728,11 @@ async function start() {
     source = await readSourceFromLocation();
     if (source) await open(source.name, source.bytes);
     if (!source && DEMO_PATH.test(location.pathname)) await openExample();
+    selectFromHash();
   } catch (error) {
     setStatus('status.linkFailed', { reason: error.message }, 'error');
   }
+  window.addEventListener('hashchange', selectFromHash);
 
   acceptLaunchedFiles();
   keepOffline();

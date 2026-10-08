@@ -372,6 +372,7 @@ export class TopologyView {
     this.resetView();
     if (this.selectedId) this.highlight(this.selectedId);
     else if (this.thread) this.paintThread();
+    if (this.matches) this.markMatches(this.matches);
   }
 
   panelAspect() {
@@ -850,6 +851,16 @@ export class TopologyView {
     for (const node of this.svg.querySelectorAll('.node')) {
       node.classList.remove('is-selected', 'is-neighbour', 'is-dimmed');
       node.removeAttribute('aria-current');
+    }
+  }
+
+  // Lo que encuentra el buscador de la columna; con null el diagrama vuelve entero.
+  markMatches(ids) {
+    this.matches = ids;
+    if (!this.svg) return;
+    this.svg.classList.toggle('has-search', ids !== null);
+    for (const node of this.svg.querySelectorAll('.node')) {
+      node.classList.toggle('is-match', ids !== null && ids.has(node.dataset.id));
     }
   }
 }

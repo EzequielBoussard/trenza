@@ -13,7 +13,9 @@ Visor web de sólo lectura para archivos `.pkt`, `.pka` y `.pkz` de Cisco Packet
 Con un `.pkt`, `.pka` o `.pkz`:
 
 - Dibuja la topología lógica con las posiciones guardadas en el archivo.
-- Muestra cada equipo con sus interfaces y direcciones, VLAN, rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y la `running-config`.
+- Muestra cada equipo con sus interfaces y direcciones, VLAN, rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso, su ubicación en la vista física y la `running-config`, que se puede copiar.
+- Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide.
+- Busca equipos por nombre, tipo o dirección y apaga en el diagrama los que no coinciden.
 - Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español y con tema claro u oscuro.
 
 Con un `.pcap` o `.pcapng`:
@@ -29,6 +31,8 @@ Es sólo un visor: para editar o simular sigue haciendo falta Packet Tracer.
 - Abrir un archivo con el botón o arrastrándolo a la página.
 - `?src=<url>` abre un archivo publicado en otro sitio, si ese servidor permite CORS (por ejemplo `raw.githubusercontent.com`). Sólo se aceptan direcciones `https`.
 - `/demo` abre la red de ejemplo de `showcase/`. La portada también ofrece una captura de ejemplo.
+- El nombre de un equipo después de `#` lo deja elegido al abrir: [`/demo#Router Principal`](https://trenza.pages.dev/demo#Router%20Principal). Sirve también con `?src=`.
+- Teclado: `/` va al buscador, las flechas recorren la lista, el diagrama y la tabla de paquetes, y Escape quita la selección.
 - Funciona sin conexión después de la primera visita y se puede instalar como aplicación.
 
 ## Cómo se lee un `.pkt`

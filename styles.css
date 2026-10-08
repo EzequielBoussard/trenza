@@ -1303,6 +1303,10 @@ body[data-dragging] .dropveil { display: grid; }
 .topology.has-selection .link { opacity: 0.18; }
 .topology.has-selection .link.is-active { opacity: 1; }
 
+/* Al buscar, lo que no coincide se apaga igual que al elegir un equipo. */
+.topology.has-search .link { opacity: 0.18; }
+.topology.has-search .node:not(.is-match) { opacity: 0.22; }
+
 .node { cursor: pointer; }
 
 .node__halo {
