@@ -139,12 +139,12 @@ export class PacketTableView {
     }
   }
 
-  load(packets) {
+  load(packets, { filter = '', sort = null } = {}) {
     this.packets = packets;
     this.origin = packets.length > 0 ? packets[0].timestamp : 0;
     this.collator = collator();
-    this.filter = '';
-    this.sort = null;
+    this.filter = filter.trim().toLowerCase();
+    this.sort = sort;
     this.selected = new Set();
     // Los resúmenes están traducidos: con otro idioma hay que rearmar los campos.
     this.haystacks = null;
@@ -398,12 +398,13 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
   }
 
   const span = packets.length > 1 ? packets[packets.length - 1].timestamp - packets[0].timestamp : 0;
+  const seconds = new Intl.NumberFormat(getLocale(), { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   const entries = [
     [t('panel.format'), capture.container],
     [t('panel.linkLayer'), linkTypeName(capture.linkType)],
-    [t('panel.packets'), String(packets.length)],
+    [t('panel.packets'), packets.length.toLocaleString(getLocale())],
     [t('panel.totalBytes'), bytes.toLocaleString(getLocale())],
-    [t('panel.duration'), span > 0 ? `${span.toFixed(3)} s` : '—'],
+    [t('panel.duration'), span > 0 ? `${seconds.format(span)} s` : '—'],
   ];
 
   if (capture.truncated > 0) {

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { countOf, setLanguage, t, withLanguage } from '../src/i18n.js';
 
 setLanguage('en');
@@ -45,4 +46,27 @@ test('el idioma prestado vuelve al de la página, incluso si algo falla', () => 
 
 test('un idioma desconocido no cambia nada', () => {
   assert.equal(withLanguage('fr', () => t('action.close')), 'Close');
+});
+
+// La página trae el inglés escrito para que nada salte al traducir; si se desfasa del
+// diccionario, sin JavaScript o hasta que llega se ve un texto viejo.
+test('el inglés de index.html coincide con el diccionario', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const unescape = (text) => text.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const bold = { pkt: '<b>.pkt</b>', pka: '<b>.pka</b>', pkz: '<b>.pkz</b>', pcap: '<b>.pcap</b>', pcapng: '<b>.pcapng</b>' };
+  let checked = 0;
+
+  for (const [, key, text] of html.matchAll(/data-i18n="([\w.]+)"[^>]*>([^<]*)</g)) {
+    assert.equal(unescape(text), t(key), key);
+    checked++;
+  }
+  for (const [, key, inner] of html.matchAll(/data-i18n-html="([\w.]+)"[^>]*>(.*?)<\/p>/g)) {
+    assert.equal(inner, t(key, bold), key);
+    checked++;
+  }
+  for (const [, text, key] of html.matchAll(/alt="([^"]*)" data-i18n-alt="([\w.]+)"/g)) {
+    assert.equal(unescape(text), t(key), key);
+    checked++;
+  }
+  assert.ok(checked >= 39, `sólo se revisaron ${checked}`);
 });

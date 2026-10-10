@@ -153,16 +153,25 @@ function arrow() {
   return node;
 }
 
-function connectionList(device, devicesById) {
+// El vecino es un botón que lo elige: así se recorre la red cable por cable desde el panel.
+function peerName(peer, { onPick, canPick } = {}) {
+  if (!peer) return createElement('span', 'connections__peer', t('panel.unknownPeer'));
+  if (!onPick || !canPick?.(peer)) return createElement('span', 'connections__peer', peer.name);
+  const button = createElement('button', 'connections__peer connections__peer--pick', peer.name);
+  button.type = 'button';
+  button.addEventListener('click', () => onPick(peer.id));
+  return button;
+}
+
+function connectionList(device, devicesById, picking) {
   const meters = new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 });
   const list = createElement('ul', 'connections');
   for (const connection of device.links) {
-    const peer = devicesById.get(connection.peerId);
     const item = createElement('li', 'connections__item');
     item.append(
       createElement('span', 'connections__port', connection.port || t('panel.unnamedPort')),
       arrow(),
-      createElement('span', 'connections__peer', peer ? peer.name : t('panel.unknownPeer')),
+      peerName(devicesById.get(connection.peerId), picking),
       createElement('span', 'connections__peer-port', connection.peerPort || ''),
     );
     if (connection.length > 0) {
@@ -208,7 +217,7 @@ function copyButton(text) {
   return wrapper;
 }
 
-export function renderDeviceInspector(container, device, devicesById) {
+export function renderDeviceInspector(container, device, devicesById, picking) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -250,7 +259,7 @@ export function renderDeviceInspector(container, device, devicesById) {
   }
 
   if (device.links.length > 0) {
-    container.append(section(t('panel.connections'), connectionList(device, devicesById)));
+    container.append(section(t('panel.connections'), connectionList(device, devicesById, picking)));
   }
 
   if (device.runningConfig.length > 0) {

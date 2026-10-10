@@ -190,9 +190,11 @@ export class TopologyView {
     this.last = null;
   }
 
-  render(model, { showInfrastructure }) {
+  // `keepView`: en otro idioma el reparto sale igual, y si el lienzo mide lo mismo la vista sigue.
+  render(model, { showInfrastructure, keepView = false }) {
     if (!this.container.isConnected) return;
 
+    const kept = keepView && this.frame ? { view: { ...this.target }, frame: this.frame } : null;
     this.last = { model, showInfrastructure };
     const { devices: visible, links } = selectVisible(model, showInfrastructure);
 
@@ -292,9 +294,8 @@ export class TopologyView {
         // Tabindex móvil: una sola parada para todo el diagrama, las flechas mueven entre equipos.
         tabindex: '-1',
         role: 'button',
-        'aria-label': address
-          ? `${device.name}, ${t(`category.${device.category}`)}, ${address.address}`
-          : `${device.name}, ${t(`category.${device.category}`)}`,
+        // Primero lo que se ve escrito, para que quien maneja por voz pueda nombrarlo.
+        'aria-label': [device.name, address?.address, t(`category.${device.category}`)].filter(Boolean).join(', '),
       });
 
       node.append(
@@ -369,7 +370,12 @@ export class TopologyView {
     this.measurePixels();
 
     this.attachNavigation(svg);
-    this.resetView();
+    if (kept && kept.frame.width === width && kept.frame.height === height) {
+      this.target = kept.view;
+      this.settle();
+    } else {
+      this.resetView();
+    }
     if (this.selectedId) this.highlight(this.selectedId);
     else if (this.thread) this.paintThread();
     if (this.matches) this.markMatches(this.matches);
@@ -783,15 +789,15 @@ export class TopologyView {
   }
 
   // El zoom es una transformación, así que no hay scroll que el navegador pueda mover.
-  bringIntoView(id) {
-    const position = this.positions.get(id);
+  bringIntoView(id, margin = FOCUS_MARGIN) {
+    const position = this.positions?.get(id);
     if (!position || !this.frame) return;
 
     const { x, y, scale } = this.target;
     const at = { x: position.x * scale + x, y: position.y * scale + y };
     const shift = (value, limit) => {
-      if (value < FOCUS_MARGIN) return FOCUS_MARGIN - value;
-      if (value > limit - FOCUS_MARGIN) return limit - FOCUS_MARGIN - value;
+      if (value < margin) return margin - value;
+      if (value > limit - margin) return limit - margin - value;
       return 0;
     };
 
@@ -809,10 +815,11 @@ export class TopologyView {
     this.onSelect(id);
   }
 
-  // Desde otro control: sólo actualiza el diagrama.
+  // Desde otro control: actualiza el diagrama y, si el equipo quedó fuera de la vista, lo trae.
   focus(id) {
     this.selectedId = id;
     this.highlight(id);
+    this.bringIntoView(id, NODE_REACH * this.target.scale);
   }
 
   highlight(id) {

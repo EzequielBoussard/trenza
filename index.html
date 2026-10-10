@@ -30,9 +30,11 @@
 <link rel="preload" href="/fonts/sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/condensed-600-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- Antes de la hoja de estilo, que si no lo frena: tema e idioma, /demo y ?src= abren el visor, y la
+     portada precarga su imagen (sólo Chromium: Safari no reusa la precarga en una imagen diferida). -->
+<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),s=localStorage.getItem('trenza.language'),n=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).map(function(x){return x.slice(0,2);}).filter(function(x){return x==='es'||x==='en';})[0],l=s==='es'||s==='en'?s:n;if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);var q=/[?&]src=/.test(location.search);if(q||/^\/demo\/?$/.test(location.pathname)){d.dataset.loaded='true';if(!q)window.pendingExample=fetch('/showcase/red-supermercado-2023.pkt');}else if(navigator.userAgentData){var p=document.createElement('link'),b='/showcase/preview-'+(t==='light'?'light':'dark');p.rel='preload';p.as='image';p.fetchPriority='high';p.imageSizes='(max-width: 62rem) calc(100vw - 2rem), 44rem';p.imageSrcset=b+'-720.webp 720w, '+b+'-1080.webp 1080w, '+b+'.webp 1440w';document.head.appendChild(p);}}catch(e){}</script>
 <!-- Rutas absolutas: con relativas, /demo/ pediría los archivos un nivel más adentro. -->
 <link rel="stylesheet" href="/styles.css">
-<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),s=localStorage.getItem('trenza.language'),n=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).map(function(x){return x.slice(0,2);}).filter(function(x){return x==='es'||x==='en';})[0],l=s==='es'||s==='en'?s:n;if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);if(/^\/demo\/?$/.test(location.pathname))window.pendingExample=fetch('/showcase/red-supermercado-2023.pkt');}catch(e){}</script>
 </head>
 <body>
 
@@ -97,7 +99,7 @@
 <dialog class="dialog" data-export-dialog aria-labelledby="export-title" aria-describedby="export-lead">
   <form class="dialog__form" data-export-form role="none">
     <h2 class="dialog__title" id="export-title" data-i18n="export.title">Export the diagram</h2>
-    <p class="dialog__lead" id="export-lead" data-i18n="export.lead"></p>
+    <p class="dialog__lead" id="export-lead" data-i18n="export.lead">The whole network is exported, regardless of the current zoom.</p>
 
     <div class="dialog__body">
       <div class="dialog__fields">
@@ -183,14 +185,14 @@
   <section class="intro">
     <div class="intro__main">
       <div class="intro__text">
-        <h1 class="intro__title" data-i18n="intro.title" tabindex="-1"></h1>
-        <p class="intro__lead" data-i18n-html="intro.lead"></p>
+        <h1 class="intro__title" data-i18n="intro.title" tabindex="-1">Viewer for Packet Tracer files and network captures</h1>
+        <p class="intro__lead" data-i18n-html="intro.lead">Open a <b>.pkt</b>, <b>.pka</b> or <b>.pkz</b> file to see the topology, interfaces and configuration of each device, or a <b>.pcap</b> or <b>.pcapng</b> file to go through the packets. The file is read in your browser and is not uploaded anywhere.</p>
         <div class="intro__actions">
           <button type="button" class="button button--primary" data-open-copy data-i18n="intro.choose">Choose a file</button>
           <button type="button" class="button" data-example="network" data-i18n="intro.exampleNetwork">Example network</button>
           <button type="button" class="button" data-example="capture" data-i18n="intro.exampleCapture">Example capture</button>
         </div>
-        <p class="intro__hint" data-i18n="intro.hint"></p>
+        <p class="intro__hint" data-i18n="intro.hint">You can also drag the file onto the page.</p>
       </div>
 
       <figure class="intro__shot">
@@ -198,42 +200,42 @@
           <img class="intro__image intro__image--dark" src="/showcase/preview-dark.webp"
             srcset="/showcase/preview-dark-720.webp 720w, /showcase/preview-dark-1080.webp 1080w, /showcase/preview-dark.webp 1440w"
             sizes="(max-width: 62rem) calc(100vw - 2rem), 44rem"
-            width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
+            width="1440" height="810" loading="lazy" decoding="async" alt="Part of the example network: a router, a server, two camera switches and the IP cameras connected to them, each with its name and address." data-i18n-alt="intro.shotAlt">
           <img class="intro__image intro__image--light" src="/showcase/preview-light.webp"
             srcset="/showcase/preview-light-720.webp 720w, /showcase/preview-light-1080.webp 1080w, /showcase/preview-light.webp 1440w"
             sizes="(max-width: 62rem) calc(100vw - 2rem), 44rem"
-            width="1440" height="810" loading="lazy" decoding="async" alt="" data-i18n-alt="intro.shotAlt">
+            width="1440" height="810" loading="lazy" decoding="async" alt="Part of the example network: a router, a server, two camera switches and the IP cameras connected to them, each with its name and address." data-i18n-alt="intro.shotAlt">
         </a>
-        <figcaption class="intro__caption" data-i18n="intro.shotCaption"></figcaption>
+        <figcaption class="intro__caption" data-i18n="intro.shotCaption">The example is a supermarket network designed in 2023: 71 devices, with IP cameras and Wi-Fi.</figcaption>
       </figure>
     </div>
 
     <div class="intro__notes">
       <section>
-        <h2 class="intro__term" data-i18n="about.pktTerm"></h2>
-        <p class="intro__body" data-i18n="about.pktBody"></p>
+        <h2 class="intro__term" data-i18n="about.pktTerm">.pkt and .pka</h2>
+        <p class="intro__body" data-i18n="about.pktBody">Networks built in Cisco Packet Tracer. Opening one usually requires installing Packet Tracer and signing in with a Cisco account.</p>
       </section>
       <section>
-        <h2 class="intro__term" data-i18n="about.pcapTerm"></h2>
-        <p class="intro__body" data-i18n="about.pcapBody"></p>
+        <h2 class="intro__term" data-i18n="about.pcapTerm">.pcap and .pcapng</h2>
+        <p class="intro__body" data-i18n="about.pcapBody">Traffic recorded with Wireshark, tcpdump or the simulation mode of Packet Tracer.</p>
       </section>
       <section>
-        <h2 class="intro__term" data-i18n="about.privacyTerm"></h2>
-        <p class="intro__body" data-i18n="about.privacyBody"></p>
+        <h2 class="intro__term" data-i18n="about.privacyTerm">Privacy</h2>
+        <p class="intro__body" data-i18n="about.privacyBody">Decryption runs in the browser. There is no server that receives the file.</p>
       </section>
       <section>
-        <h2 class="intro__term" data-i18n="about.limitsTerm"></h2>
-        <p class="intro__body" data-i18n="about.limitsBody"></p>
+        <h2 class="intro__term" data-i18n="about.limitsTerm">Read only</h2>
+        <p class="intro__body" data-i18n="about.limitsBody">It does not edit or simulate. The diagram can be exported as PNG, JPG, SVG or PDF, and the capture as CSV or pcap.</p>
       </section>
     </div>
 
     <footer class="intro__footer">
       <p>
-        <span data-i18n="about.madeBy"></span>
-        <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard<span class="visually-hidden" data-i18n="action.newTab"></span></a>.
-        <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub<span class="visually-hidden" data-i18n="action.newTab"></span></a>
+        <span data-i18n="about.madeBy">Made by</span>
+        <a class="link" href="https://ezequiel.is-a.dev" target="_blank" rel="noopener">Ezequiel Boussard<span class="visually-hidden" data-i18n="action.newTab">, opens in a new tab</span></a>.
+        <a class="link" href="https://github.com/EzequielBoussard" target="_blank" rel="noopener">GitHub<span class="visually-hidden" data-i18n="action.newTab">, opens in a new tab</span></a>
       </p>
-      <p data-i18n="about.disclaimer"></p>
+      <p data-i18n="about.disclaimer">Trenza is an independent project, not affiliated with or endorsed by Cisco. Cisco and Packet Tracer are trademarks of Cisco Systems, Inc.</p>
     </footer>
   </section>
 
@@ -245,7 +247,7 @@
 
 </main>
 
-<div class="dropveil" data-dropveil aria-hidden="true"><span data-i18n="intro.drop"></span></div>
+<div class="dropveil" data-dropveil aria-hidden="true"><span data-i18n="intro.drop">Drop the file to open it</span></div>
 
 <!-- Evita la cascada de imports (4 niveles). Tiene que coincidir con el grafo de app.js. -->
 <link rel="modulepreload" href="/src/i18n.js">

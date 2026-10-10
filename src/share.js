@@ -15,7 +15,13 @@ export async function readSourceFromLocation() {
     throw new Error(t('error.insecureUrl'));
   }
 
-  const response = await fetch(url, { redirect: 'follow' });
+  // Sin red o sin CORS el navegador sólo dice "Failed to fetch", y en inglés.
+  let response;
+  try {
+    response = await fetch(url, { redirect: 'follow' });
+  } catch {
+    throw new Error(t('error.unreachable'));
+  }
   if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
 
   return {

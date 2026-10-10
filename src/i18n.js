@@ -225,6 +225,7 @@ const DICTIONARIES = {
     'error.badUrl': 'The src parameter is not a valid address',
     'error.insecureUrl': 'Only https addresses are accepted in the src parameter',
     'error.httpStatus': 'The server answered {status} when asked for the file',
+    'error.unreachable': 'The server did not answer, or it does not let other sites read the file (CORS)',
 
     'packet.truncated': 'Truncated packet: only the first layers were read',
     'packet.undissected': '{bytes} bytes not dissected',
@@ -492,6 +493,7 @@ const DICTIONARIES = {
     'error.badUrl': 'El parámetro src no es una dirección válida',
     'error.insecureUrl': 'Sólo se aceptan direcciones https en el parámetro src',
     'error.httpStatus': 'El servidor respondió {status} al pedir el archivo',
+    'error.unreachable': 'El servidor no respondió, o no deja que otros sitios lean el archivo (CORS)',
 
     'packet.truncated': 'Paquete truncado: sólo se leyeron las capas iniciales',
     'packet.undissected': '{bytes} bytes sin desglosar',

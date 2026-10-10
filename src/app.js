@@ -55,6 +55,14 @@ const EXAMPLES = {
 // Cualquier otra ruta se muestra como "/", conservando ?src=.
 const DEMO_PATH = /^\/demo\/?$/;
 
+const canonical = document.querySelector('link[rel="canonical"]');
+
+// La dirección sigue a lo abierto, y la canónica a la dirección: /demo es una página propia.
+function go(path) {
+  history.replaceState(null, '', path);
+  canonical.href = new URL(location.pathname, canonical.href).href;
+}
+
 const state = {
   file: null,
   kind: null,
@@ -108,7 +116,7 @@ function looksLikeCapture(name, bytes) {
   return [0x0a0d0d0a, 0xa1b2c3d4, 0xd4c3b2a1, 0xa1b23c4d, 0x4d3cb2a1].includes(magic >>> 0);
 }
 
-function renderDeviceList() {
+function renderDeviceList(term = '') {
   elements.rail.replaceChildren();
 
   labelGrip('action.resizeList');
@@ -136,6 +144,7 @@ function renderDeviceList() {
   search.placeholder = t('rail.searchDevices');
   search.setAttribute('aria-label', t('rail.searchDevices'));
   search.setAttribute('aria-keyshortcuts', '/');
+  search.value = term;
   elements.rail.append(search);
 
   const list = createElement('ul', 'device-list');
@@ -159,10 +168,10 @@ function renderDeviceList() {
       const button = createElement('button', `device-chip device-chip--${device.category}`);
       button.type = 'button';
       button.dataset.id = device.id;
-      // El lector junta los 2 textos sin pausa ("PC16Terminal"); la coma los separa.
-      button.setAttribute('aria-label', `${device.name}, ${t(`category.${device.category}`)}`);
+      // Sin la coma oculta el lector junta los 2 textos sin pausa ("PC16Terminal").
       button.append(
         createElement('span', 'device-chip__name', device.name),
+        createElement('span', 'visually-hidden', ', '),
         createElement('span', 'device-chip__meta', t(`category.${device.category}`)),
       );
       button.addEventListener('click', () => selectDevice(device.id));
@@ -195,7 +204,7 @@ function renderDeviceList() {
     const { shown, total } = draw(search.value);
     announcer.say(shown === 0 ? t('rail.noMatches') : t('rail.matches', { shown, total: countOf('devices', total) }));
   });
-  draw('');
+  draw(term);
 }
 
 // La lista cambia sin mover el foco del buscador: el lector oye cuántos quedan al dejar de tipear.
@@ -240,9 +249,22 @@ function selectDevice(id) {
   if (!device) return;
   state.selectedDeviceId = id;
   state.topology.focus(id);
-  renderDeviceInspector(elements.panel, device, state.devicesById);
+  renderDeviceInspector(elements.panel, device, state.devicesById, {
+    onPick: pickPeer,
+    canPick: (peer) => peer.category !== 'infrastructure' || state.showInfrastructure,
+  });
+  elements.panel.scrollTop = 0;
   markChips(id);
   linkDevice(device.name);
+}
+
+// Desde las conexiones del panel: el botón pulsado desaparece con el panel viejo, así que el
+// foco pasa al título del equipo nuevo.
+function pickPeer(id) {
+  selectDevice(id);
+  const title = elements.panel.querySelector('.panel-head__title');
+  title.tabIndex = -1;
+  title.focus();
 }
 
 function clearSelection() {
@@ -305,13 +327,17 @@ function paintNetwork() {
     legendHost: elements.stage,
   });
   state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
-
   renderDeviceList();
-  if (state.selectedDeviceId && state.devicesById.has(state.selectedDeviceId)) {
-    selectDevice(state.selectedDeviceId);
-  } else {
-    showNetworkSummary();
-  }
+  showNetworkSummary();
+}
+
+// En otro idioma el diagrama sale igual: la vista, la búsqueda y el filtro de cables siguen.
+function translateNetwork() {
+  const term = elements.rail.querySelector('.rail__search')?.value;
+  state.topology.render(state.model, { showInfrastructure: state.showInfrastructure, keepView: true });
+  renderDeviceList(term);
+  if (state.selectedDeviceId) selectDevice(state.selectedDeviceId);
+  else showNetworkSummary();
 }
 
 async function showNetwork(bytes) {
@@ -333,7 +359,10 @@ async function showNetwork(bytes) {
   }, 'ok');
 }
 
-function paintCapture() {
+// `keep`: al cambiar de idioma los resúmenes se traducen, pero el filtro y el orden siguen.
+function paintCapture(keep = false) {
+  const filter = keep ? elements.rail.querySelector('.rail__search')?.value ?? '' : '';
+  const sort = keep ? state.packetTable.sort : null;
   state.packets = state.capture.packets.map(dissectPacket);
 
   clearStage();
@@ -341,7 +370,7 @@ function paintCapture() {
   elements.stage.append(table);
 
   state.packetTable = new PacketTableView(table, { onSelect: showPacketSelection });
-  state.packetTable.load(state.packets);
+  state.packetTable.load(state.packets, { filter, sort });
   if (state.packetSelection.length > 0) state.packetTable.select(state.packetSelection);
 
   elements.rail.replaceChildren();
@@ -355,6 +384,7 @@ function paintCapture() {
   search.placeholder = t('rail.searchPackets');
   search.setAttribute('aria-label', t('rail.searchPackets'));
   search.setAttribute('aria-keyshortcuts', '/');
+  search.value = filter;
   const announcer = filterAnnouncer();
   search.addEventListener('input', () => {
     state.packetTable.setFilter(search.value);
@@ -414,7 +444,7 @@ async function open(name, bytes) {
   delete document.body.dataset.view;
   elements.fileName.textContent = name;
   refreshTitle();
-  document.body.dataset.loaded = 'true';
+  document.documentElement.dataset.loaded = 'true';
   rescueFocus(trigger, elements.fileName);
   setStatus('status.reading');
 
@@ -455,7 +485,7 @@ function showFailure(message) {
 // Un archivo propio no tiene dirección: si quedara /demo, recargar abriría el ejemplo.
 async function openFile(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  history.replaceState(null, '', '/');
+  go('/');
   await open(file.name, bytes);
 }
 
@@ -517,7 +547,7 @@ function wireFileInput() {
 async function openExample(kind = 'network') {
   const path = EXAMPLES[kind];
   const there = kind === 'network' ? DEMO_PATH.test(location.pathname) : location.pathname === '/';
-  if (!there) history.replaceState(null, '', kind === 'network' ? '/demo' : '/');
+  if (!there) go(kind === 'network' ? '/demo' : '/');
   setStatus('status.reading');
   // En /demo el guion de la cabecera ya pidió la red, en paralelo con los módulos.
   const early = kind === 'network' ? window.pendingExample : null;
@@ -565,12 +595,15 @@ function markTheme() {
 function wireTheme() {
   applyTheme(getTheme());
   markTheme();
+  // El diagrama toma los colores de variables CSS: cambiar el tema no lo rehace ni pierde la vista.
   elements.themeToggle.addEventListener('click', () => crossfade(() => {
     toggleTheme();
     markTheme();
-    if (state.kind === 'network') paintNetwork();
   }, elements.themeToggle));
 }
+
+// Sin una referencia guardada, el observador se recolecta y deja de avisar.
+const gripWatchers = [];
 
 // Columnas que se estiran desde su borde (la lista, a lo alto si van apiladas); doble clic vuelve
 // a la medida de fábrica. `sign` es 1 con el borde a la derecha de la columna y -1 a la izquierda.
@@ -594,6 +627,10 @@ function wireGrip(grip, pane, name, sign, widths) {
     grip.setAttribute('aria-valuemax', high);
     grip.setAttribute('aria-valuenow', Math.round(pane.getBoundingClientRect()[dimension]));
   };
+  // Un separador que recibe foco tiene que decir su medida siempre, también al cambiar la ventana.
+  const watcher = new ResizeObserver(show);
+  watcher.observe(pane);
+  gripWatchers.push(watcher);
   const resize = (dimension, value) => {
     const [low, high] = limits(dimension);
     if (value === null) delete sizes[dimension];
@@ -657,8 +694,8 @@ function wireLanguage() {
     refreshTitle();
 
     if (state.status.key) setStatus(state.status.key, state.status.values, state.status.tone);
-    if (state.kind === 'network') paintNetwork();
-    if (state.kind === 'capture') paintCapture();
+    if (state.kind === 'network') translateNetwork();
+    if (state.kind === 'capture') paintCapture(true);
   }));
 }
 
@@ -669,7 +706,7 @@ function closeFile() {
   state.model = null;
   state.capture = null;
   state.selectedDeviceId = null;
-  delete document.body.dataset.loaded;
+  delete document.documentElement.dataset.loaded;
   delete document.body.dataset.view;
   elements.fileName.textContent = '';
   clearStage();
@@ -677,7 +714,7 @@ function closeFile() {
   elements.panel.replaceChildren();
   elements.fileInput.value = '';
   // A la raíz: si quedara /demo, recargar volvería a abrir el ejemplo.
-  history.replaceState(null, '', '/');
+  go('/');
   refreshTitle();
   setStatus('status.idle');
   rescueFocus(trigger, elements.introTitle);
@@ -719,9 +756,7 @@ async function start() {
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 
-  if (location.pathname !== '/' && !DEMO_PATH.test(location.pathname)) {
-    history.replaceState(null, '', `/${location.search}${location.hash}`);
-  }
+  go(`${DEMO_PATH.test(location.pathname) ? '/demo' : '/'}${location.search}${location.hash}`);
 
   let source = null;
   try {
@@ -732,6 +767,8 @@ async function start() {
   } catch (error) {
     setStatus('status.linkFailed', { reason: error.message }, 'error');
   }
+  // El guion de la cabecera ya mostró el visor; si no se abrió nada, vuelve la portada.
+  if (!state.file) delete document.documentElement.dataset.loaded;
   window.addEventListener('hashchange', selectFromHash);
 
   acceptLaunchedFiles();

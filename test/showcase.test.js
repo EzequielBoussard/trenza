@@ -26,3 +26,17 @@ test('la captura de ejemplo se lee entera', () => {
   assert.equal(capture.packets.length, 30);
   assert.deepEqual([...protocols].sort(), ['ARP', 'DHCP', 'DNS', 'HTTP', 'ICMP', 'NTP']);
 });
+
+// El guion de la cabecera arma la misma lista que la imagen; si se desfasan, la precarga
+// baja un archivo que la imagen no usa.
+test('la precarga de la portada pide lo mismo que la imagen', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const script = html.match(/<script>([^<]*)<\/script>/)[1];
+
+  for (const theme of ['dark', 'light']) {
+    const image = html.match(new RegExp(`<img class="intro__image intro__image--${theme}"[^>]*>`))[0];
+    const srcset = new Function('b', `return ${script.match(/p\.imageSrcset=([^;]*);/)[1]}`)(`/showcase/preview-${theme}`);
+    assert.equal(srcset, image.match(/srcset="([^"]*)"/)[1]);
+    assert.ok(script.includes(`p.imageSizes='${image.match(/sizes="([^"]*)"/)[1]}'`));
+  }
+});

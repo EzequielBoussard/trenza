@@ -180,10 +180,18 @@
   --icon-rays: 1;
 }
 
-
 * { box-sizing: border-box; }
 
 [hidden] { display: none !important; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 html, body {
   height: 100%;
@@ -347,6 +355,8 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   display: flex;
   align-items: center;
   min-width: 0;
+  /* En /demo se pinta vacío hasta que llega el nombre; así la fila no crece después. */
+  min-height: 1em;
   margin: 0;
   overflow: hidden;
   font-family: var(--font-mono);
@@ -730,6 +740,8 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--text-muted);
+  /* Un renglón aunque esté vacía: en /demo se pinta antes de tener texto. */
+  min-height: calc(1lh + 0.8rem + 1px);
 }
 
 .statusbar[data-tone='ok'] { color: var(--green); }
@@ -751,20 +763,20 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-body:not([data-loaded]) .masthead__file,
-body:not([data-loaded]) .masthead__actions { display: none; }
+html:not([data-loaded]) .masthead__file,
+html:not([data-loaded]) .masthead__actions { display: none; }
 
 /* En la portada la barra de estado sólo aparece si hay algo que avisar. */
-body:not([data-loaded]) .statusbar:not([data-tone='error']):not([data-tone='warn']) { display: none; }
+html:not([data-loaded]) .statusbar:not([data-tone='error']):not([data-tone='warn']) { display: none; }
 
-body:not([data-loaded]) .rail,
-body:not([data-loaded]) .grip,
-body:not([data-loaded]) .stage,
-body:not([data-loaded]) .panel { display: none; }
+html:not([data-loaded]) .rail,
+html:not([data-loaded]) .grip,
+html:not([data-loaded]) .stage,
+html:not([data-loaded]) .panel { display: none; }
 
-body[data-loaded] .intro { display: none; }
+html[data-loaded] .intro { display: none; }
 
-body:not([data-loaded]) .workspace {
+html:not([data-loaded]) .workspace {
   grid-template-columns: 1fr;
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: none;
@@ -1559,16 +1571,30 @@ body[data-dragging] .dropveil { display: grid; }
 
 .connections__arrow { color: var(--text-faint); }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 .connections__peer { grid-column: 3; font-weight: 500; }
 .connections__peer-port { grid-column: 3; }
+
+.connections__peer--pick {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: start;
+  text-decoration: underline;
+  text-decoration-color: var(--text-faint);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.connections__peer--pick:hover { text-decoration-color: var(--orange); }
+
+@media (pointer: coarse) {
+  .connections__peer--pick { min-height: 2rem; }
+}
 
 .connections__length {
   grid-row: 2;
@@ -1712,11 +1738,15 @@ body[data-dragging] .dropveil { display: grid; }
     border: 0;
   }
 
+  /* Vacía mientras se abre el archivo: reserva el alto para que el diagrama no baje después. */
+  .rail:empty { height: var(--rail-height, clamp(12rem, 28vh, 22rem)); }
+
   /* En iPhone vh cuenta también la barra de direcciones; svh es lo que de verdad se ve. Va
      aparte: dentro de var(), una unidad que el navegador no conoce anula la regla entera. */
   @supports (height: 1svh) {
     .stage { height: clamp(16rem, 60svh, 30rem); }
     .rail { max-height: var(--rail-height, clamp(12rem, 28svh, 22rem)); }
+    .rail:empty { height: var(--rail-height, clamp(12rem, 28svh, 22rem)); }
   }
 
   /* El panel va a lo largo de la página y no tiene alto que cambiar. */
@@ -1762,7 +1792,7 @@ body[data-dragging] .dropveil { display: grid; }
     gap: 0.6rem 1rem;
   }
 
-  body:not([data-loaded]) .masthead { grid-template-areas: 'brand prefs'; }
+  html:not([data-loaded]) .masthead { grid-template-areas: 'brand prefs'; }
 }
 
 @media (max-width: 40rem) {
