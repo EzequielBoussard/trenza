@@ -56,17 +56,17 @@ function interfaceTable(interfaces) {
 
   const body = createElement('tbody');
   for (const entry of interfaces) {
-    const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '—', mask: '—' }];
+    const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '-', mask: '-' }];
     for (const address of addresses) {
       const row = createElement('tr');
       // Nombres como GigabitEthernet0/0.10 no tienen dónde cortar; se deja partirlos.
-      const name = createElement('td', 'table__mono table__wrap', entry.name || entry.mac || '—');
+      const name = createElement('td', 'table__mono table__wrap', entry.name || entry.mac || '-');
       if (entry.description) name.title = entry.description;
 
       row.append(
         name,
         createElement('td', 'table__mono', address.address),
-        createElement('td', 'table__mono', address.mask || '—'),
+        createElement('td', 'table__mono', address.mask || '-'),
         createElement('td', null, t(entry.enabled ? 'table.up' : 'table.down')),
       );
       body.append(row);
@@ -87,11 +87,11 @@ function vlanTable(vlans) {
   return dataTable(headings, vlans.map((vlan) => {
     const cells = [
       { text: vlan.id, mono: true },
-      { text: vlan.name || '—' },
-      { text: vlan.ports.join(', ') || '—', mono: true, wrap: true },
-      { text: vlan.trunks.join(', ') || '—', mono: true, wrap: true },
+      { text: vlan.name || '-' },
+      { text: vlan.ports.join(', ') || '-', mono: true, wrap: true },
+      { text: vlan.trunks.join(', ') || '-', mono: true, wrap: true },
     ];
-    if (routed) cells.push({ text: vlan.routed.join(', ') || '—', mono: true, wrap: true });
+    if (routed) cells.push({ text: vlan.routed.join(', ') || '-', mono: true, wrap: true });
     return cells;
   }));
 }
@@ -101,7 +101,7 @@ function routeTable(routes) {
     ['table.destination', 'table.mask', 'table.via'],
     routes.map((route) => [
       { text: route.destination, mono: true },
-      { text: route.mask || '—', mono: true },
+      { text: route.mask || '-', mono: true },
       { text: route.via, mono: true },
     ]),
   );
@@ -121,9 +121,9 @@ function routingTable(routing) {
   return dataTable(headings, routing.map((entry) => {
     const cells = [
       { text: protocolLabel(entry) },
-      { text: entry.networks.join('\n') || '—', mono: true, lines: true, wrap: true },
+      { text: entry.networks.join('\n') || '-', mono: true, lines: true, wrap: true },
     ];
-    if (passive) cells.push({ text: entry.passive.join('\n') || '—', mono: true, lines: true, wrap: true });
+    if (passive) cells.push({ text: entry.passive.join('\n') || '-', mono: true, lines: true, wrap: true });
     return cells;
   }));
 }
@@ -138,8 +138,8 @@ function accessListTable(lists) {
     ['table.accessList', 'table.aclRules', 'table.aclApplied'],
     lists.map((entry) => [
       { text: entry.id, mono: true },
-      { text: entry.rules.join('\n') || '—', mono: true, lines: true, wrap: true },
-      { text: applied(entry).join('\n') || '—', mono: true, lines: true, wrap: true },
+      { text: entry.rules.join('\n') || '-', mono: true, lines: true, wrap: true },
+      { text: applied(entry).join('\n') || '-', mono: true, lines: true, wrap: true },
     ]),
   );
 }
@@ -229,8 +229,8 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
 
   const gateway = device.interfaces.map((entry) => entry.gateway).find(Boolean);
   const identity = [
-    [t('panel.type'), device.type || '—'],
-    [t('panel.model'), device.model || '—'],
+    [t('panel.type'), device.type || '-'],
+    [t('panel.model'), device.model || '-'],
     [t('panel.links'), String(device.links.length)],
   ];
   if (gateway) identity.push([t('panel.gateway'), gateway]);

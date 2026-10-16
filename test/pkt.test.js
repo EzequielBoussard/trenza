@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { deflateRawSync, deflateSync } from 'node:zlib';
 import { setLanguage } from '../src/i18n.js';
 import { decodePacketTracerFile } from '../src/pkt/decode.js';
-import { locationOf } from '../src/pkt/model.js';
+import { locationOf, withoutUnread } from '../src/pkt/model.js';
 
 // Los mensajes que se comparan abajo son los del idioma por defecto.
 setLanguage('en');
@@ -86,4 +86,20 @@ test('la ubicación física nombra lo que hay entre Intercity y el equipo', () =
   ]);
   assert.deepEqual(locationOf('{a},{b},{c},{d},{e}', places), ['Montevideo', 'Sede', 'Rack']);
   assert.deepEqual(locationOf('', places), []);
+});
+
+test('antes de armar el árbol se sacan las partes que el visor no lee', () => {
+  const xml = '<PACKETTRACER5><NETWORK><DEVICE><ENGINE><NAME>R1</NAME>'
+    + '<FILE_MANAGER><FILE><FILE_MANAGER>anidado</FILE_MANAGER></FILE></FILE_MANAGER>'
+    + '<THING_MODEL/><PORT><IP>10.0.0.1</IP></PORT></ENGINE></DEVICE></NETWORK>'
+    + '<PHYSICALWORKSPACE><ENVIRONMENT id="1"><THING_MODEL>x</THING_MODEL></ENVIRONMENT>'
+    + '<ENVIRONMENT_OPTIONS>sigue</ENVIRONMENT_OPTIONS></PHYSICALWORKSPACE></PACKETTRACER5>';
+
+  assert.equal(withoutUnread(xml), '<PACKETTRACER5><NETWORK><DEVICE><ENGINE><NAME>R1</NAME>'
+    + '<THING_MODEL/><PORT><IP>10.0.0.1</IP></PORT></ENGINE></DEVICE></NETWORK>'
+    + '<PHYSICALWORKSPACE><ENVIRONMENT_OPTIONS>sigue</ENVIRONMENT_OPTIONS></PHYSICALWORKSPACE></PACKETTRACER5>');
+
+  // Si algo no cierra, el texto vuelve entero para que el parser dé el error.
+  const broken = '<A><FILE_MANAGER><FILE_MANAGER></FILE_MANAGER></A>';
+  assert.equal(withoutUnread(broken), broken);
 });

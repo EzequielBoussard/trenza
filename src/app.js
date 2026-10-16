@@ -459,6 +459,7 @@ async function open(name, bytes) {
   } catch (error) {
     showFailure(error.message);
   }
+  readGrips();
 }
 
 // El botón que abrió o cerró el archivo puede haber desaparecido y el foco caería en cualquier
@@ -602,8 +603,13 @@ function wireTheme() {
   }, elements.themeToggle));
 }
 
-// Sin una referencia guardada, el observador se recolecta y deja de avisar.
-const gripWatchers = [];
+// Un separador que recibe foco tiene que decir su medida desde el principio. Se mide al abrir y
+// al cambiar la ventana: un ResizeObserver sobre las columnas choca en Safari con el del diagrama.
+const gripReaders = [];
+
+function readGrips() {
+  requestAnimationFrame(() => gripReaders.forEach((read) => read()));
+}
 
 // Columnas que se estiran desde su borde (la lista, a lo alto si van apiladas); doble clic vuelve
 // a la medida de fábrica. `sign` es 1 con el borde a la derecha de la columna y -1 a la izquierda.
@@ -627,10 +633,7 @@ function wireGrip(grip, pane, name, sign, widths) {
     grip.setAttribute('aria-valuemax', high);
     grip.setAttribute('aria-valuenow', Math.round(pane.getBoundingClientRect()[dimension]));
   };
-  // Un separador que recibe foco tiene que decir su medida siempre, también al cambiar la ventana.
-  const watcher = new ResizeObserver(show);
-  watcher.observe(pane);
-  gripWatchers.push(watcher);
+  gripReaders.push(show);
   const resize = (dimension, value) => {
     const [low, high] = limits(dimension);
     if (value === null) delete sizes[dimension];
@@ -753,6 +756,7 @@ async function start() {
   wireActions();
   wireGrip(elements.railGrip, elements.rail, 'rail', 1, [200, 480]);
   wireGrip(elements.panelGrip, elements.panel, 'panel', -1, [280, 600]);
+  window.addEventListener('resize', readGrips);
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 

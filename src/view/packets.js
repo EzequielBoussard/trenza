@@ -80,7 +80,7 @@ function cell(className, text, needle) {
 }
 
 function formatTime(seconds, origin) {
-  return Number.isFinite(seconds) ? (seconds - origin).toFixed(6) : '—';
+  return Number.isFinite(seconds) ? (seconds - origin).toFixed(6) : '-';
 }
 
 export class PacketTableView {
@@ -295,8 +295,8 @@ export class PacketTableView {
       row.append(
         createElement('td', 'table__mono', String(packet.index)),
         createElement('td', 'table__mono', formatTime(packet.timestamp, this.origin)),
-        cell('table__mono', packet.source || '—', this.filter),
-        cell('table__mono', packet.destination || '—', this.filter),
+        cell('table__mono', packet.source || '-', this.filter),
+        cell('table__mono', packet.destination || '-', this.filter),
         cell(null, packet.protocol, this.filter),
         createElement('td', 'table__mono', String(packet.originalLength)),
         cell('table__detail', packet.summary, this.filter),
@@ -404,7 +404,7 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
     [t('panel.linkLayer'), linkTypeName(capture.linkType)],
     [t('panel.packets'), packets.length.toLocaleString(getLocale())],
     [t('panel.totalBytes'), bytes.toLocaleString(getLocale())],
-    [t('panel.duration'), span > 0 ? `${seconds.format(span)} s` : '—'],
+    [t('panel.duration'), span > 0 ? `${seconds.format(span)} s` : '-'],
   ];
 
   if (capture.truncated > 0) {

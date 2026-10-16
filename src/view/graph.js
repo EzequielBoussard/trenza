@@ -304,24 +304,14 @@ export function tidiestWidth(widths, attempt) {
 // Un renglón por bloque; sin renglón libre queda en el suyo como `crowded`. El offset 0 vale:
 // comparar contra null. Con `limit` devuelve null apenas el desorden lo alcanza.
 export function planLabels(devices, positions, measure, limit = Infinity) {
-  const overlaps = (box, other) =>
-    box.x1 < other.x2 && box.x2 > other.x1 && box.y1 < other.y2 && box.y2 > other.y1;
+  const order = devices
+    .map((device) => ({ device, disc: positions.get(device.id) }))
+    .sort((a, b) => a.disc.y - b.disc.y || a.disc.x - b.disc.x);
+  const ordered = order.map((entry) => entry.device);
+  const discs = order.map((entry) => entry.disc);
 
-  // Contra el círculo: su cuadrado sobra en las esquinas.
-  const touchesDisc = (box, disc) => {
-    const dx = disc.x - Math.max(box.x1, Math.min(disc.x, box.x2));
-    const dy = disc.y - Math.max(box.y1, Math.min(disc.y, box.y2));
-    return dx * dx + dy * dy < LABEL_GEOMETRY.discRadius ** 2;
-  };
-
-  const ordered = [...devices].sort((a, b) => {
-    const first = positions.get(a.id);
-    const second = positions.get(b.id);
-    return first.y - second.y || first.x - second.x;
-  });
-
-  const discs = ordered.map((device) => positions.get(device.id));
-  const reserved = new Array(ordered.length);
+  const count = ordered.length;
+  const reserved = new Array(count);
   const plan = new Map();
   let penalty = 0;
 
@@ -330,41 +320,66 @@ export function planLabels(devices, positions, measure, limit = Infinity) {
   let reach = 0;
   for (const device of ordered) reach = Math.max(reach, labelBox(device, measure).half);
   const cellWidth = 2 * (reach + LABEL_GEOMETRY.gap) + LABEL_GEOMETRY.discRadius;
-  const cellOf = (x, y) => [Math.floor(x / cellWidth), Math.floor(y / NEIGHBOURHOOD)];
-  const cells = new Map();
-  discs.forEach(({ x, y }, index) => {
-    const key = cellOf(x, y).join();
-    if (!cells.has(key)) cells.set(key, []);
-    cells.get(key).push(index);
-  });
+  const columns = discs.map(({ x }) => Math.floor(x / cellWidth));
+  const rows = discs.map(({ y }) => Math.floor(y / NEIGHBOURHOOD));
 
-  for (let i = 0; i < ordered.length; i++) {
+  // Clave numérica, con una celda de margen para las vecinas del borde: armar una cadena por
+  // vecina costaba más que probar los choques.
+  let firstColumn = Infinity;
+  let lastColumn = -Infinity;
+  let firstRow = Infinity;
+  for (let i = 0; i < count; i++) {
+    firstColumn = Math.min(firstColumn, columns[i] - 1);
+    lastColumn = Math.max(lastColumn, columns[i] + 1);
+    firstRow = Math.min(firstRow, rows[i] - 1);
+  }
+  const span = lastColumn - firstColumn + 1;
+  const keyOf = (column, row) => (row - firstRow) * span + column - firstColumn;
+  const cells = new Map();
+  for (let i = 0; i < count; i++) {
+    const key = keyOf(columns[i], rows[i]);
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(i);
+  }
+
+  const radius = LABEL_GEOMETRY.discRadius ** 2;
+  // Contra el círculo, porque su cuadrado sobra en las esquinas; y contra los bloques ya puestos.
+  const collides = (x1, x2, y1, y2, around, i) => {
+    for (const cell of around) {
+      for (const j of cell) {
+        const disc = discs[j];
+        const dx = disc.x - Math.max(x1, Math.min(disc.x, x2));
+        const dy = disc.y - Math.max(y1, Math.min(disc.y, y2));
+        if (dx * dx + dy * dy < radius) return true;
+        const other = reserved[j];
+        if (j < i && x1 < other.x2 && x2 > other.x1 && y1 < other.y2 && y2 > other.y1) return true;
+      }
+    }
+    return false;
+  };
+
+  for (let i = 0; i < count; i++) {
     const device = ordered[i];
     const { x, y } = discs[i];
     const box = labelBox(device, measure);
     const half = box.half + LABEL_GEOMETRY.gap;
-    const bottom = box.bottom;
 
-    const [column, row] = cellOf(x, y);
-    const near = [];
+    const around = [];
     for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) near.push(...(cells.get(`${column + dx},${row + dy}`) ?? []));
+      for (let dy = -1; dy <= 1; dy++) {
+        const cell = cells.get(keyOf(columns[i] + dx, rows[i] + dy));
+        if (cell) around.push(cell);
+      }
     }
 
-    const boxAt = (offset) => ({
-      x1: x - half,
-      x2: x + half,
-      y1: y + LABEL_GEOMETRY.nameTop + offset,
-      y2: y + bottom + offset,
-    });
-
-    const collides = (box) => near.some((j) => touchesDisc(box, discs[j]) || (j < i && overlaps(box, reserved[j])));
-
-    const free = BLOCK_SLOTS.find((offset) => !collides(boxAt(offset)));
+    const x1 = x - half;
+    const x2 = x + half;
+    const free = BLOCK_SLOTS.find((offset) =>
+      !collides(x1, x2, y + LABEL_GEOMETRY.nameTop + offset, y + box.bottom + offset, around, i));
     const offset = free ?? 0;
 
     // Se reserva aunque haya quedado encimada: se dibuja igual.
-    reserved[i] = boxAt(offset);
+    reserved[i] = { x1, x2, y1: y + LABEL_GEOMETRY.nameTop + offset, y2: y + box.bottom + offset };
     plan.set(device.id, { offset, crowded: free === undefined });
 
     penalty += (free === undefined ? 1000 : 0) + (offset > 0 ? 1 : 0);

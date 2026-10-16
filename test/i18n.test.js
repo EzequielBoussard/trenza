@@ -11,17 +11,17 @@ test('una cadena sin marcadores vuelve tal cual', () => {
 });
 
 test('la misma plantilla con valores distintos no se contamina', () => {
-  // Se cachea la plantilla partida, no el resultado.
+  // Lo que se cachea es la plantilla partida; el resultado se arma cada vez.
   const primero = t('packet.lengths', { source: 51000, destination: 53, length: 40 });
   const segundo = t('packet.lengths', { source: 40404, destination: 443, length: 8 });
 
-  assert.equal(primero, '51000 → 53 len=40');
-  assert.equal(segundo, '40404 → 443 len=8');
+  assert.equal(primero, '51000 > 53 len=40');
+  assert.equal(segundo, '40404 > 443 len=8');
   assert.equal(t('packet.lengths', { source: 51000, destination: 53, length: 40 }), primero);
 });
 
 test('un marcador sin valor se deja a la vista en vez de desaparecer', () => {
-  assert.equal(t('packet.lengths', { source: 1 }), '1 → {destination} len={length}');
+  assert.equal(t('packet.lengths', { source: 1 }), '1 > {destination} len={length}');
 });
 
 test('el plural sigue al número y al idioma', () => {

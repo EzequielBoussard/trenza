@@ -56,7 +56,7 @@ Son módulos ES servidos tal cual, sin dependencias ni paso de compilación.
 npm test
 ```
 
-Las pruebas (51, con `node:test`) cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/
@@ -76,7 +76,7 @@ Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define 
 
 Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
-Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 72 equipos, y con los mismos guardados como `.pkz`. El formato sin cifrar sólo se probó con archivos generados. Las listas de acceso se probaron con configuraciones escritas a mano, porque ninguno de los archivos reales tenía una.
+Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 72 equipos, y con los mismos guardados como `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en un segundo y medio y se probó hasta 16000. El formato sin cifrar sólo se probó con archivos generados. Las listas de acceso se probaron con configuraciones escritas a mano, porque ninguno de los archivos reales tenía una.
 
 ## Contribuir
 

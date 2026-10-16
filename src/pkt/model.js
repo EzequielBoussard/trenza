@@ -161,8 +161,37 @@ function readLink(linkNode) {
   };
 }
 
+// Más de la mitad del XML que guarda Packet Tracer: el ambiente de la vista física, los
+// archivos de cada equipo y el modelo de los dispositivos IoT. El visor no lee nada de eso.
+const UNREAD = ['ENVIRONMENT', 'FILE_MANAGER', 'THING_MODEL', 'PIXMAPBANK'];
+
+// Se saca del texto antes de armar el árbol, que es lo que más tarda al abrir. Si algo no
+// cierra, el texto vuelve entero y el error lo da el parser.
+export function withoutUnread(text) {
+  const tags = new RegExp(`<(/?)(${UNREAD.join('|')})[\\s/>]`, 'g');
+  const kept = [];
+  let from = 0;
+  let open = null;
+  let depth = 0;
+  for (const match of text.matchAll(tags)) {
+    const [, closing, name] = match;
+    const end = text.indexOf('>', match.index) + 1;
+    if (!closing && text[end - 2] === '/') continue;
+    if (!closing && depth === 0) {
+      kept.push(text.slice(from, match.index));
+      open = name;
+    }
+    if (name !== open) continue;
+    depth += closing ? -1 : 1;
+    if (depth === 0) from = end;
+  }
+  if (depth !== 0) return text;
+  kept.push(text.slice(from));
+  return kept.join('');
+}
+
 export function buildNetworkModel(xmlText) {
-  const document = new DOMParser().parseFromString(xmlText, 'application/xml');
+  const document = new DOMParser().parseFromString(withoutUnread(xmlText), 'application/xml');
   if (document.querySelector('parsererror')) {
     throw new Error(t('error.xml'));
   }
