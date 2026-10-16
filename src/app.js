@@ -4,7 +4,8 @@ import { buildNetworkModel } from './pkt/model.js';
 import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
-import { renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
+import { CATEGORY_ORDER } from './view/graph.js';
+import { categoryIcon, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
 import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
 import { wireExportDialog } from './view/export-dialog.js';
@@ -73,6 +74,8 @@ const state = {
   selectedDeviceId: null,
   packetSelection: [],
   showInfrastructure: false,
+  // El tipo elegido en la guía del resumen; se traduce si cambia el idioma.
+  categoryFilter: null,
   topology: null,
   packetTable: null,
   variant: null,
@@ -116,6 +119,11 @@ function looksLikeCapture(name, bytes) {
   return [0x0a0d0d0a, 0xa1b2c3d4, 0xd4c3b2a1, 0xa1b23c4d, 0x4d3cb2a1].includes(magic >>> 0);
 }
 
+// Por tipo, como la guía del resumen, y por nombre con los números como números: PC2 antes que PC10.
+const names = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const byKindAndName = (a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)
+  || names.compare(a.name, b.name);
+
 function renderDeviceList(term = '') {
   elements.rail.replaceChildren();
 
@@ -134,6 +142,8 @@ function renderDeviceList(term = '') {
     if (!state.showInfrastructure && selected?.category === 'infrastructure') clearSelection();
     state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
     draw(search.value);
+    // En la guía del resumen la infraestructura se puede elegir sólo si está a la vista.
+    if (!state.selectedDeviceId) showNetworkSummary();
   });
   toggle.append(checkbox, createElement('span', null, t('rail.infrastructure')));
   heading.append(toggle);
@@ -159,17 +169,18 @@ function renderDeviceList(term = '') {
     const matches = visible.filter((device) => {
       if (!needle) return true;
       const addresses = device.interfaces.flatMap((entry) => entry.addresses).map((entry) => entry.address);
-      return `${device.name} ${device.type} ${addresses.join(' ')}`.toLowerCase().includes(needle);
+      return `${device.name} ${t(`category.${device.category}`)} ${device.type} ${addresses.join(' ')}`.toLowerCase().includes(needle);
     });
     state.topology.markMatches(needle ? new Set(matches.map((device) => device.id)) : null);
 
-    for (const device of matches) {
+    for (const device of [...matches].sort(byKindAndName)) {
       const item = createElement('li');
       const button = createElement('button', `device-chip device-chip--${device.category}`);
       button.type = 'button';
       button.dataset.id = device.id;
       // Sin la coma oculta el lector junta los 2 textos sin pausa ("PC16Terminal").
       button.append(
+        categoryIcon(device.category),
         createElement('span', 'device-chip__name', device.name),
         createElement('span', 'visually-hidden', ', '),
         createElement('span', 'device-chip__meta', t(`category.${device.category}`)),
@@ -202,6 +213,7 @@ function renderDeviceList(term = '') {
   elements.rail.append(announcer.region);
   search.addEventListener('input', () => {
     const { shown, total } = draw(search.value);
+    markCategoryFilter(search.value);
     announcer.say(shown === 0 ? t('rail.noMatches') : t('rail.matches', { shown, total: countOf('devices', total) }));
   });
   draw(term);
@@ -301,11 +313,33 @@ function selectFromHash() {
   selectDevice(device.id);
 }
 
+// Desde la guía del resumen: escribe el tipo en el buscador, que es lo que filtra lista y
+// diagrama. El mismo tipo otra vez lo borra.
+function filterCategory(category) {
+  const search = elements.rail.querySelector('.rail__search');
+  if (!search) return;
+  search.value = state.categoryFilter === category ? '' : t(`category.${category}`);
+  search.dispatchEvent(new Event('input'));
+}
+
+// Escribir a mano el nombre de un tipo también lo marca en la guía.
+function markCategoryFilter(term) {
+  const needle = term.trim().toLowerCase();
+  const categories = new Set(state.model.devices.map((device) => device.category));
+  state.categoryFilter = [...categories].find((category) => needle && t(`category.${category}`).toLowerCase() === needle) ?? null;
+  for (const button of elements.panel.querySelectorAll('[data-category]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.category === state.categoryFilter));
+  }
+}
+
 function showNetworkSummary() {
   renderNetworkSummary(elements.panel, state.model, {
     fileName: state.file.name,
     variant: state.variant,
     onDownload: () => download(new Blob([state.file.bytes]), state.file.name),
+    onFilter: filterCategory,
+    filtering: state.categoryFilter,
+    hidden: (category) => category === 'infrastructure' && !state.showInfrastructure,
   });
 }
 
@@ -333,7 +367,9 @@ function paintNetwork() {
 
 // En otro idioma el diagrama sale igual: la vista, la búsqueda y el filtro de cables siguen.
 function translateNetwork() {
-  const term = elements.rail.querySelector('.rail__search')?.value;
+  const term = state.categoryFilter
+    ? t(`category.${state.categoryFilter}`)
+    : elements.rail.querySelector('.rail__search')?.value;
   state.topology.render(state.model, { showInfrastructure: state.showInfrastructure, keepView: true });
   renderDeviceList(term);
   if (state.selectedDeviceId) selectDevice(state.selectedDeviceId);
@@ -351,6 +387,7 @@ async function showNetwork(bytes) {
   state.variant = decoded.variant;
   state.devicesById = new Map(model.devices.map((device) => [device.id, device]));
   state.selectedDeviceId = null;
+  state.categoryFilter = null;
 
   paintNetwork();
   setStatus('status.network', {
@@ -709,6 +746,7 @@ function closeFile() {
   state.model = null;
   state.capture = null;
   state.selectedDeviceId = null;
+  state.categoryFilter = null;
   delete document.documentElement.dataset.loaded;
   delete document.body.dataset.view;
   elements.fileName.textContent = '';

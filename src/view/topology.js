@@ -287,6 +287,8 @@ export class TopologyView {
     devices.forEach((device) => {
       const position = positions.get(device.id);
       const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
+      // Primero lo que se ve escrito, para que quien maneja por voz pueda nombrarlo.
+      const spoken = [device.name, address?.address, t(`category.${device.category}`)].filter(Boolean).join(', ');
       const node = element('g', {
         class: `node node--${device.category}`,
         transform: `translate(${position.x} ${position.y})`,
@@ -294,11 +296,15 @@ export class TopologyView {
         // Tabindex móvil: una sola parada para todo el diagrama, las flechas mueven entre equipos.
         tabindex: '-1',
         role: 'button',
-        // Primero lo que se ve escrito, para que quien maneja por voz pueda nombrarlo.
-        'aria-label': [device.name, address?.address, t(`category.${device.category}`)].filter(Boolean).join(', '),
+        'aria-label': spoken,
       });
+      // Con la red entera a la vista los nombres se leen chicos; al pasar el puntero, el aviso.
+      // Es el mismo texto del nombre accesible, así el lector no lo repite como descripción.
+      const tooltip = element('title');
+      tooltip.textContent = spoken;
 
       node.append(
+        tooltip,
         element('circle', { class: 'node__ring', r: 31 }),
         element('circle', { class: 'node__halo', r: 26 }),
         element('circle', { class: 'node__disc', r: 18 }),
@@ -446,6 +452,7 @@ export class TopologyView {
       button.className = `legend__item legend__item--${entry.thread}`;
       button.dataset.thread = entry.thread;
       button.setAttribute('aria-pressed', 'false');
+      button.title = t(`${entry.key}.about`);
 
       const swatch = document.createElement('span');
       swatch.className = 'legend__swatch';

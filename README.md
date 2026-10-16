@@ -13,6 +13,7 @@ Visor web de sólo lectura para archivos `.pkt`, `.pka` y `.pkz` de Cisco Packet
 Con un `.pkt`, `.pka` o `.pkz`:
 
 - Dibuja la topología lógica con las posiciones guardadas en el archivo.
+- Explica en lenguaje llano qué es cada tipo de equipo, con el mismo símbolo que en el diagrama, para que la red se entienda sin saber de redes. Elegir un tipo deja a la vista sólo esos equipos.
 - Muestra cada equipo con sus interfaces y direcciones, VLAN, rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso, su ubicación en la vista física y la `running-config`, que se puede copiar.
 - Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide. En el panel, el equipo del otro lado de cada conexión se elige con un clic.
 - Busca equipos por nombre, tipo o dirección y apaga en el diagrama los que no coinciden.
@@ -21,7 +22,7 @@ Con un `.pkt`, `.pka` o `.pkz`:
 Con un `.pcap` o `.pcapng`:
 
 - Lista los paquetes con tiempo, direcciones y protocolo, con filtro y orden por columna.
-- Desglosa cada paquete por capas y muestra el volcado hexadecimal.
+- Desglosa cada paquete por capas y muestra el volcado hexadecimal. Los protocolos comunes (DHCP, DNS, ARP, ping y otros) traen una línea que dice para qué sirven.
 - Exporta la captura, o los paquetes seleccionados, como CSV o pcap.
 
 Es sólo un visor: para editar o simular sigue haciendo falta Packet Tracer.

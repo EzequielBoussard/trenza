@@ -782,8 +782,11 @@ html:not([data-loaded]) .workspace {
   grid-template-areas: none;
 }
 
+/* Posicionadas para que los textos ocultos para lectores queden dentro de su desplazamiento:
+   si no, se ubican contra la página y la estiran hasta el final de la lista. */
 .rail,
 .panel {
+  position: relative;
   min-height: 0;
   overflow-y: auto;
   background: var(--surface);
@@ -1248,7 +1251,7 @@ body[data-dragging] .dropveil { display: grid; }
 @media (hover: hover) {
   .device-chip:hover { background: var(--raised); }
 }
-.device-chip.is-selected { background: var(--raised); color: #fff; }
+.device-chip.is-selected { background: var(--raised); color: var(--text-strong); }
 
 .device-chip--router { border-left-color: var(--orange); }
 .device-chip--switch { border-left-color: var(--blue); }
@@ -1258,6 +1261,8 @@ body[data-dragging] .dropveil { display: grid; }
 .device-chip--cloud { border-left-color: var(--brown-pale); }
 .device-chip--security { border-left-color: var(--orange-pale); }
 .device-chip--iot { border-left-color: var(--green-pale); }
+
+.device-chip .glyph { align-self: center; }
 
 .device-chip__name {
   flex: 1;
@@ -1472,6 +1477,77 @@ body[data-dragging] .dropveil { display: grid; }
   line-height: 1.15;
 }
 
+.panel-head__kind--typed {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.panel-head__about {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Símbolo de cada tipo de equipo, igual al del diagrama; el color lo pone el código. */
+.glyph {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.key {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.key__row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: start;
+}
+
+button.key__row { cursor: pointer; }
+button.key__row:hover { background: var(--raised); }
+.key__row[aria-pressed='true'] { border-color: var(--line); background: var(--raised); }
+
+@media (pointer: coarse) {
+  button.key__row { min-height: 40px; }
+}
+
+.key__name { flex: 1; font-weight: 500; }
+
+.key__count {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.key__about {
+  margin: 0 0 0.3rem;
+  padding-left: 2rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
 .panel-section {
   padding: 1rem 1.15rem;
   border-bottom: 1px solid var(--line-soft);
@@ -1539,6 +1615,12 @@ body[data-dragging] .dropveil { display: grid; }
 }
 
 .table__mono { font-family: var(--font-mono); }
+
+.table__sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
 
 .table-scroller { overflow-x: auto; }
 

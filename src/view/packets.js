@@ -361,6 +361,9 @@ export function renderPacketInspector(container, packet) {
     createElement('p', 'panel-head__kind', t('panel.packet', { index: packet.index })),
     createElement('h2', 'panel-head__title', packet.protocol),
   );
+  // Qué hace el protocolo, en una línea, si es uno de los comunes.
+  const key = `protocol.${packet.protocol}`;
+  if (t(key) !== key) header.append(createElement('p', 'panel-head__about', t(key)));
   container.append(header);
 
   for (const layer of packet.layers) {

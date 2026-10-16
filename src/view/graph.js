@@ -14,6 +14,9 @@ export const CATEGORY_GLYPHS = {
 };
 
 // Colores del código T568B: el pleno para el contorno y el pálido para el símbolo.
+// De la puerta hacia adentro: así se lee la red, desde la salida a Internet hasta los equipos.
+export const CATEGORY_ORDER = ['cloud', 'router', 'security', 'switch', 'wireless', 'server', 'endpoint', 'iot', 'other', 'infrastructure'];
+
 export const CATEGORY_THREADS = {
   router: ['orange', 'orange-pale'],
   switch: ['blue', 'blue-pale'],

@@ -70,3 +70,13 @@ test('el inglés de index.html coincide con el diccionario', () => {
   }
   assert.ok(checked >= 39, `sólo se revisaron ${checked}`);
 });
+
+// Una clave que falta en un idioma se ve en pantalla como su nombre crudo.
+test('los dos diccionarios tienen las mismas claves', () => {
+  const source = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+  const split = source.indexOf('\n  es: {\n');
+  const keys = (part) => [...part.matchAll(/^ {4}'([\w.]+)':/gm)].map((match) => match[1]).sort();
+  const english = keys(source.slice(0, split));
+  assert.ok(english.length > 200);
+  assert.deepEqual(keys(source.slice(split)), english);
+});

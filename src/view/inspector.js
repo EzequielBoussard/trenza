@@ -1,10 +1,27 @@
 import { getLocale, t } from '../i18n.js';
+import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS } from './graph.js';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 function createElement(tag, className, textContent) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (textContent !== undefined) node.textContent = textContent;
   return node;
+}
+
+// El mismo símbolo y el mismo color que el equipo tiene en el diagrama.
+export function categoryIcon(category) {
+  const icon = document.createElementNS(SVG_NS, 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('class', 'glyph');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.setAttribute('focusable', 'false');
+  icon.style.setProperty('stroke', `var(--${(CATEGORY_THREADS[category] ?? CATEGORY_THREADS.other)[0]})`);
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', CATEGORY_GLYPHS[category] ?? CATEGORY_GLYPHS.other);
+  icon.append(path);
+  return icon;
 }
 
 function definitionList(entries) {
@@ -45,28 +62,37 @@ function dataTable(headings, rows) {
   return scrollable(table);
 }
 
+// La máscara va debajo de la dirección y más tenue: en una columna aparte la tabla no entra en
+// el panel, y para quien sólo quiere saber la dirección es un dato secundario.
+function addressCell({ address, mask }) {
+  const cell = createElement('td', 'table__mono', address);
+  if (mask) cell.append(createElement('span', 'table__sub', mask));
+  return cell;
+}
+
 function interfaceTable(interfaces) {
   const table = createElement('table', 'table');
   const head = createElement('thead');
   const headRow = createElement('tr');
-  for (const key of ['table.interface', 'table.address', 'table.mask', 'table.state']) {
+  for (const key of ['table.interface', 'table.address', 'table.state']) {
     headRow.append(createElement('th', null, t(key)));
   }
   head.append(headRow);
 
   const body = createElement('tbody');
   for (const entry of interfaces) {
-    const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '-', mask: '-' }];
+    const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '-' }];
     for (const address of addresses) {
       const row = createElement('tr');
-      // Nombres como GigabitEthernet0/0.10 no tienen dónde cortar; se deja partirlos.
-      const name = createElement('td', 'table__mono table__wrap', entry.name || entry.mac || '-');
+      const name = createElement('td', 'table__mono', entry.name || entry.mac || '-');
+      // GigabitEthernet0/0.10 no tiene dónde cortar: se corta antes del número, nunca en la palabra.
+      const [, word, number] = entry.name.match(/^(\D+)(\d.*)$/) ?? [];
+      if (number) name.replaceChildren(word, document.createElement('wbr'), number);
       if (entry.description) name.title = entry.description;
 
       row.append(
         name,
-        createElement('td', 'table__mono', address.address),
-        createElement('td', 'table__mono', address.mask || '-'),
+        addressCell(address),
         createElement('td', null, t(entry.enabled ? 'table.up' : 'table.down')),
       );
       body.append(row);
@@ -221,9 +247,12 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
+  const kind = createElement('p', 'panel-head__kind panel-head__kind--typed');
+  kind.append(categoryIcon(device.category), t(`category.${device.category}`));
   header.append(
-    createElement('p', 'panel-head__kind', t(`category.${device.category}`)),
+    kind,
     createElement('h2', 'panel-head__title', device.name),
+    createElement('p', 'panel-head__about', t(`category.${device.category}.about`)),
   );
   container.append(header);
 
@@ -270,7 +299,40 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
   }
 }
 
-export function renderNetworkSummary(container, model, { fileName, variant, onDownload } = {}) {
+// Qué tipos de equipo hay, con su símbolo y para qué sirven. Elegir uno deja a la vista sólo
+// esos; los que están ocultos (la infraestructura, por omisión) quedan como texto.
+function categoryKey(devices, { onFilter, filtering, hidden }) {
+  const counts = new Map();
+  for (const device of devices) counts.set(device.category, (counts.get(device.category) ?? 0) + 1);
+
+  const list = createElement('ul', 'key');
+  for (const category of CATEGORY_ORDER.filter((entry) => counts.has(entry))) {
+    const item = createElement('li', 'key__item');
+    const about = createElement('p', 'key__about', t(`category.${category}.about`));
+    about.id = `key-about-${category}`;
+
+    const pickable = onFilter && !hidden?.(category);
+    const row = createElement(pickable ? 'button' : 'div', 'key__row');
+    row.append(
+      categoryIcon(category),
+      createElement('span', 'key__name', t(`category.${category}`)),
+      createElement('span', 'visually-hidden', ', '),
+      createElement('span', 'key__count', String(counts.get(category))),
+    );
+    if (pickable) {
+      row.type = 'button';
+      row.dataset.category = category;
+      row.setAttribute('aria-pressed', String(category === filtering));
+      row.setAttribute('aria-describedby', about.id);
+      row.addEventListener('click', () => onFilter(category));
+    }
+    item.append(row, about);
+    list.append(item);
+  }
+  return list;
+}
+
+export function renderNetworkSummary(container, model, { fileName, variant, onDownload, ...filter } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -278,13 +340,12 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
     createElement('p', 'panel-head__kind', t('panel.summary')),
     createElement('h2', 'panel-head__title', t('panel.topology')),
   );
-  container.append(header);
+  container.append(header, section(t('panel.inventory'), categoryKey(model.devices, filter)));
 
-  const counts = new Map();
-  for (const device of model.devices) {
-    const label = t(`category.${device.category}`);
-    counts.set(label, (counts.get(label) || 0) + 1);
+  if (model.description) {
+    container.append(section(t('panel.description'), createElement('p', 'panel-text', model.description)));
   }
+  container.append(section(t('panel.howTo'), createElement('p', 'panel-text', t('panel.howToText'))));
 
   const facts = [
     [t('panel.version'), model.version],
@@ -304,16 +365,5 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
     file.append(button);
   }
 
-  container.append(
-    section(t('panel.file'), file),
-    section(t('panel.inventory'), definitionList([...counts.entries()].map(([label, count]) => [label, String(count)]))),
-  );
-
-  if (model.description) {
-    container.append(section(t('panel.description'), createElement('p', 'panel-text', model.description)));
-  }
-
-  container.append(
-    section(t('panel.howTo'), createElement('p', 'panel-text', t('panel.howToText'))),
-  );
+  container.append(section(t('panel.file'), file));
 }
