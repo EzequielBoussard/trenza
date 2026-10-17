@@ -290,17 +290,27 @@ export function untidiness(plan) {
   return total;
 }
 
+// Si aun con el ancho mayor queda encimada más de 1 etiqueta de cada 10, afinar el ancho de a un
+// paso no se nota, y con miles de equipos son segundos: se prueba 1 ancho de cada 4.
+const CROWDED_SHARE = 0.1;
+const COARSE_STRIDE = 4;
+
 // El ancho más chico con todas las etiquetas en su renglón; si no hay, el de menor desorden.
 // La primera pasada corta cada intento en la primera etiqueta corrida, que suele estar arriba.
-export function tidiestWidth(widths, attempt) {
+export function tidiestWidth(widths, attempt, labelCount) {
   for (const width of widths) {
     const tidy = attempt(width, 1);
     if (tidy) return tidy;
   }
   // Ninguno prolijo: del más ancho al más angosto, donde el mejor aparece pronto y poda más. Con
   // el límite en empate + 1, entre empatados gana el más angosto.
-  let best = null;
-  for (const width of [...widths].reverse()) best = attempt(width, best ? best.untidiness + 1 : Infinity) ?? best;
+  const descending = [...widths].reverse();
+  let best = attempt(descending[0], Infinity);
+  const crowded = Math.floor(best.untidiness / 1000);
+  const stride = crowded > labelCount * CROWDED_SHARE ? COARSE_STRIDE : 1;
+  for (let at = stride; at < descending.length; at += stride) {
+    best = attempt(descending[at], best.untidiness + 1) ?? best;
+  }
   return best;
 }
 

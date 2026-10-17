@@ -161,9 +161,12 @@ function readLink(linkNode) {
   };
 }
 
-// Más de la mitad del XML que guarda Packet Tracer: el ambiente de la vista física, los
-// archivos de cada equipo y el modelo de los dispositivos IoT. El visor no lee nada de eso.
-const UNREAD = ['ENVIRONMENT', 'FILE_MANAGER', 'THING_MODEL', 'PIXMAPBANK'];
+// Más de la mitad del XML que guarda Packet Tracer: el ambiente de la vista física, los archivos
+// de cada equipo, los clientes de Wi-Fi, celular y correo, y el modelo de los IoT. Nada se lee.
+const UNREAD = [
+  'ENVIRONMENT', 'FILE_MANAGER', 'THING_MODEL', 'PIXMAPBANK',
+  'WIRELESS_CLIENT', 'CELLULAR_CLIENT', 'BLUETOOTH_MANAGER', 'ALGORITHM_SETTINGS', 'EMAIL_CLIENT',
+];
 
 // Se saca del texto antes de armar el árbol, que es lo que más tarda al abrir. Si algo no
 // cierra, el texto vuelve entero y el error lo da el parser.

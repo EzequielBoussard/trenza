@@ -11,5 +11,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

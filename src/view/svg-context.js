@@ -32,6 +32,7 @@ export class SvgContext {
       dash: null,
       offsetX: 0,
       offsetY: 0,
+      scale: 1,
     };
     this.stack = [];
 
@@ -52,8 +53,19 @@ export class SvgContext {
   }
 
   translate(x, y) {
-    this.state.offsetX += x;
-    this.state.offsetY += y;
+    this.state.offsetX += x * this.state.scale;
+    this.state.offsetY += y * this.state.scale;
+  }
+
+  // Sólo uniforme (se usa el primer factor): es lo único que pide el dibujo, y así el grosor
+  // del trazo escala parejo.
+  scale(factor) {
+    this.state.scale *= factor;
+  }
+
+  point(x, y) {
+    const { scale, offsetX, offsetY } = this.state;
+    return [round(x * scale + offsetX), round(y * scale + offsetY)];
   }
 
   setLineDash(pattern) {
@@ -67,15 +79,16 @@ export class SvgContext {
   }
 
   moveTo(x, y) {
-    this.path.push(`M${round(x + this.state.offsetX)} ${round(y + this.state.offsetY)}`);
+    this.path.push(`M${this.point(x, y).join(' ')}`);
   }
 
   lineTo(x, y) {
-    this.path.push(`L${round(x + this.state.offsetX)} ${round(y + this.state.offsetY)}`);
+    this.path.push(`L${this.point(x, y).join(' ')}`);
   }
 
   arc(x, y, radius) {
-    this.circle = { x: x + this.state.offsetX, y: y + this.state.offsetY, radius };
+    const { scale, offsetX, offsetY } = this.state;
+    this.circle = { x: x * scale + offsetX, y: y * scale + offsetY, radius: radius * scale };
     this.path = [];
   }
 
@@ -85,9 +98,10 @@ export class SvgContext {
   }
 
   fillRect(x, y, width, height) {
-    const { offsetX, offsetY } = this.state;
-    this.elements.push(`<rect x="${round(x + offsetX)}" y="${round(y + offsetY)}"`
-      + ` width="${round(width)}" height="${round(height)}" ${this.fillAttributes()}/>`);
+    const [left, top] = this.point(x, y);
+    const { scale } = this.state;
+    this.elements.push(`<rect x="${left}" y="${top}"`
+      + ` width="${round(width * scale)}" height="${round(height * scale)}" ${this.fillAttributes()}/>`);
   }
 
   fill() {
@@ -108,32 +122,36 @@ export class SvgContext {
   }
 
   strokePathData(data) {
-    const { offsetX, offsetY } = this.state;
-    this.elements.push(`<path d="${data}" fill="none" transform="translate(${round(offsetX)} ${round(offsetY)})"`
-      + ` ${this.strokeAttributes()}/>`);
+    const { offsetX, offsetY, scale } = this.state;
+    const scaled = scale === 1 ? '' : ` scale(${round(scale)})`;
+    // Con la escala en el transform, el grosor del trazo va sin escalar: el SVG lo escala solo.
+    this.elements.push(`<path d="${data}" fill="none" transform="translate(${round(offsetX)} ${round(offsetY)})${scaled}"`
+      + ` ${this.strokeAttributes(1)}/>`);
   }
 
   fillText(content, x, y, halo) {
     const { weight, size, family } = parseFont(this.state.font);
-    const { strokeStyle, lineWidth, lineJoin } = this.state;
-    this.elements.push(`<text x="${round(x + this.state.offsetX)}" y="${round(y + this.state.offsetY)}"`
-      + ` ${this.fillAttributes()} font-family="${escape(family)}" font-size="${round(size)}"`
+    const { strokeStyle, lineWidth, lineJoin, scale } = this.state;
+    const [left, top] = this.point(x, y);
+    this.elements.push(`<text x="${left}" y="${top}"`
+      + ` ${this.fillAttributes()} font-family="${escape(family)}" font-size="${round(size * scale)}"`
       + ` font-weight="${weight}" text-anchor="${ANCHORS[this.state.textAlign] || 'start'}"`
-      + (halo ? ` paint-order="stroke" stroke="${strokeStyle}" stroke-width="${round(lineWidth)}"`
+      + (halo ? ` paint-order="stroke" stroke="${strokeStyle}" stroke-width="${round(lineWidth * scale)}"`
         + ` stroke-linejoin="${lineJoin}"` : '')
       + `>${escape(content)}</text>`);
   }
 
-  strokeAttributes() {
+  strokeAttributes(scale = this.state.scale) {
     const { strokeStyle, lineWidth, lineCap, lineJoin, globalAlpha, dash } = this.state;
-    return `stroke="${strokeStyle}" stroke-width="${round(lineWidth)}" stroke-linecap="${lineCap}"`
+    return `stroke="${strokeStyle}" stroke-width="${round(lineWidth * scale)}" stroke-linecap="${lineCap}"`
       + ` stroke-linejoin="${lineJoin}"${globalAlpha < 1 ? ` stroke-opacity="${round(globalAlpha)}"` : ''}`
       + `${dash ? ` stroke-dasharray="${dash}"` : ''}`;
   }
 
   toSvg({ width, height, title }) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"`
-      + ` width="${width}" height="${height}" role="img" aria-label="${escape(title)}">\n`
+    const box = { width: round(width), height: round(height) };
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${box.width} ${box.height}"`
+      + ` width="${box.width}" height="${box.height}" role="img" aria-label="${escape(title)}">\n`
       + `<title>${escape(title)}</title>\n${this.elements.join('\n')}\n</svg>\n`;
   }
 }

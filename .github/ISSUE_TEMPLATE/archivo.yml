@@ -1,0 +1,26 @@
+name: Un archivo no abre o se ve mal
+description: Para un .pkt, .pka, .pkz o una captura que Trenza no muestra bien.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Packet Tracer
+      description: La que usaste para guardar el archivo. Si es una captura, con qué se grabó.
+      placeholder: 8.2.1
+  - type: input
+    id: browser
+    attributes:
+      label: Navegador y sistema
+      placeholder: Chrome 130 en Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Qué pasó
+      description: Qué esperabas ver y qué viste. Si apareció un mensaje de error, copialo.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: Si podés, adjuntá el archivo en un comentario. Revisá antes que no tenga contraseñas ni datos que no quieras publicar.

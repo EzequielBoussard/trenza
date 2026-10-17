@@ -1774,6 +1774,45 @@ button.key__row:hover { background: var(--raised); }
 }
 .packet-row.is-selected { background: var(--raised); }
 
+.peek { display: none; }
+
+/* Apiladas, el panel queda fuera de la pantalla: un botón al pie del diagrama lleva hasta él. */
+@media (max-width: 1180px) {
+  .peek:not([hidden]) {
+    display: block;
+    grid-area: stage;
+    align-self: end;
+    justify-self: center;
+    z-index: 3;
+    max-width: calc(100% - 2rem);
+    margin-bottom: 0.75rem;
+    padding: 0.55rem 1rem;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
+  }
+}
+
+/* Con colores forzados el fondo que marca lo elegido se pierde: va un contorno del sistema. */
+@media (forced-colors: active) {
+  .device-chip.is-selected,
+  .packet-row.is-selected,
+  .key__row[aria-pressed='true'],
+  .legend__item.is-active {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
 .table__detail {
   max-width: 32rem;
   overflow: hidden;

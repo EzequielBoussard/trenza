@@ -81,9 +81,7 @@ Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.3.0, 7.3.1, 8
 
 ## Contribuir
 
-Si un archivo no abre o se ve mal, abrí un issue con la versión de Packet Tracer con la que se guardó y, si se puede, el archivo. Un `.pkt` lleva la configuración de cada equipo: antes de subirlo, revisá que no tenga contraseñas ni datos que no quieras publicar.
-
-Los cambios tienen que pasar `npm test` y no agregar dependencias ni paso de compilación.
+Si un archivo no abre o se ve mal, abrí un issue con la versión de Packet Tracer con la que se guardó. Cómo reportar problemas y proponer cambios está en [CONTRIBUTING.md](CONTRIBUTING.md); las vulnerabilidades se reportan en privado, como dice [SECURITY.md](SECURITY.md).
 
 ## Licencia
 

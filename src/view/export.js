@@ -4,6 +4,7 @@ import { SvgContext, haloText, strokeGlyph } from './svg-context.js';
 import {
   ADDRESS_FONT,
   CATEGORY_GLYPHS,
+  CATEGORY_ORDER,
   CATEGORY_THREADS,
   LABEL_FONT,
   LABEL_REACH_BELOW,
@@ -146,9 +147,16 @@ function labelMeasurer() {
   };
 }
 
-function planLegend(context, links, availableWidth, chrome) {
-  const entries = LEGEND_ENTRIES.filter((entry) => new Set(links.map(threadFor)).has(entry.thread))
-    .map((entry) => ({ ...entry, label: t(entry.key) }));
+// Con la guía, primero los tipos de equipo que hay, con su símbolo: quien no es de redes los
+// necesita para leer el dibujo. Después, los cables.
+function planLegend(context, { devices, links, guide }, availableWidth, chrome) {
+  const kinds = new Set(devices.map((device) => device.category));
+  const entries = [
+    ...(guide ? CATEGORY_ORDER.filter((category) => kinds.has(category))
+      .map((category) => ({ category, label: t(`category.${category}`) })) : []),
+    ...LEGEND_ENTRIES.filter((entry) => new Set(links.map(threadFor)).has(entry.thread))
+      .map((entry) => ({ ...entry, label: t(entry.key) })),
+  ];
 
   if (entries.length === 0) return { entries, columns: 0, rows: 0, columnWidth: 0, height: 0 };
 
@@ -297,6 +305,23 @@ function drawLegend(context, legend, { palette, chrome, left, top }) {
     const x = left + (index % legend.columns) * legend.columnWidth;
     const y = top + Math.floor(index / legend.columns) * chrome.legendRow + 10 * zoom;
 
+    context.fillStyle = palette['text-muted'];
+    context.fillText(entry.label, x + 26 * zoom, y + 4 * zoom);
+
+    if (entry.category) {
+      // El símbolo del diagrama, de 24 unidades llevado a 18 como la muestra de cable.
+      context.save();
+      context.translate(x, y - 10 * zoom);
+      context.scale(0.75 * zoom, 0.75 * zoom);
+      context.lineWidth = 2;
+      context.lineJoin = 'round';
+      context.lineCap = 'round';
+      context.strokeStyle = palette[(CATEGORY_THREADS[entry.category] || CATEGORY_THREADS.other)[0]];
+      strokeGlyph(context, CATEGORY_GLYPHS[entry.category] || CATEGORY_GLYPHS.other);
+      context.restore();
+      return;
+    }
+
     context.lineWidth = 2 * zoom;
     context.strokeStyle = palette[entry.thread];
     context.beginPath();
@@ -309,14 +334,11 @@ function drawLegend(context, legend, { palette, chrome, left, top }) {
     context.moveTo(x, y + zoom);
     context.lineTo(x + 18 * zoom, y + zoom);
     context.stroke();
-
-    context.fillStyle = palette['text-muted'];
-    context.fillText(entry.label, x + 26 * zoom, y + 4 * zoom);
   });
 }
 
 // Tamaño natural: el más chico en el que las etiquetas no se pisan.
-function measureDiagram(model, showInfrastructure, chrome, measure) {
+function measureDiagram(model, { showInfrastructure, guide }, chrome, measure) {
   const context2d = measure.context;
 
   // Lo que no depende del marco se calcula una vez: spreadScaleFor es O(n²) y esto se
@@ -350,7 +372,8 @@ function measureDiagram(model, showInfrastructure, chrome, measure) {
   const provisional = frameForNetwork(placed, { left: side, right: side, top, bottom: top }, spread);
   const across = provisional.width - chrome.margin * 2;
 
-  const legend = planLegend(context2d, links, across - watermarkWidth(context2d, chrome) - 24 * chrome.zoom, chrome);
+  const legendWidth = across - watermarkWidth(context2d, chrome) - 24 * chrome.zoom;
+  const legend = planLegend(context2d, { devices: [...placed, ...stray], links, guide }, legendWidth, chrome);
   const tray = trayPlan(stray, across);
   const insets = {
     left: side,
@@ -410,24 +433,24 @@ function designWidths(shape) {
   return Array.from({ length: DESIGN_STEPS + 1 }, (_, step) => floor + DESIGN_STEP * step);
 }
 
-function planExport(model, { showInfrastructure, pixels, measure = labelMeasurer() }) {
-  const shapeFor = (width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure);
+function planExport(model, { showInfrastructure, guide, pixels, measure = labelMeasurer() }) {
+  const shapeFor = (width) => measureDiagram(model, { showInfrastructure, guide }, chromeFor(width), measure);
   const shape = settledShape(shapeFor);
   if (!pixels) return { ...layoutInto(shape, shape.natural), scale: 1 };
 
   const aspect = pixels.width / pixels.height;
   const planAt = (width, limit) => layoutInto(shapeFor(width), { width, height: width / aspect }, limit);
-  const best = tidiestWidth(designWidths(shape), planAt);
+  const best = tidiestWidth(designWidths(shape), planAt, shape.placed.length + shape.stray.length);
   return { ...best, scale: pixels.width / best.design.width };
 }
 
 // Sólo las medidas en las que la dirección queda por encima del piso de legibilidad.
-export function offeredSizes(model, { showInfrastructure, format }) {
+export function offeredSizes(model, { showInfrastructure, guide, format }) {
   // Un medidor para todas las medidas: lo que no depende del marco se calcula una sola vez.
   const measure = labelMeasurer();
   let widths;
   try {
-    widths = designWidths(settledShape((width) => measureDiagram(model, showInfrastructure, chromeFor(width), measure)));
+    widths = designWidths(settledShape((width) => measureDiagram(model, { showInfrastructure, guide }, chromeFor(width), measure)));
   } catch {
     return [];
   }
@@ -445,7 +468,7 @@ export function offeredSizes(model, { showInfrastructure, format }) {
     if (!readable(widths[0])) return false;
     if (readable(widths[widths.length - 1])) return true;
     try {
-      return readable(planExport(model, { showInfrastructure, pixels, measure }).design.width);
+      return readable(planExport(model, { showInfrastructure, guide, pixels, measure }).design.width);
     } catch {
       return false;
     }
@@ -473,13 +496,13 @@ function canvasSizeFor(format, size) {
   };
 }
 
-async function renderNetworkToCanvas(model, { showInfrastructure, format, size, transparent, title, palette, language, budget }) {
+async function renderNetworkToCanvas(model, { showInfrastructure, guide, format, size, transparent, title, palette, language, budget }) {
   await labelFontsReady();
 
   // Dentro de withLanguage también el plan: el ancho de la leyenda depende del idioma.
   return withLanguage(language, () => {
     const pixels = canvasSizeFor(format, size);
-    const plan = planExport(model, { showInfrastructure, pixels });
+    const plan = planExport(model, { showInfrastructure, guide, pixels });
     const { design, scale } = plan;
 
     const width = Math.round(design.width * scale);
@@ -628,11 +651,11 @@ async function buildPdf(canvas, pointsPerPixel) {
 }
 
 // El SVG va al tamaño natural.
-async function buildSvg(model, { showInfrastructure, transparent, title, palette, language }) {
+async function buildSvg(model, { showInfrastructure, guide, transparent, title, palette, language }) {
   await labelFontsReady();
 
   return withLanguage(language, () => {
-    const plan = planExport(model, { showInfrastructure, pixels: null });
+    const plan = planExport(model, { showInfrastructure, guide, pixels: null });
     const context = new SvgContext();
 
     if (!transparent) {
@@ -653,12 +676,13 @@ function sizeFor(format, choice) {
 
 // Devuelve también la medida real, que es lo que distingue 2 resoluciones en la vista previa.
 export async function renderNetworkPreview(model, request, budget) {
-  const { format, name, size: choice, transparent, showInfrastructure, language, theme } = request;
+  const { format, name, size: choice, transparent, showInfrastructure, guide, language, theme } = request;
   const descriptor = EXPORT_FORMATS[format];
   if (!descriptor) throw new Error(t('error.unknownFormat', { format }));
 
   const { canvas, plan, width, height, magnify } = await renderNetworkToCanvas(model, {
     showInfrastructure,
+    guide,
     format,
     size: descriptor.vector ? null : sizeFor(format, choice),
     transparent: transparent && format === 'png',
@@ -671,7 +695,7 @@ export async function renderNetworkPreview(model, request, budget) {
   return { canvas, crowded: plan.crowded, width, height, design: plan.design, magnify };
 }
 
-async function createNetworkExport(model, { format, name, size: choice, transparent, showInfrastructure, language, theme }) {
+async function createNetworkExport(model, { format, name, size: choice, transparent, showInfrastructure, guide, language, theme }) {
   const descriptor = EXPORT_FORMATS[format];
   if (!descriptor) throw new Error(t('error.unknownFormat', { format }));
 
@@ -679,12 +703,13 @@ async function createNetworkExport(model, { format, name, size: choice, transpar
   const fileName = `${name}.${descriptor.extension}`;
 
   if (descriptor.vector) {
-    const { blob, plan } = await buildSvg(model, { showInfrastructure, transparent, title: name, palette, language });
+    const { blob, plan } = await buildSvg(model, { showInfrastructure, guide, transparent, title: name, palette, language });
     return { blob, fileName, crowded: plan.crowded, width: plan.design.width, height: plan.design.height };
   }
 
   const { canvas, plan } = await renderNetworkToCanvas(model, {
     showInfrastructure,
+    guide,
     format,
     size: sizeFor(format, choice),
     transparent: transparent && format === 'png',

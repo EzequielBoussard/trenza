@@ -7,7 +7,6 @@ import {
   LABEL_TYPE,
   LEGEND_ENTRIES,
   halfLabelWidth,
-  labelFontsReady,
   partitionDevices,
   planLabels,
   projectIntoRect,
@@ -152,19 +151,6 @@ export class TopologyView {
     this.order = [];
     this.measure = labelMeasurer();
     this.watchPanelShape();
-    this.watchFonts();
-  }
-
-  // Si las fuentes llegan después del primer dibujado, las medidas estaban hechas con la
-  // alternativa (hasta 19 % más angosta). Se reparte de nuevo, sólo con la vista sin tocar.
-  watchFonts() {
-    labelFontsReady().then(() => {
-      if (!this.last) return;
-      const { x, y, scale } = this.target;
-      if (x !== 0 || y !== 0 || scale !== 1) return;
-      this.measure = labelMeasurer();
-      this.render(this.last.model, { showInfrastructure: this.last.showInfrastructure });
-    });
   }
 
   // Rehace el reparto si el panel cambia bastante de forma, pero sólo con la vista sin tocar.
@@ -423,7 +409,7 @@ export class TopologyView {
 
     const widths = [];
     for (let width = MIN_VIEW_WIDTH; width <= MAX_VIEW_WIDTH; width += VIEW_STEP) widths.push(width);
-    return tidiestWidth(widths, attempt);
+    return tidiestWidth(widths, attempt, devices.length);
   }
 
   buildControls() {

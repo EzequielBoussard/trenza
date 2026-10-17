@@ -22,6 +22,7 @@ function requestFrom(elements, state) {
     name: fields.name.value.trim() || suggestExportName(state.file.name),
     size: fields.size.value,
     transparent: fields.transparent.checked,
+    guide: fields.guide.checked,
     showInfrastructure: state.showInfrastructure,
     language: fields.language.value,
     theme: fields.theme.value,
@@ -32,7 +33,8 @@ function requestFrom(elements, state) {
 function updateSizeOptions(elements, state) {
   const format = elements.exportForm.elements.format.value;
   const paper = format === 'pdf';
-  const offered = offeredSizes(state.model, { showInfrastructure: state.showInfrastructure, format });
+  const guide = elements.exportForm.elements.guide.checked;
+  const offered = offeredSizes(state.model, { showInfrastructure: state.showInfrastructure, guide, format });
   const select = elements.exportForm.elements.size;
   const chosen = select.value;
 
@@ -72,6 +74,7 @@ function updateFormatFields(elements, state, preview) {
   const vector = VECTOR_FORMATS.includes(format);
 
   elements.transparentField.hidden = capture || format === 'jpg' || format === 'pdf';
+  elements.guideField.hidden = capture;
   elements.sizeField.hidden = capture || vector;
   if (!capture && !vector) updateSizeOptions(elements, state);
 

@@ -4,7 +4,7 @@ import { buildNetworkModel } from './pkt/model.js';
 import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
-import { CATEGORY_ORDER } from './view/graph.js';
+import { CATEGORY_ORDER, labelFontsReady } from './view/graph.js';
 import { categoryIcon, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
 import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
@@ -19,6 +19,7 @@ const elements = {
   railGrip: document.querySelector('[data-rail-grip]'),
   panelGrip: document.querySelector('[data-panel-grip]'),
   panel: document.querySelector('[data-panel]'),
+  peek: document.querySelector('[data-peek]'),
   status: document.querySelector('[data-status]'),
   fileName: document.querySelector('[data-file-name]'),
   fileInput: document.querySelector('[data-file-input]'),
@@ -40,6 +41,7 @@ const elements = {
   exportCancel: document.querySelector('[data-export-cancel]'),
   exportNote: document.querySelector('[data-export-note]'),
   transparentField: document.querySelector('[data-transparent-field]'),
+  guideField: document.querySelector('[data-guide-field]'),
   previewPanel: document.querySelector('[data-preview-panel]'),
   previewFrame: document.querySelector('[data-preview-frame]'),
   previewNote: document.querySelector('[data-preview-note]'),
@@ -268,15 +270,22 @@ function selectDevice(id) {
   elements.panel.scrollTop = 0;
   markChips(id);
   linkDevice(device.name);
+  elements.peek.textContent = t('panel.peek', { name: device.name });
+  elements.peek.hidden = false;
+}
+
+// Apiladas, el panel queda debajo del diagrama, fuera de la pantalla: el botón lleva a su título.
+function goToPanel() {
+  const title = elements.panel.querySelector('.panel-head__title');
+  title.tabIndex = -1;
+  title.focus();
 }
 
 // Desde las conexiones del panel: el botón pulsado desaparece con el panel viejo, así que el
 // foco pasa al título del equipo nuevo.
 function pickPeer(id) {
   selectDevice(id);
-  const title = elements.panel.querySelector('.panel-head__title');
-  title.tabIndex = -1;
-  title.focus();
+  goToPanel();
 }
 
 function clearSelection() {
@@ -286,6 +295,7 @@ function clearSelection() {
   markChips(null);
   showNetworkSummary();
   linkDevice(null);
+  elements.peek.hidden = true;
 }
 
 // Con /demo o ?src= la dirección se puede compartir, y el # nombra el equipo elegido:
@@ -377,8 +387,11 @@ function translateNetwork() {
 }
 
 async function showNetwork(bytes) {
+  // El reparto mide los nombres: con la tipografía todavía en camino habría que repartir 2 veces.
+  const fonts = labelFontsReady();
   const decoded = await decodePacketTracerFile(bytes);
   const model = buildNetworkModel(new TextDecoder().decode(decoded.xml));
+  await fonts;
 
   state.kind = 'network';
   document.body.dataset.view = 'network';
@@ -479,6 +492,7 @@ async function open(name, bytes) {
   state.model = null;
   state.capture = null;
   delete document.body.dataset.view;
+  elements.peek.hidden = true;
   elements.fileName.textContent = name;
   refreshTitle();
   document.documentElement.dataset.loaded = 'true';
@@ -747,6 +761,7 @@ function closeFile() {
   state.capture = null;
   state.selectedDeviceId = null;
   state.categoryFilter = null;
+  elements.peek.hidden = true;
   delete document.documentElement.dataset.loaded;
   delete document.body.dataset.view;
   elements.fileName.textContent = '';
@@ -763,6 +778,7 @@ function closeFile() {
 
 function wireActions() {
   elements.reset.addEventListener('click', closeFile);
+  elements.peek.addEventListener('click', goToPanel);
 
   // El logo es un enlace a / para que funcione sin JavaScript y en otra pestaña.
   elements.home.addEventListener('click', (event) => {
