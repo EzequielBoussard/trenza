@@ -1,5 +1,5 @@
 import { getLocale, t } from '../i18n.js';
-import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS } from './graph.js';
+import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS, selectVisible } from './graph.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -347,10 +347,11 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
   }
   container.append(section(t('panel.howTo'), createElement('p', 'panel-text', t('panel.howToText'))));
 
+  const network = selectVisible(model, false);
   const facts = [
     [t('panel.version'), model.version],
-    [t('panel.devices'), String(model.devices.length)],
-    [t('panel.links'), String(model.links.length)],
+    [t('panel.devices'), String(network.devices.length)],
+    [t('panel.links'), String(network.links.length)],
   ];
   if (variant) facts.splice(1, 0, [t('panel.variant'), t(`variant.${variant}`)]);
 

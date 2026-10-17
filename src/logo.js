@@ -21,7 +21,7 @@ function paramAt(x) {
 
 const round = (value) => Math.round(value * 10) / 10;
 
-/** El hilo corrido `shift` tramos a la derecha y recortado a los 2 tramos del logo. */
+// El hilo corrido `shift` tramos a la derecha y recortado a los 2 tramos del logo.
 export function strandPath(shift, falling) {
   let path = '';
   for (let k = Math.floor(-shift); k < 2 - shift; k++) {

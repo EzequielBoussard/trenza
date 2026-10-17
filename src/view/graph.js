@@ -13,10 +13,10 @@ export const CATEGORY_GLYPHS = {
   other: 'M5 5h14v14H5z',
 };
 
-// Colores del código T568B: el pleno para el contorno y el pálido para el símbolo.
 // De la puerta hacia adentro: así se lee la red, desde la salida a Internet hasta los equipos.
 export const CATEGORY_ORDER = ['cloud', 'router', 'security', 'switch', 'wireless', 'server', 'endpoint', 'iot', 'other', 'infrastructure'];
 
+// Colores del código T568B: el pleno para el contorno y el pálido para el símbolo.
 export const CATEGORY_THREADS = {
   router: ['orange', 'orange-pale'],
   switch: ['blue', 'blue-pale'],
@@ -101,7 +101,7 @@ const TRAY_ROW_HEIGHT = 96;
 const TRAY_HEADING = 26;
 
 // Aparta los equipos sin enlaces que quedaron fuera del rectángulo de la red: uno solo a
-// 3900 unidades achicaba todo el resto.
+// 3900 unidades achicaría todo el resto.
 export function partitionDevices(devices, links) {
   const connected = new Set(links.flatMap((link) => [link.from, link.to]));
   const wired = devices.filter((device) => connected.has(device.id));
@@ -182,7 +182,7 @@ export function projectIntoRect(devices, rect, { stretch = 1 } = {}) {
   );
 }
 
-// Medidas desde el centro del dispositivo. discRadius tiene que ser el del halo dibujado,
+// Medidas desde el centro del equipo. discRadius tiene que ser el del halo dibujado,
 // y nameTop no puede ser menor que discRadius.
 const LABEL_GEOMETRY = {
   discRadius: 26,

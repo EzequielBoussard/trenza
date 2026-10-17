@@ -108,8 +108,8 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* Colores del par trenzado T568B, cada uno en versión plena y pálida. */
-/* Safari ignora el fondo de un select nativo; con el esquema declarado lo dibuja oscuro. */
+/* Colores del par trenzado T568B, cada uno en versión plena y pálida. Con el esquema declarado,
+   Safari dibuja oscuro el fondo de un select nativo. */
 :root {
   color-scheme: dark;
   --ground: #0f1218;
@@ -719,7 +719,7 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   cursor: pointer;
 }
 
-/* Pegado abajo: en pantallas bajas el diálogo se desplaza y el botón quedaba fuera. */
+/* Pegado abajo: en pantallas bajas el diálogo se desplaza y el botón quedaría fuera. */
 .dialog__actions {
   position: sticky;
   bottom: 0;
@@ -1278,7 +1278,7 @@ body[data-dragging] .dropveil { display: grid; }
 
 /* Diagrama */
 
-/* Sin selección de texto: al arrastrar desde una etiqueta se marcaba el nombre. */
+/* Sin selección de texto: al arrastrar desde una etiqueta se marcaría el nombre. */
 .topology {
   width: 100%;
   height: 100%;
@@ -1842,7 +1842,7 @@ button.key__row:hover { background: var(--raised); }
   /* Con el teléfono acostado, 60vh deja el diagrama en 190 px. */
   .stage { height: clamp(16rem, 60vh, 30rem); }
 
-  /* La leyenda va arriba: el diagrama no deja desplazar la página y abajo quedaba fuera. */
+  /* La leyenda va arriba: el diagrama no deja desplazar la página y abajo quedaría fuera. */
   .stage { grid-template-rows: auto minmax(0, 1fr); }
   .stage > * { grid-row: 2; }
 

@@ -77,7 +77,7 @@ const PAPER_SIZES = {
 
 export const DEFAULT_PAPER = 'a4';
 
-// El PDF lleva el diagrama como imagen; a 200 ppp el texto se veía blando al ampliar.
+// El PDF lleva el diagrama como imagen; con menos resolución el texto se ve blando al ampliar.
 const PRINT_DPI = 300;
 
 // El piso de legibilidad se mide sobre la dirección, que es el texto más chico.

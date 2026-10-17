@@ -4,7 +4,7 @@ import { buildNetworkModel } from './pkt/model.js';
 import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
-import { CATEGORY_ORDER, labelFontsReady } from './view/graph.js';
+import { CATEGORY_ORDER, labelFontsReady, selectVisible } from './view/graph.js';
 import { categoryIcon, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
 import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
@@ -137,7 +137,7 @@ function renderDeviceList(term = '') {
   const checkbox = createElement('input');
   checkbox.type = 'checkbox';
   checkbox.checked = state.showInfrastructure;
-  // Sólo se redibuja la lista: rehacer la columna borraba la búsqueda y el foco de la casilla.
+  // Sólo se redibuja la lista: rehacer la columna perdería la búsqueda y el foco de la casilla.
   checkbox.addEventListener('change', () => {
     state.showInfrastructure = checkbox.checked;
     const selected = state.devicesById.get(state.selectedDeviceId);
@@ -403,9 +403,11 @@ async function showNetwork(bytes) {
   state.categoryFilter = null;
 
   paintNetwork();
+  // Los equipos de red: una regleta o un rack no cuentan, igual que en el diagrama.
+  const network = selectVisible(model, false);
   setStatus('status.network', {
-    devices: { key: 'unit.devices', values: { count: model.devices.length } },
-    links: { key: 'unit.links', values: { count: model.links.length } },
+    devices: { key: 'unit.devices', values: { count: network.devices.length } },
+    links: { key: 'unit.links', values: { count: network.links.length } },
   }, 'ok');
 }
 

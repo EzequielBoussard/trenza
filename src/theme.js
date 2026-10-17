@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'trenza.theme';
 
-/** La elección guardada, o null: sin elección queda el oscuro. */
+// La elección guardada, o null: sin elección queda el oscuro.
 export function getTheme() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
