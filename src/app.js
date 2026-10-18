@@ -5,7 +5,7 @@ import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
 import { CATEGORY_ORDER, labelFontsReady, selectVisible } from './view/graph.js';
-import { categoryIcon, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
+import { categoryIcon, markScrollable, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
 import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
 import { wireExportDialog } from './view/export-dialog.js';
@@ -694,6 +694,7 @@ function wireGrip(grip, pane, name, sign, widths) {
     if (sizes[dimension]) document.documentElement.style.setProperty(`--${name}-${dimension}`, `${sizes[dimension]}px`);
     else document.documentElement.style.removeProperty(`--${name}-${dimension}`);
     show();
+    markScrollable(elements.panel);
   };
   const save = () => {
     try {
@@ -813,6 +814,7 @@ async function start() {
   wireGrip(elements.railGrip, elements.rail, 'rail', 1, [200, 480]);
   wireGrip(elements.panelGrip, elements.panel, 'panel', -1, [280, 600]);
   window.addEventListener('resize', readGrips);
+  window.addEventListener('resize', () => markScrollable(elements.panel));
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 

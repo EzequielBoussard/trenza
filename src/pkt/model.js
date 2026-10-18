@@ -161,12 +161,13 @@ function readLink(linkNode) {
   };
 }
 
-// Más de la mitad del XML que guarda Packet Tracer: el ambiente de la vista física, los archivos
-// de cada equipo, los clientes de Wi-Fi, celular y correo, y el modelo de los IoT. En una actividad,
-// además, la corrección y los bloqueos. Nada se lee.
+// Más de la mitad del XML: el ambiente de la vista física, archivos, clientes, IoT, IPv6 de cada
+// puerto y, en una actividad, la corrección y los bloqueos. Nada se lee.
 const UNREAD = [
   'ENVIRONMENT', 'FILE_MANAGER', 'THING_MODEL', 'PIXMAPBANK',
   'WIRELESS_CLIENT', 'CELLULAR_CLIENT', 'BLUETOOTH_MANAGER', 'ALGORITHM_SETTINGS', 'EMAIL_CLIENT',
+  'PHYSICAL_CPUR', 'COORD_SETTINGS', 'USER_APPS', 'EXT_ATTRIBUTES', 'IOE_CLIENT', 'NDV6',
+  'DHCPV6_MAIN', 'PARENT_PATH',
   'COMPARISONS', 'INITIALSETUP', 'LOCKINGTREE',
 ];
 

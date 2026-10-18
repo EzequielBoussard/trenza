@@ -58,7 +58,7 @@ Son módulos ES servidos tal cual, sin dependencias ni paso de compilación.
 npm test
 ```
 
-Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. GitHub Actions las corre en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. Las que necesitan una página abren Chrome o Edge sin ventana y lo manejan por el protocolo de DevTools, sin dependencias: la red de ejemplo, una actividad con sus instrucciones, el zoom y una red de 600 equipos. Si no hay ninguno instalado se saltan, y `CHROME_PATH` indica otro. GitHub Actions las corre todas en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/
@@ -78,7 +78,7 @@ Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define 
 
 Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
-Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en poco más de un segundo y se probó hasta 16000. El formato sin cifrar sólo se probó con archivos generados. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
+Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en menos de un segundo, una de 4000 en 3 y una de 16000 en 12, sin etiquetas encimadas; de lejos los nombres se dibujan recién cuando se pueden leer, y el zoom llega hasta leerlos. El formato sin cifrar sólo se probó con archivos generados. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
 
 ## Contribuir
 

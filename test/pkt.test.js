@@ -1,26 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deflateRawSync, deflateSync } from 'node:zlib';
+import { deflateRawSync } from 'node:zlib';
 import { setLanguage } from '../src/i18n.js';
 import { decodePacketTracerFile } from '../src/pkt/decode.js';
 import { locationOf, printable, withoutUnread } from '../src/pkt/model.js';
+import { buildLegacyFile } from './support/files.js';
 
 // Los mensajes que se comparan abajo son los del idioma por defecto.
 setLanguage('en');
-
-// El formato heredado no lleva Twofish: se puede generar acá.
-function buildLegacyFile(xml) {
-  const payload = deflateSync(Buffer.from(xml, 'utf8'));
-  const withHeader = Buffer.alloc(4 + payload.length);
-  withHeader.writeUInt32BE(Buffer.byteLength(xml, 'utf8'), 0);
-  payload.copy(withHeader, 4);
-
-  const output = new Uint8Array(withHeader.length);
-  for (let i = 0; i < withHeader.length; i++) {
-    output[i] = withHeader[i] ^ ((withHeader.length - i) & 0xff);
-  }
-  return output;
-}
 
 test('lee un archivo con el formato heredado', async () => {
   const xml = '<PACKETTRACER5><VERSION>5.3.3</VERSION></PACKETTRACER5>';

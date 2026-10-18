@@ -117,6 +117,7 @@
   --raised: #1c2230;
   --line: #262e3c;
   --line-soft: #1f2634;
+  --edge-shade: rgb(0 0 0 / 0.55);
   --text: #e4e8f0;
   --text-muted: #98a2b6;
   --text-faint: #858da0;
@@ -156,6 +157,7 @@
   --raised: #e8ebf1;
   --line: #d3d9e2;
   --line-soft: #e3e7ee;
+  --edge-shade: rgb(21 26 34 / 0.14);
   --text: #151a22;
   --text-muted: #545d6d;
   --text-faint: #5f6776;
@@ -1278,17 +1280,25 @@ body[data-dragging] .dropveil { display: grid; }
 
 /* Diagrama */
 
-/* Sin selección de texto: al arrastrar desde una etiqueta se marcaría el nombre. */
-.topology {
+/* Sin selección de texto: al arrastrar desde una etiqueta se marcaría el nombre. Recibe los
+   gestos aunque el <svg>, con zoom, no la cubra entera. */
+.topology-viewport {
   width: 100%;
   height: 100%;
+  overflow: hidden;
   touch-action: none;
   cursor: grab;
   -webkit-user-select: none;
   user-select: none;
 }
 
-.topology.is-panning { cursor: grabbing; }
+.topology-viewport.is-panning { cursor: grabbing; }
+
+.topology {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 .link__strand {
   stroke-width: 1.4;
@@ -1367,6 +1377,8 @@ body[data-dragging] .dropveil { display: grid; }
   stroke-width: 3.5px;
   stroke-linejoin: round;
 }
+
+.topology.is-far .node__labels { display: none; }
 
 /* Tienen que coincidir con LABEL_TYPE en graph.js. */
 .node__label {
@@ -1672,7 +1684,22 @@ button.key__row:hover { background: var(--raised); }
   color: var(--text-muted);
 }
 
-.table-scroller { overflow-x: auto; }
+/* Una sombra en el borde avisa que la tabla sigue. Las tapas viajan con el contenido (local) y la
+   tapan al llegar a la punta; las sombras quedan quietas en el borde. */
+.table-scroller {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--surface) 40%, transparent) left / 1.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 40%, transparent) right / 1.5rem 100% no-repeat local,
+    linear-gradient(to right, var(--edge-shade), transparent) left / 0.75rem 100% no-repeat scroll,
+    linear-gradient(to left, var(--edge-shade), transparent) right / 0.75rem 100% no-repeat scroll;
+}
+
+.table-scroller:focus-visible,
+.code-block:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
 
 /* Con anywhere la tabla achica la columna hasta cortar cualquier palabra. */
 .table__wrap { overflow-wrap: break-word; }

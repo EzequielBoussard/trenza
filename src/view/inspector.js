@@ -323,6 +323,23 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
     code.textContent = text;
     container.append(section('running-config', code, copyButton(text)));
   }
+  markScrollable(container);
+}
+
+// Lo que se desplaza tiene que poder recorrerse con el teclado: sólo eso es una parada del
+// tabulador, con el nombre de su sección. Hay que volver a medir si el panel cambia de ancho.
+export function markScrollable(container) {
+  for (const box of container.querySelectorAll('.table-scroller, .code-block')) {
+    const scrolls = box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1;
+    if (scrolls === box.hasAttribute('tabindex')) continue;
+    if (scrolls) {
+      box.tabIndex = 0;
+      box.setAttribute('role', 'region');
+      box.setAttribute('aria-label', box.closest('section')?.querySelector('h3')?.textContent ?? '');
+    } else {
+      for (const name of ['tabindex', 'role', 'aria-label']) box.removeAttribute(name);
+    }
+  }
 }
 
 // Qué tipos de equipo hay, con su símbolo y para qué sirven. Elegir uno deja a la vista sólo
@@ -377,6 +394,7 @@ function activitySection(pages) {
   }
   const toggle = createElement('details', 'activity__toggle');
   toggle.append(createElement('summary', null, t('panel.readInstructions')), content);
+  toggle.addEventListener('toggle', () => markScrollable(toggle));
   wrapper.append(toggle);
   return section(t('panel.activity'), wrapper);
 }
@@ -417,4 +435,5 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
   }
 
   container.append(section(t('panel.file'), file));
+  markScrollable(container);
 }

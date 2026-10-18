@@ -29,6 +29,19 @@ const MAX_VIEW_WIDTH = 5200;
 // rango de a 50 cuesta unos 33 ms en el peor caso.
 const VIEW_STEP = 50;
 
+// Una red de miles de equipos no entra en MAX_VIEW_WIDTH: el techo crece con la raíz de la
+// cantidad (la red de ejemplo pide unas 300 por raíz de equipo) y desde ahí se prueba de a 3 %.
+const WIDTH_PER_DEVICE = 600;
+const VIEW_GROWTH = 1.03;
+
+function viewWidths(count) {
+  const widths = [];
+  for (let width = MIN_VIEW_WIDTH; width <= MAX_VIEW_WIDTH; width += VIEW_STEP) widths.push(width);
+  const ceiling = WIDTH_PER_DEVICE * Math.sqrt(count);
+  for (let width = MAX_VIEW_WIDTH * VIEW_GROWTH; width <= ceiling; width *= VIEW_GROWTH) widths.push(Math.round(width));
+  return widths;
+}
+
 // El lienzo toma la proporción del panel para no dejar franjas vacías. Un teléfono apaisado
 // llega a 4,09, de ahí el tope de arriba.
 const FALLBACK_ASPECT = 1.6;
@@ -66,6 +79,19 @@ const VIEW_SIDE_MARGIN = 40;
 // Por debajo de 0,5 el diagrama entero ya entra con aire de sobra; alejar más sólo lo achica.
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 6;
+
+// En un lienzo de miles de equipos 6× no alcanza para leer: el zoom llega hasta que el nombre
+// mida al menos esto en pantalla.
+const ZOOMED_NAME_PX = 40;
+
+// Con miles de equipos, de lejos el nombre mide menos de un píxel y pintar esos textos lleva
+// segundos por cuadro. Pasados FAR_LABELS_FROM equipos se dibujan desde que se leen.
+const FAR_LABELS_FROM = 500;
+const LEGIBLE_NAME_PX = 4;
+
+// En esas redes, mientras la vista se mueve la placa desplaza la imagen ya pintada; quieta este
+// tiempo, se vuelve a pintar nítida.
+const STILL_AFTER = 160;
 
 // Constante de tiempo, en ms, de la animación de los botones de zoom. La rueda y el
 // pellizco no se animan porque se sienten con retraso.
@@ -171,6 +197,7 @@ export class TopologyView {
   // Sin desconectar el observador, una vista reemplazada vuelve a poner su leyenda.
   destroy() {
     this.shapeWatcher.disconnect();
+    clearTimeout(this.still);
     if (this.legend) this.legend.remove();
     this.legend = null;
     this.last = null;
@@ -344,10 +371,15 @@ export class TopologyView {
 
     scene.append(linkLayer, nodeLayer);
     svg.append(scene);
-    this.container.append(svg, this.buildControls());
+    // El zoom va como transformación CSS del <svg>, que la compone la placa de video. Cambiar el
+    // atributo de un grupo recalcula el árbol entero: con miles de equipos, 67 ms por cuadro.
+    const viewport = document.createElement('div');
+    viewport.className = 'topology-viewport';
+    viewport.append(svg);
+    this.container.append(viewport, this.buildControls());
 
     this.svg = svg;
-    this.scene = scene;
+    this.viewport = viewport;
     this.devices = devices;
     this.positions = positions;
     this.frame = { width, height };
@@ -361,7 +393,7 @@ export class TopologyView {
     };
     this.measurePixels();
 
-    this.attachNavigation(svg);
+    this.attachNavigation(viewport);
     if (kept && kept.frame.width === width && kept.frame.height === height) {
       this.target = kept.view;
       this.settle();
@@ -407,9 +439,7 @@ export class TopologyView {
       return plan && { width, height, positions, plan, tray, trayTop, side, untidiness: untidiness(plan) };
     };
 
-    const widths = [];
-    for (let width = MIN_VIEW_WIDTH; width <= MAX_VIEW_WIDTH; width += VIEW_STEP) widths.push(width);
-    return tidiestWidth(widths, attempt, devices.length);
+    return tidiestWidth(viewWidths(devices.length), attempt, devices.length);
   }
 
   buildControls() {
@@ -479,7 +509,7 @@ export class TopologyView {
     this.svg.classList.toggle('has-selection', Boolean(this.thread));
   }
 
-  attachNavigation(svg) {
+  attachNavigation(surface) {
     // Un puntero arrastra, 2 pellizcan. `raw` es la vista sin límite que va pidiendo el
     // gesto; lo que se muestra es esa vista frenada contra el límite.
     const pointers = new Map();
@@ -493,8 +523,8 @@ export class TopologyView {
     const startPan = () => {
       if (panning) return;
       panning = true;
-      for (const id of pointers.keys()) svg.setPointerCapture(id);
-      svg.classList.add('is-panning');
+      for (const id of pointers.keys()) surface.setPointerCapture(id);
+      surface.classList.add('is-panning');
     };
 
     const spreadOf = () => {
@@ -502,8 +532,8 @@ export class TopologyView {
       return { distance: Math.hypot(a.x - b.x, a.y - b.y), clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 };
     };
 
-    // Los eventos de rueda se acumulan y se aplican una vez por cuadro: getScreenCTM fuerza
-    // un recálculo de layout en cada llamada.
+    // Los eventos de rueda se acumulan y se aplican una vez por cuadro: medir la caja fuerza un
+    // recálculo de layout si algo cambió.
     let turning = null;
     const applyTurn = () => {
       const { factor, focus, shift } = turning;
@@ -513,43 +543,43 @@ export class TopologyView {
       this.settle();
     };
 
-    svg.addEventListener('wheel', (event) => {
+    surface.addEventListener('wheel', (event) => {
       event.preventDefault();
       const lines = event.deltaMode === 1 ? 16 : 1;
 
       if (!turning) {
-        turning = { factor: 1, focus: null, shift: 0, matrix: svg.getScreenCTM().inverse() };
+        turning = { factor: 1, focus: null, shift: 0, box: surface.getBoundingClientRect() };
         requestAnimationFrame(applyTurn);
       }
       // Con Alt la rueda desplaza a lo ancho.
       if (event.altKey) {
-        turning.shift -= (event.deltaY + event.deltaX) * lines * turning.matrix.a;
+        turning.shift -= ((event.deltaY + event.deltaX) * lines) / this.pixels.ratio;
         return;
       }
       const gain = event.ctrlKey ? PINCH_SENSITIVITY : WHEEL_SENSITIVITY;
       const turn = Math.min(WHEEL_NOTCH, Math.max(-WHEEL_NOTCH, event.deltaY * lines * gain));
       turning.factor *= Math.exp(-turn);
-      turning.focus = this.pointerInScene(event, turning.matrix);
+      turning.focus = this.pointerInFrame(event, turning.box);
     }, { passive: false });
 
     // Safari manda gesture* además de wheel; sin esto acerca la página entera. En iOS el
     // pellizco ya llega como 2 punteros, así que acá sólo se atiende el del trackpad.
     let pinch = 1;
-    svg.addEventListener('gesturestart', (event) => {
+    surface.addEventListener('gesturestart', (event) => {
       event.preventDefault();
       pinch = event.scale;
     });
-    svg.addEventListener('gesturechange', (event) => {
+    surface.addEventListener('gesturechange', (event) => {
       event.preventDefault();
       if (pointers.size < 2) {
-        this.zoomTo(this.target.scale * (event.scale / pinch), this.pointerInScene(event));
+        this.zoomTo(this.target.scale * (event.scale / pinch), this.pointerInFrame(event));
         this.target = this.clampView(this.target);
         this.settle();
       }
       pinch = event.scale;
     });
 
-    svg.addEventListener('pointerdown', (event) => {
+    surface.addEventListener('pointerdown', (event) => {
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
       if (pointers.size === 1) {
@@ -565,7 +595,7 @@ export class TopologyView {
       }
     });
 
-    svg.addEventListener('pointermove', (event) => {
+    surface.addEventListener('pointermove', (event) => {
       const last = pointers.get(event.pointerId);
       if (!last) return;
       if (!panning) {
@@ -574,8 +604,7 @@ export class TopologyView {
       }
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
-      // La escala sale de la matriz: con otra proporción, el ancho del elemento no sirve.
-      const ratio = 1 / svg.getScreenCTM().a;
+      const ratio = 1 / this.pixels.ratio;
       if (pointers.size === 1) {
         raw.x += (event.clientX - last.x) * ratio;
         raw.y += (event.clientY - last.y) * ratio;
@@ -583,7 +612,7 @@ export class TopologyView {
         const next = spreadOf();
         raw.x += (next.clientX - spread.clientX) * ratio;
         raw.y += (next.clientY - spread.clientY) * ratio;
-        if (spread.distance > 0) raw = this.zoomView(raw, raw.scale * (next.distance / spread.distance), this.pointerInScene(next));
+        if (spread.distance > 0) raw = this.zoomView(raw, raw.scale * (next.distance / spread.distance), this.pointerInFrame(next));
         spread = next;
       }
       this.target = this.stretchView(raw, ratio);
@@ -603,7 +632,7 @@ export class TopologyView {
       origin = null;
       raw = null;
       panning = false;
-      svg.classList.remove('is-panning');
+      surface.classList.remove('is-panning');
       if (click) this.onClear();
 
       const limited = this.clampView(this.target);
@@ -612,20 +641,22 @@ export class TopologyView {
         this.glide(SNAP_TAU);
       }
     };
-    svg.addEventListener('pointerup', endDrag);
-    svg.addEventListener('pointercancel', endDrag);
+    surface.addEventListener('pointerup', endDrag);
+    surface.addEventListener('pointercancel', endDrag);
     // Si el navegador suelta la captura por su cuenta, el puntero no puede quedar colgado.
-    svg.addEventListener('lostpointercapture', endDrag);
+    surface.addEventListener('lostpointercapture', endDrag);
   }
 
-  pointerInScene(event, matrix) {
-    return new DOMPoint(event.clientX, event.clientY)
-      .matrixTransform(matrix ?? this.svg.getScreenCTM().inverse());
+  // Del puntero a unidades del lienzo sin zoom. La matriz del <svg> ya incluye su transformación.
+  pointerInFrame(event, box = this.viewport.getBoundingClientRect()) {
+    const { ratio, left, top } = this.pixels;
+    return { x: (event.clientX - box.left - left) / ratio, y: (event.clientY - box.top - top) / ratio };
   }
 
   // Acerca dejando quieto `focus`.
   zoomView(view, scale, focus) {
-    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+    const deepest = Math.max(MAX_SCALE, ZOOMED_NAME_PX / (LABEL_TYPE.nameSize * this.pixels.ratio));
+    const next = Math.min(deepest, Math.max(MIN_SCALE, scale));
     const anchor = focus ?? { x: this.frame.width / 2, y: this.frame.height / 2 };
     const ratio = next / view.scale;
     return {
@@ -729,12 +760,21 @@ export class TopologyView {
   }
 
   applyTransform() {
-    if (!this.scene) return;
+    if (!this.svg) return;
     const { x, y, scale } = this.transform;
-    this.scene.setAttribute('transform', `translate(${x} ${y}) scale(${scale})`);
+    const { ratio, left, top } = this.pixels;
+    this.svg.style.setProperty('transform-origin', `${left}px ${top}px`);
+    this.svg.style.setProperty('transform', `translate(${x * ratio}px, ${y * ratio}px) scale(${scale})`);
+
+    if (this.devices.length > FAR_LABELS_FROM) {
+      const far = LABEL_TYPE.nameSize * ratio * scale < LEGIBLE_NAME_PX;
+      if (far !== this.svg.classList.contains('is-far')) this.svg.classList.toggle('is-far', far);
+      this.svg.style.setProperty('will-change', 'transform');
+      clearTimeout(this.still);
+      this.still = setTimeout(() => this.svg.style.removeProperty('will-change'), STILL_AFTER);
+    }
 
     // Propiedades del contenedor: una variable CSS se heredaría y recalcularía el SVG entero.
-    const { ratio, left, top } = this.pixels;
     const spacing = GRID_SPACING * scale;
     this.container.style.setProperty('background-size', `${spacing}px ${spacing}px`);
     this.container.style.setProperty('background-position', `${left + x * ratio}px ${top + y * ratio}px`);
@@ -742,7 +782,7 @@ export class TopologyView {
 
   // Píxeles por unidad del lienzo y dónde empieza, con la franja que deja `meet` si sobra panel.
   measurePixels() {
-    const { width, height } = this.svg.getBoundingClientRect();
+    const { width, height } = this.viewport.getBoundingClientRect();
     const ratio = Math.min(width / this.frame.width, height / this.frame.height) || 1;
     this.pixels = { ratio, left: (width - this.frame.width * ratio) / 2, top: (height - this.frame.height * ratio) / 2 };
   }
