@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { deflateRawSync, deflateSync } from 'node:zlib';
 import { setLanguage } from '../src/i18n.js';
 import { decodePacketTracerFile } from '../src/pkt/decode.js';
-import { locationOf, withoutUnread } from '../src/pkt/model.js';
+import { locationOf, printable, withoutUnread } from '../src/pkt/model.js';
 
 // Los mensajes que se comparan abajo son los del idioma por defecto.
 setLanguage('en');
@@ -102,4 +102,11 @@ test('antes de armar el árbol se sacan las partes que el visor no lee', () => {
   // Si algo no cierra, el texto vuelve entero para que el parser dé el error.
   const broken = '<A><FILE_MANAGER><FILE_MANAGER></FILE_MANAGER></A>';
   assert.equal(withoutUnread(broken), broken);
+});
+
+test('los caracteres de control que guarda IOS se escriben como los muestra IOS', () => {
+  const banner = `<LINE>banner motd ${String.fromCharCode(3)}Solo personal autorizado${String.fromCharCode(3)}</LINE>`;
+
+  assert.equal(printable(banner), '<LINE>banner motd ^CSolo personal autorizado^C</LINE>');
+  assert.equal(printable('a\tb\r\nc'), 'a\tb\r\nc', 'tocó un espacio en blanco que XML sí admite');
 });

@@ -100,12 +100,56 @@ const TRAY_SLOT = 160;
 const TRAY_ROW_HEIGHT = 96;
 const TRAY_HEADING = 26;
 
+// A menos de STACKED unidades los iconos se tapan también en Packet Tracer, y separar las
+// etiquetas pediría un lienzo varias veces más grande. Se apartan hasta APART sobre su recta.
+const STACKED = 24;
+const APART = 48;
+
+export function unstack(devices) {
+  const moved = new Map();
+  const at = (device) => moved.get(device.id) ?? device;
+  for (let pass = 0; pass < 4; pass++) {
+    const cells = new Map();
+    for (const device of devices) {
+      const { x, y } = at(device);
+      const key = `${Math.floor(x / APART)},${Math.floor(y / APART)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(device);
+    }
+
+    let changed = false;
+    for (const a of devices) {
+      const p = at(a);
+      const column = Math.floor(p.x / APART);
+      const row = Math.floor(p.y / APART);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (const b of cells.get(`${column + dx},${row + dy}`) ?? []) {
+            if (b.id <= a.id) continue;
+            const q = at(b);
+            const distance = Math.hypot(q.x - p.x, q.y - p.y);
+            if (distance >= STACKED) continue;
+            const [ux, uy] = distance > 0 ? [(q.x - p.x) / distance, (q.y - p.y) / distance] : [0, 1];
+            const push = (APART - distance) / 2;
+            moved.set(a.id, { x: p.x - ux * push, y: p.y - uy * push });
+            moved.set(b.id, { x: q.x + ux * push, y: q.y + uy * push });
+            changed = true;
+          }
+        }
+      }
+    }
+    if (!changed) break;
+  }
+  if (moved.size === 0) return devices;
+  return devices.map((device) => (moved.has(device.id) ? { ...device, ...moved.get(device.id) } : device));
+}
+
 // Aparta los equipos sin enlaces que quedaron fuera del rectángulo de la red: uno solo a
 // 3900 unidades achicaría todo el resto.
 export function partitionDevices(devices, links) {
   const connected = new Set(links.flatMap((link) => [link.from, link.to]));
   const wired = devices.filter((device) => connected.has(device.id));
-  if (wired.length < 2) return { placed: devices, stray: [] };
+  if (wired.length < 2) return { placed: unstack(devices), stray: [] };
 
   const { minX, minY, spanX, spanY } = measureBounds(wired);
   const slackX = spanX * 0.15;
@@ -119,7 +163,7 @@ export function partitionDevices(devices, links) {
         || device.y < minY - slackY || device.y > minY + spanY + slackY);
     (apart ? stray : placed).push(device);
   }
-  return { placed, stray };
+  return { placed: unstack(placed), stray };
 }
 
 export function trayPlan(stray, availableWidth) {

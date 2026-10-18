@@ -1,5 +1,6 @@
 import { getLocale, t } from '../i18n.js';
 import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS, selectVisible } from './graph.js';
+import { renderRichText } from './rich-text.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -39,6 +40,12 @@ function scrollable(table) {
   return wrapper;
 }
 
+// GigabitEthernet0/0.10 no tiene dónde cortar: se corta antes del número, nunca en la palabra.
+function withPortBreaks(text) {
+  return text.split(/(?<=[a-z]{3})(?=[0-9])/i)
+    .flatMap((part, index) => (index === 0 ? [part] : [document.createElement('wbr'), part]));
+}
+
 function dataTable(headings, rows) {
   const table = createElement('table', 'table');
   const headRow = createElement('tr');
@@ -50,10 +57,14 @@ function dataTable(headings, rows) {
   const body = createElement('tbody');
   for (const cells of rows) {
     const row = createElement('tr');
-    for (const { text, mono, wrap, lines } of cells) {
+    for (const { text, sub, mono, wrap, lines } of cells) {
       const className = [mono && 'table__mono', wrap && 'table__wrap', lines && 'table__lines']
         .filter(Boolean).join(' ');
-      row.append(createElement('td', className || null, text));
+      const cell = createElement('td', className || null);
+      if (wrap) cell.append(...withPortBreaks(text));
+      else cell.textContent = text;
+      if (sub) cell.append(createElement('span', 'table__sub', sub));
+      row.append(cell);
     }
     body.append(row);
   }
@@ -84,10 +95,8 @@ function interfaceTable(interfaces) {
     const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '-' }];
     for (const address of addresses) {
       const row = createElement('tr');
-      const name = createElement('td', 'table__mono', entry.name || entry.mac || '-');
-      // GigabitEthernet0/0.10 no tiene dónde cortar: se corta antes del número, nunca en la palabra.
-      const [, word, number] = entry.name.match(/^(\D+)(\d.*)$/) ?? [];
-      if (number) name.replaceChildren(word, document.createElement('wbr'), number);
+      const name = createElement('td', 'table__mono');
+      name.append(...withPortBreaks(entry.name || entry.mac || '-'));
       if (entry.description) name.title = entry.description;
 
       row.append(
@@ -103,21 +112,37 @@ function interfaceTable(interfaces) {
   return scrollable(table);
 }
 
+// Las abreviaturas de `show vlan brief`: con los nombres enteros la tabla no entra en el panel.
+const PORT_ABBREVIATIONS = [
+  [/^TenGigabitEthernet/i, 'Te'], [/^GigabitEthernet/i, 'Gi'], [/^FastEthernet/i, 'Fa'],
+  [/^Ethernet/i, 'Et'], [/^Serial/i, 'Se'], [/^Port-channel/i, 'Po'],
+];
+
+function shortPort(name) {
+  for (const [long, short] of PORT_ABBREVIATIONS) if (long.test(name)) return name.replace(long, short);
+  return name;
+}
+
 // Agrupada por VLAN: por puerto, un switch de 24 bocas serían 24 renglones.
 function vlanTable(vlans) {
-  // La columna de subinterfaces sólo aparece en un router-on-a-stick.
+  // Las columnas de voz y de subinterfaces sólo aparecen si algún puerto las usa.
+  const voice = vlans.some((vlan) => vlan.voice.length > 0);
   const routed = vlans.some((vlan) => vlan.routed.length > 0);
-  const headings = ['table.vlan', 'table.vlanName', 'table.accessPorts', 'table.trunkPorts'];
+  const headings = ['table.vlan', 'table.accessPorts'];
+  if (voice) headings.push('table.voicePorts');
+  headings.push('table.trunkPorts');
   if (routed) headings.push('table.routedPorts');
+  const list = (names) => names.map(shortPort).join(', ') || '-';
+  const trunk = (vlan, name) => (vlan.native.includes(name) ? `${name} (${t('table.native')})` : name);
 
   return dataTable(headings, vlans.map((vlan) => {
     const cells = [
-      { text: vlan.id, mono: true },
-      { text: vlan.name || '-' },
-      { text: vlan.ports.join(', ') || '-', mono: true, wrap: true },
-      { text: vlan.trunks.join(', ') || '-', mono: true, wrap: true },
+      { text: vlan.id, sub: vlan.name, mono: true },
+      { text: list(vlan.ports), mono: true, wrap: true },
     ];
-    if (routed) cells.push({ text: vlan.routed.join(', ') || '-', mono: true, wrap: true });
+    if (voice) cells.push({ text: list(vlan.voice), mono: true, wrap: true });
+    cells.push({ text: list(vlan.trunks.map((name) => trunk(vlan, name))), mono: true, wrap: true });
+    if (routed) cells.push({ text: list(vlan.routed), mono: true, wrap: true });
     return cells;
   }));
 }
@@ -145,8 +170,9 @@ function routingTable(routing) {
   if (passive) headings.push('table.passive');
 
   return dataTable(headings, routing.map((entry) => {
+    const label = [protocolLabel(entry), entry.routerId && `router-id ${entry.routerId}`].filter(Boolean);
     const cells = [
-      { text: protocolLabel(entry) },
+      { text: label.join('\n'), lines: true },
       { text: entry.networks.join('\n') || '-', mono: true, lines: true, wrap: true },
     ];
     if (passive) cells.push({ text: entry.passive.join('\n') || '-', mono: true, lines: true, wrap: true });
@@ -332,6 +358,29 @@ function categoryKey(devices, { onFilter, filtering, hidden }) {
   return list;
 }
 
+// Puede ser texto o HTML de Qt, que vacío igual trae su marcado.
+function descriptionOf(text) {
+  if (!text.trim()) return null;
+  if (!/^\s*<(!doctype|html)/i.test(text)) return createElement('p', 'panel-text panel-text--lines', text);
+  const { content } = renderRichText([text]);
+  return content.textContent.trim() ? content : null;
+}
+
+// Cerradas de entrada: son varias pantallas de texto.
+function activitySection(pages) {
+  const { title, content } = renderRichText(pages);
+  const wrapper = createElement('div');
+  if (title) {
+    const heading = createElement('p', 'activity__title', title);
+    if (content.lang) heading.lang = content.lang;
+    wrapper.append(heading);
+  }
+  const toggle = createElement('details', 'activity__toggle');
+  toggle.append(createElement('summary', null, t('panel.readInstructions')), content);
+  wrapper.append(toggle);
+  return section(t('panel.activity'), wrapper);
+}
+
 export function renderNetworkSummary(container, model, { fileName, variant, onDownload, ...filter } = {}) {
   container.replaceChildren();
 
@@ -340,11 +389,12 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
     createElement('p', 'panel-head__kind', t('panel.summary')),
     createElement('h2', 'panel-head__title', t('panel.topology')),
   );
-  container.append(header, section(t('panel.inventory'), categoryKey(model.devices, filter)));
+  container.append(header);
+  if (model.instructions.length > 0) container.append(activitySection(model.instructions));
+  container.append(section(t('panel.inventory'), categoryKey(model.devices, filter)));
 
-  if (model.description) {
-    container.append(section(t('panel.description'), createElement('p', 'panel-text', model.description)));
-  }
+  const description = descriptionOf(model.description);
+  if (description) container.append(section(t('panel.description'), description));
   container.append(section(t('panel.howTo'), createElement('p', 'panel-text', t('panel.howToText'))));
 
   const network = selectVisible(model, false);

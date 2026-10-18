@@ -9,6 +9,7 @@ import {
   planLabels,
   projectIntoRect,
   threadFor,
+  unstack,
 } from '../src/view/graph.js';
 
 const INSETS = { left: 120, right: 120, top: 150, bottom: 130 };
@@ -99,4 +100,21 @@ test('el color del enlace sale del cableado y, si falta, del medio', () => {
   assert.equal(threadFor({ wiring: '', media: 'eCoaxial' }), 'brown');
   assert.equal(threadFor({ wiring: '', media: 'eOctal' }), 'neutral');
   assert.equal(threadFor({ wiring: '', media: '' }), 'neutral');
+});
+
+test('dos equipos encimados en el archivo se apartan y el resto no se toca', () => {
+  const devices = [
+    { id: 'a', x: 627, y: 160 },
+    { id: 'b', x: 632, y: 150 },
+    { id: 'c', x: 400, y: 150 },
+  ];
+  const placed = unstack(devices);
+  const [a, b] = placed;
+
+  assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 47.9, 'siguen encimados');
+  assert.equal(placed[2], devices[2]);
+  assert.deepEqual(devices[0], { id: 'a', x: 627, y: 160 }, 'cambió el modelo original');
+
+  const apart = [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 45, y: 0 }];
+  assert.equal(unstack(apart), apart, 'separó equipos que no se tapan');
 });

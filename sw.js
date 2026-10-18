@@ -35,6 +35,7 @@ const SHELL = [
   '/src/view/topology.js',
   '/src/view/graph.js',
   '/src/view/inspector.js',
+  '/src/view/rich-text.js',
   '/src/view/packets.js',
   '/src/view/export.js',
   '/src/view/export-dialog.js',

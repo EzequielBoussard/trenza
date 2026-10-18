@@ -243,3 +243,76 @@ test('la red de un protocolo no se confunde con la de otro bloque', () => {
 
   assert.deepEqual(rip.networks, ['10.0.0.0'], 'se coló la red de la reserva de DHCP');
 });
+
+test('OSPF activado en la interfaz cuenta como red del proceso, con su router-id', () => {
+  const config = `
+!
+interface GigabitEthernet0/0/0
+ ip address 10.0.1.1 255.255.255.248
+ ip ospf cost 10
+ ip ospf 10 area 0
+!
+interface Serial0/1/0
+ ipv6 address 2001:db8:acad:1::1/64
+ ipv6 ospf 20 area 1
+!
+router ospf 10
+ router-id 6.6.6.6
+ passive-interface GigabitEthernet0/0/0
+!
+ipv6 router ospf 20
+ router-id 7.7.7.7
+!
+`.split('\n');
+  const protocols = readRoutingProtocols(config, readInterfaces(config));
+
+  assert.deepEqual(protocols.map((entry) => [entry.protocol, entry.id, entry.version, entry.routerId]), [
+    ['OSPF', '10', '', '6.6.6.6'],
+    ['OSPF', '20', '3', '7.7.7.7'],
+  ]);
+  assert.deepEqual(protocols[0].networks, ['GigabitEthernet0/0/0 area 0'], '"ip ospf cost" se leyó como área');
+  assert.deepEqual(protocols[1].networks, ['Serial0/1/0 area 1']);
+});
+
+test('una lista en las líneas vty filtra el acceso remoto y cuenta como aplicada', () => {
+  const config = `
+!
+ip access-list standard ADMIN
+ permit 192.168.1.64 0.0.0.7
+!
+line con 0
+!
+line vty 0 4
+ access-class ADMIN in
+ login
+line vty 5 15
+ access-class ADMIN in
+!
+`.split('\n');
+  const [list] = readAccessLists(config, readInterfaces(config));
+
+  assert.deepEqual(list.rules, ['permit 192.168.1.64 0.0.0.7']);
+  assert.deepEqual(list.inbound, ['vty 0 4', 'vty 5 15']);
+});
+
+test('la VLAN de voz y la nativa del tronco quedan anotadas en su VLAN', () => {
+  const config = `
+!
+interface FastEthernet0/11
+ switchport access vlan 10
+ switchport mode access
+ switchport voice vlan 40
+!
+interface GigabitEthernet0/1
+ switchport trunk native vlan 99
+ switchport mode trunk
+!
+`.split('\n');
+  const vlans = new Map(readVlans(config, readInterfaces(config)).map((vlan) => [vlan.id, vlan]));
+
+  assert.deepEqual([...vlans.keys()], ['10', '40', '99']);
+  assert.deepEqual(vlans.get('40').voice, ['FastEthernet0/11']);
+  assert.deepEqual(vlans.get('40').ports, [], 'el puerto de voz se contó como de acceso');
+  assert.deepEqual(vlans.get('99').native, ['GigabitEthernet0/1']);
+  assert.deepEqual(vlans.get('99').trunks, ['GigabitEthernet0/1']);
+});

@@ -136,7 +136,7 @@ function readDevice(deviceNode, index, places) {
     interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
     vlans: readVlans(configLines, configured, vlansFromEngine(engine)),
     routes: readRoutes(configLines),
-    routing: readRoutingProtocols(configLines),
+    routing: readRoutingProtocols(configLines, configured),
     accessLists: readAccessLists(configLines, configured),
     runningConfig: configLines,
     links: [],
@@ -162,10 +162,12 @@ function readLink(linkNode) {
 }
 
 // Más de la mitad del XML que guarda Packet Tracer: el ambiente de la vista física, los archivos
-// de cada equipo, los clientes de Wi-Fi, celular y correo, y el modelo de los IoT. Nada se lee.
+// de cada equipo, los clientes de Wi-Fi, celular y correo, y el modelo de los IoT. En una actividad,
+// además, la corrección y los bloqueos. Nada se lee.
 const UNREAD = [
   'ENVIRONMENT', 'FILE_MANAGER', 'THING_MODEL', 'PIXMAPBANK',
   'WIRELESS_CLIENT', 'CELLULAR_CLIENT', 'BLUETOOTH_MANAGER', 'ALGORITHM_SETTINGS', 'EMAIL_CLIENT',
+  'COMPARISONS', 'INITIALSETUP', 'LOCKINGTREE',
 ];
 
 // Se saca del texto antes de armar el árbol, que es lo que más tarda al abrir. Si algo no
@@ -193,8 +195,23 @@ export function withoutUnread(text) {
   return kept.join('');
 }
 
+// XML no admite caracteres de control, y IOS los guarda: `banner motd` va entre dos Ctrl+C. Se
+// escriben como los muestra IOS, ^C.
+export function printable(text) {
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, (char) => `^${String.fromCharCode(char.charCodeAt(0) + 64)}`);
+}
+
+// Una actividad (.pka) guarda la red en el estado en que se guardó, la inicial y la de respuesta;
+// se muestra la primera, que es la que abre Packet Tracer. Las instrucciones son páginas HTML.
+function readInstructions(root) {
+  const activity = childNamed(root, 'ACTIVITY');
+  const instructions = activity ? childNamed(activity, 'INSTRUCTIONS') : null;
+  if (!instructions) return [];
+  return childrenNamed(instructions, 'PAGE').map((page) => page.textContent).filter((page) => page.trim());
+}
+
 export function buildNetworkModel(xmlText) {
-  const document = new DOMParser().parseFromString(withoutUnread(xmlText), 'application/xml');
+  const document = new DOMParser().parseFromString(printable(withoutUnread(xmlText)), 'application/xml');
   if (document.querySelector('parsererror')) {
     throw new Error(t('error.xml'));
   }
@@ -224,6 +241,7 @@ export function buildNetworkModel(xmlText) {
   return {
     version: childText(root, 'VERSION') || t('panel.unknownVersion'),
     description: childText(network, 'DESCRIPTION'),
+    instructions: readInstructions(root),
     devices,
     links: connected,
   };

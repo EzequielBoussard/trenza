@@ -1578,6 +1578,56 @@ button.key__row:hover { background: var(--raised); }
   color: var(--text-muted);
 }
 
+.panel-text--lines { white-space: pre-line; }
+
+.activity__title {
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.activity__toggle > summary {
+  width: fit-content;
+  padding: 0.2rem 0;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.activity__toggle > summary:hover { color: var(--text); }
+
+@media (pointer: coarse) {
+  .activity__toggle > summary { padding: 0.55rem 0; }
+}
+
+.rich-text {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.rich-text :is(h4, h5, h6) {
+  margin: 1.1rem 0 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.rich-text h4 { font-size: 0.92rem; }
+.rich-text h5 { font-size: 0.86rem; }
+.rich-text h6 { font-size: 0.82rem; }
+.rich-text p { margin: 0.4rem 0; }
+.rich-text ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+.rich-text li { margin: 0.2rem 0; }
+.rich-text .rich-text__deeper { margin-left: 1.2rem; list-style-type: circle; }
+.rich-text .code-block { margin: 0.5rem 0; max-height: none; }
+.rich-text .table-scroller { margin: 0.5rem 0; }
+.rich-text .table td { overflow-wrap: normal; }
+.rich-text .table td p { margin: 0; }
+.rich-text strong { color: var(--text); }
+
 .facts {
   display: grid;
   grid-template-columns: minmax(6rem, auto) 1fr;
@@ -1624,7 +1674,8 @@ button.key__row:hover { background: var(--raised); }
 
 .table-scroller { overflow-x: auto; }
 
-.table__wrap { overflow-wrap: anywhere; }
+/* Con anywhere la tabla achica la columna hasta cortar cualquier palabra. */
+.table__wrap { overflow-wrap: break-word; }
 
 .table__lines { white-space: pre-line; }
 

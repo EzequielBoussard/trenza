@@ -31,11 +31,21 @@ export function readInterfaces(configLines) {
     const access = line.match(/^switchport access vlan\s+(\d+)/i);
     if (access) current.vlan = access[1];
 
+    const voice = line.match(/^switchport voice vlan\s+(\d+)/i);
+    if (voice) current.voice = voice[1];
+
+    const native = line.match(/^switchport trunk native vlan\s+(\d+)/i);
+    if (native) current.native = native[1];
+
+    // OSPF activado en la interfaz y no con `network` bajo `router ospf`.
+    const ospf = line.match(/^ip(v6)? ospf\s+(\d+)\s+area\s+(\S+)/i);
+    if (ospf) current.ospf = { ipv6: Boolean(ospf[1]), id: ospf[2], area: ospf[3] };
+
     // Router-on-a-stick: la VLAN sale de la encapsulación, diga lo que diga el nombre de la subinterfaz.
     const tagged = line.match(/^encapsulation\s+dot1q\s+(\d+)/i);
     if (tagged) current.dot1q = tagged[1];
 
-    const group = line.match(/^ip access-group\s+(\S+)\s+(in|out)\b/i);
+    const group = line.match(/^(?:ip access-group|ipv6 traffic-filter)\s+(\S+)\s+(in|out)\b/i);
     if (group) current.accessGroups.push({ id: group[1], direction: group[2].toLowerCase() });
 
     // Un trunk sin "allowed vlan" las lleva todas.
@@ -75,7 +85,7 @@ export function readVlans(configLines, interfaces, declared = []) {
   const vlans = new Map();
   const named = new Set();
   const define = (id) => {
-    if (!vlans.has(id)) vlans.set(id, { id, name: '', ports: [], trunks: [], routed: [] });
+    if (!vlans.has(id)) vlans.set(id, { id, name: '', ports: [], voice: [], trunks: [], native: [], routed: [] });
     return vlans.get(id);
   };
 
@@ -100,6 +110,14 @@ export function readVlans(configLines, interfaces, declared = []) {
     if (entry.vlan) {
       define(entry.vlan).ports.push(entry.name);
       named.add(entry.vlan);
+    }
+    if (entry.voice) {
+      define(entry.voice).voice.push(entry.name);
+      named.add(entry.voice);
+    }
+    if (entry.native) {
+      define(entry.native).native.push(entry.name);
+      named.add(entry.native);
     }
     if (entry.dot1q) {
       define(entry.dot1q).routed.push(entry.name);
@@ -151,8 +169,15 @@ export function readAccessLists(configLines, interfaces = []) {
   };
 
   let open = null;
+  let terminal = null;
   for (const raw of configLines) {
     const line = raw.trim();
+
+    // `access-class` filtra quién entra por Telnet o SSH: se aplica a las líneas vty, no a una interfaz.
+    const header = line.match(/^line\s+(.+)$/i);
+    if (header) terminal = header[1].replace(/\s+/g, ' ');
+    const restricted = line.match(/^(?:ipv6 )?access-class\s+(\S+)\s+(in|out)\b/i);
+    if (restricted && terminal) define(restricted[1])[restricted[2].toLowerCase() === 'in' ? 'inbound' : 'outbound'].push(terminal);
 
     // Numeradas: una regla por línea. Nombradas: un bloque que termina en la primera línea
     // que no es regla.
@@ -184,16 +209,25 @@ export function readAccessLists(configLines, interfaces = []) {
 }
 
 // Las sentencias `network` quedan como texto: cada protocolo tiene su propia sintaxis.
-export function readRoutingProtocols(configLines) {
+export function readRoutingProtocols(configLines, interfaces = []) {
   const protocols = [];
   let open = null;
 
   for (const raw of configLines) {
     const line = raw.trim();
 
-    const header = line.match(/^router\s+([a-z0-9]+)\s*(\S*)/i);
+    const header = line.match(/^(ipv6 )?router\s+([a-z0-9]+)\s*(\S*)/i);
     if (header) {
-      open = { protocol: header[1].toUpperCase(), id: header[2], version: '', networks: [], passive: [] };
+      const ipv6 = Boolean(header[1]);
+      const protocol = header[2].toUpperCase();
+      open = {
+        protocol: ipv6 && protocol === 'RIP' ? 'RIPng' : protocol,
+        id: header[3],
+        version: ipv6 && protocol === 'OSPF' ? '3' : '',
+        routerId: '',
+        networks: [],
+        passive: [],
+      };
       protocols.push(open);
       continue;
     }
@@ -211,6 +245,21 @@ export function readRoutingProtocols(configLines) {
 
     const passive = line.match(/^passive-interface\s+(\S+)/i);
     if (passive) open.passive.push(passive[1]);
+
+    const routerId = line.match(/^router-id\s+(\S+)/i);
+    if (routerId) open.routerId = routerId[1];
+  }
+
+  for (const entry of interfaces) {
+    if (!entry.ospf) continue;
+    const { ipv6, id, area } = entry.ospf;
+    const version = ipv6 ? '3' : '';
+    let owner = protocols.find((item) => item.protocol === 'OSPF' && item.id === id && item.version === version);
+    if (!owner) {
+      owner = { protocol: 'OSPF', id, version, routerId: '', networks: [], passive: [] };
+      protocols.push(owner);
+    }
+    owner.networks.push(`${entry.name} area ${area}`);
   }
 
   return protocols;

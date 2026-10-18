@@ -14,10 +14,11 @@ Con un `.pkt`, `.pka` o `.pkz`:
 
 - Dibuja la topología lógica con las posiciones guardadas en el archivo.
 - Explica en una frase qué es cada tipo de equipo, con el mismo símbolo que en el diagrama. Elegir un tipo deja a la vista sólo esos equipos.
-- Muestra cada equipo con sus interfaces y direcciones, VLAN, rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso, su ubicación en la vista física y la `running-config`, que se puede copiar.
+- Muestra cada equipo con sus interfaces y direcciones, VLAN (también la de voz y la nativa de cada tronco), rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y dónde están aplicadas, su ubicación en la vista física y la `running-config`, que se puede copiar.
 - Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide. En el panel, el equipo del otro lado de cada conexión se elige con un clic.
 - Busca equipos por nombre, tipo o dirección y apaga en el diagrama los que no coinciden.
 - Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español, con tema claro u oscuro y, si se quiere, con los tipos de equipo en la leyenda.
+- En una actividad (`.pka`) muestra además sus instrucciones, con la tabla de direcciones y los comandos, y la red tal como se guardó.
 
 Con un `.pcap` o `.pcapng`:
 
@@ -77,7 +78,7 @@ Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define 
 
 Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
-Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, y con los mismos guardados como `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en poco más de un segundo y se probó hasta 16000. El formato sin cifrar sólo se probó con archivos generados. Las listas de acceso se probaron con configuraciones escritas a mano, porque ninguno de los archivos reales tenía una.
+Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en poco más de un segundo y se probó hasta 16000. El formato sin cifrar sólo se probó con archivos generados. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
 
 ## Contribuir
 
