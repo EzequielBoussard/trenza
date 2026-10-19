@@ -1,14 +1,9 @@
+import { csvBlob } from '../download.js';
 import { t } from '../i18n.js';
 
 const PCAP_MAGIC = 0xa1b2c3d4;
 const SNAPLEN = 65535;
 
-function csvCell(value) {
-  const text = String(value ?? '');
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-// Con BOM: sin él, Excel abre el CSV en la codificación del sistema y rompe los acentos.
 export function toCsv(packets, { origin }) {
   const headers = ['table.number', 'table.time', 'panel.packet', 'table.source', 'table.destination',
     'table.protocol', 'table.length', 'table.detail'].map((key) => t(key));
@@ -25,8 +20,7 @@ export function toCsv(packets, { origin }) {
     packet.summary,
   ]);
 
-  const text = [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
-  return new Blob([`﻿${text}\r\n`], { type: 'text/csv;charset=utf-8' });
+  return csvBlob([headers, ...rows]);
 }
 
 // Pcap clásico: alcanza con un tipo de enlace por paquete.

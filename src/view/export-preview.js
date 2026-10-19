@@ -33,7 +33,7 @@ export function createExportPreview({ frame, note, lens, lensCanvas }) {
         : `${result.width} × ${result.height} px`;
       const paper = request.format === 'pdf' && SIZE_LABELS[request.size];
       const touching = result.crowded > 0
-        ? t('export.previewCrowded', { crowded: countOf('labels', result.crowded) })
+        ? t(VECTOR_FORMATS.includes(request.format) ? 'export.previewCrowded' : 'export.previewCrowdedRaster', { crowded: countOf('labels', result.crowded) })
         : '';
 
       note.textContent = [paper, measure, touching].filter(Boolean).join(' · ');

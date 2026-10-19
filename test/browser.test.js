@@ -1,6 +1,6 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,12 +14,14 @@ const skip = executable ? false : 'no hay Chrome ni Edge (CHROME_PATH lo indica 
 let site;
 let browser;
 let folder;
+let nextDownload;
 
 before(async () => {
   if (skip) return;
   site = await serve(fileURLToPath(new URL('..', import.meta.url)));
   browser = await launch(executable);
   folder = mkdtempSync(join(tmpdir(), 'trenza-archivos-'));
+  nextDownload = await browser.downloads(folder);
 });
 
 after(async () => {
@@ -195,6 +197,68 @@ test('con más de 500 equipos las etiquetas esperan a leerse y el zoom llega a l
 
   assert.ok(scale > 6, `el zoom se quedó en ${scale}`);
   assert.ok(name >= 20, `el nombre mide ${name} px`);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('el diálogo de exportar entra directo al nombre y entrega PNG, inventario e imagen copiada', { skip }, async () => {
+  await browser.grant(site.url, ['clipboardReadWrite', 'clipboardSanitizedWrite']);
+  const tab = await browser.tab();
+  await openFile(tab, 'red.pkt', buildLegacyFile(LAB));
+
+  // El foco entra una sola vez, directo al nombre.
+  const focused = await tab.evaluate(`(() => {
+    const seen = [];
+    const dialog = document.querySelector('[data-export-dialog]');
+    dialog.addEventListener('focusin', (event) => seen.push(event.target.tagName));
+    dialog.addEventListener('focus', () => seen.push('DIALOG'));
+    document.querySelector('[data-export]').click();
+    return seen.concat(document.activeElement.name);
+  })()`);
+  assert.deepEqual(focused, ['INPUT', 'name']);
+
+  let download = nextDownload();
+  await tab.evaluate(`(() => {
+    const form = document.querySelector('[data-export-form]');
+    form.elements.name.value = '  Mi diagrama.png ';
+    form.querySelector('input[name=format][value=png]').click();
+    form.requestSubmit();
+  })()`);
+  let file = await download;
+  const png = readFileSync(file.path);
+  assert.equal(file.name, 'Mi diagrama.png');
+  assert.deepEqual([...png.subarray(1, 4)].map((code) => String.fromCharCode(code)).join(''), 'PNG');
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1920, 1080]);
+  await tab.waitFor("document.querySelector('[role=status]').textContent.startsWith('Mi diagrama.png · 1920×1080 px')");
+
+  download = nextDownload();
+  await tab.evaluate(`(() => {
+    document.querySelector('[data-export]').click();
+    const form = document.querySelector('[data-export-form]');
+    form.querySelector('[data-for=network] input[value=csv]').click();
+    form.dispatchEvent(new Event('change'));
+    if (!document.querySelector('[data-preview-panel]').hidden) throw new Error('el inventario muestra la vista previa');
+    form.requestSubmit();
+  })()`);
+  file = await download;
+  const rows = readFileSync(file.path, 'utf8').replace(/^\uFEFF/, '').trim().split('\r\n');
+  assert.equal(file.name, 'red.csv');
+  assert.equal(rows.length, 4);
+  assert.match(rows[1], /^"R1","Router","ISR4331","GigabitEthernet0\/0\/0","192\.0\.2\.1","255\.255\.255\.0"/);
+
+  await tab.evaluate(`(() => {
+    document.querySelector('[data-export]').click();
+    document.querySelector('[data-export-form] input[name=format][value=png]').click();
+    document.querySelector('[data-export-form]').dispatchEvent(new Event('change'));
+    document.querySelector('[data-export-copy]').click();
+  })()`);
+  await tab.waitFor("document.querySelector('[role=status]').dataset.tone !== 'info'");
+  const copied = await tab.evaluate(`(async () => {
+    const [item] = await navigator.clipboard.read();
+    const bitmap = await createImageBitmap(await item.getType('image/png'));
+    return [document.querySelector('[role=status]').textContent, bitmap.width, bitmap.height];
+  })()`);
+  assert.deepEqual(copied, ['Image copied, 1920×1080 px: it can be pasted into any document.', 1920, 1080]);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });

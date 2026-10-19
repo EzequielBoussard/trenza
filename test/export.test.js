@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { suggestExportName } from '../src/view/export.js';
+import { cleanExportName, inventoryCsv, suggestExportName } from '../src/view/export.js';
 import {
   LABEL_TYPE,
   LAYOUT_STRETCH,
@@ -117,4 +117,40 @@ test('dos equipos encimados en el archivo se apartan y el resto no se toca', () 
 
   const apart = [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 45, y: 0 }];
   assert.equal(unstack(apart), apart, 'separó equipos que no se tapan');
+});
+
+test('el nombre escrito a mano no rompe el archivo ni repite la extensión', () => {
+  assert.equal(cleanExportName('  red: piso 2/oficina.PNG ', 'red.pkt'), 'red- piso 2-oficina');
+  assert.equal(cleanExportName('diagrama.v2', 'red.pkt'), 'diagrama.v2');
+  assert.equal(cleanExportName('   ', 'Mi red.pkt'), 'Mi red');
+});
+
+test('el inventario tiene un renglón por dirección, en el orden de la lista', async () => {
+  const device = (id, name, category, interfaces) => ({ id, name, category, model: 'M', location: ['Sede', 'Rack'], interfaces, links: [] });
+  const model = {
+    devices: [
+      device('2', 'PC10', 'endpoint', [{ name: 'FastEthernet0', mac: '', gateway: '10.0.0.1', enabled: true, addresses: [{ address: '10.0.0.10', mask: '255.255.255.0' }] }]),
+      device('3', 'PC9', 'endpoint', []),
+      device('1', 'R1', 'router', [
+        { name: 'Gig0/0', mac: '', gateway: '', enabled: true, addresses: [{ address: '10.0.0.1', mask: '255.255.255.0' }, { address: '2001:db8::1', mask: '' }] },
+        { name: 'Gig0/1', mac: '', gateway: '', enabled: false, addresses: [] },
+      ]),
+    ],
+    links: [],
+  };
+  const { blob, devices } = inventoryCsv(model, { showInfrastructure: false });
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const lines = (await blob.text()).trim().split('\r\n');
+
+  assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf], 'sin BOM, Excel rompe los acentos');
+  assert.equal(devices, 3);
+  assert.equal(lines[0], '"Device","Type","Model","Interface","Address","Mask","Gateway","State","Location"');
+  assert.deepEqual(lines.slice(1).map((line) => line.split('","').slice(0, 5).join('|').replace(/^"/, '')), [
+    'R1|Router|M|Gig0/0|10.0.0.1',
+    'R1|Router|M|Gig0/0|2001:db8::1',
+    'R1|Router|M|Gig0/1|',
+    'PC9|User device|M||',
+    'PC10|User device|M|FastEthernet0|10.0.0.10',
+  ]);
+  assert.match(lines[5], /"10\.0\.0\.1","Up","Sede › Rack"$/);
 });

@@ -8,7 +8,11 @@ import {
   DEFAULT_RESOLUTION,
   SIZE_LABELS,
   VECTOR_FORMATS,
+  canCopyImage,
+  cleanExportName,
+  copyNetworkImage,
   exportNetwork,
+  inventoryCsv,
   offeredSizes,
   suggestExportName,
 } from './export.js';
@@ -19,7 +23,7 @@ function requestFrom(elements, state) {
   const fields = elements.exportForm.elements;
   return {
     format: fields.format.value,
-    name: fields.name.value.trim() || suggestExportName(state.file.name),
+    name: cleanExportName(fields.name.value, state.file.name),
     size: fields.size.value,
     transparent: fields.transparent.checked,
     guide: fields.guide.checked,
@@ -72,20 +76,24 @@ function updateFormatFields(elements, state, preview) {
 
   const format = elements.exportForm.elements.format.value;
   const vector = VECTOR_FORMATS.includes(format);
+  // El CSV de una red es el inventario: no lleva dibujo.
+  const drawing = !capture && format !== 'csv';
 
-  elements.transparentField.hidden = capture || format === 'jpg' || format === 'pdf';
-  elements.guideField.hidden = capture;
-  elements.sizeField.hidden = capture || vector;
-  if (!capture && !vector) updateSizeOptions(elements, state);
+  elements.transparentField.hidden = !drawing || format === 'jpg' || format === 'pdf';
+  elements.guideField.hidden = !drawing;
+  elements.sizeField.hidden = !drawing || vector;
+  if (drawing && !vector) updateSizeOptions(elements, state);
 
   elements.languageField.hidden = format === 'pcap';
-  elements.themeField.hidden = capture;
+  elements.themeField.hidden = !drawing;
   elements.scopeField.hidden = !capture || state.packetSelection.length === 0;
+  elements.exportCopy.hidden = !drawing || !['png', 'jpg'].includes(format) || !canCopyImage();
   elements.exportNote.textContent = capture ? t(CAPTURE_NOTES[format] ?? '')
-    : vector ? t('export.svgNote')
-      : format === 'pdf' ? t('export.pdfNote') : '';
+    : !drawing ? t('export.inventoryNote')
+      : vector ? t('export.svgNote')
+        : format === 'pdf' ? t('export.pdfNote') : '';
 
-  const shows = state.kind === 'network';
+  const shows = drawing;
   elements.previewPanel.hidden = !shows;
   elements.exportDialog.classList.toggle('dialog--wide', shows);
   if (shows) preview.schedule(state.model, requestFrom(elements, state));
@@ -123,6 +131,20 @@ function exportCapture(state, setStatus, { name, format, scope, language }) {
     size: Math.round(blob.size / 1024),
   }, 'ok');
 }
+
+function exportInventory(state, setStatus, { name, language }) {
+  const { blob, devices } = withLanguage(language, () => inventoryCsv(state.model, { showInfrastructure: state.showInfrastructure }));
+  const fileName = `${name}.csv`;
+  download(blob, fileName);
+  setStatus('status.exportedInventory', {
+    file: fileName,
+    devices: { key: 'unit.devices', values: { count: devices } },
+    size: Math.max(1, Math.round(blob.size / 1024)),
+  }, 'ok');
+}
+
+// Dibujar una red grande bloquea la página: el aviso tiene que pintarse antes.
+const nextPaint = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
 
 async function exportDiagram(state, setStatus, request) {
   try {
@@ -171,6 +193,19 @@ export function wireExportDialog({ elements, state, setStatus }) {
 
   elements.exportForm.addEventListener('change', refresh);
   elements.exportCancel.addEventListener('click', () => elements.exportDialog.close());
+
+  elements.exportCopy.addEventListener('click', async () => {
+    const request = requestFrom(elements, state);
+    const copying = copyNetworkImage(state.model, { ...request, transparent: request.format === 'png' && request.transparent });
+    elements.exportDialog.close();
+    setStatus('status.copying');
+    try {
+      const result = await copying;
+      setStatus('status.copied', { width: result.width, height: result.height }, 'ok');
+    } catch (error) {
+      setStatus('status.copyFailed', { reason: error.message }, 'error');
+    }
+  });
   elements.previewFrame.addEventListener('pointermove', (event) => {
     if (event.pointerType === 'mouse') preview.move(event);
   });
@@ -181,6 +216,11 @@ export function wireExportDialog({ elements, state, setStatus }) {
     const request = requestFrom(elements, state);
 
     elements.exportDialog.close();
+
+    if (state.kind === 'network' && request.format === 'csv') {
+      exportInventory(state, setStatus, request);
+      return;
+    }
     setStatus('status.exporting');
 
     if (state.kind === 'capture') {
@@ -193,6 +233,7 @@ export function wireExportDialog({ elements, state, setStatus }) {
       return;
     }
 
+    await nextPaint();
     await exportDiagram(state, setStatus, request);
   });
 }

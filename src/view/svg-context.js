@@ -68,6 +68,15 @@ export class SvgContext {
     return [round(x * scale + offsetX), round(y * scale + offsetY)];
   }
 
+  // Lo dibujado hasta endGroup() queda bajo un <title>: el visor lo muestra al pasar el puntero.
+  beginGroup(title) {
+    this.elements.push(`<g><title>${escape(title)}</title>`);
+  }
+
+  endGroup() {
+    this.elements.push('</g>');
+  }
+
   setLineDash(pattern) {
     this.state.dash = pattern && pattern.length > 0 ? pattern.join(' ') : null;
   }

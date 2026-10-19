@@ -39,6 +39,7 @@ const elements = {
   exportDialog: document.querySelector('[data-export-dialog]'),
   exportForm: document.querySelector('[data-export-form]'),
   exportCancel: document.querySelector('[data-export-cancel]'),
+  exportCopy: document.querySelector('[data-export-copy]'),
   exportNote: document.querySelector('[data-export-note]'),
   transparentField: document.querySelector('[data-transparent-field]'),
   guideField: document.querySelector('[data-guide-field]'),

@@ -205,6 +205,22 @@ export async function launch(executable) {
       tab.close = () => connection.send('Target.closeTarget', { targetId });
       return tab;
     },
+    // Cada descarga queda en `folder` con un nombre propio; `next()` espera la siguiente.
+    async downloads(folder) {
+      await connection.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: folder, eventsEnabled: true });
+      const names = new Map();
+      const waiting = [];
+      connection.handlers.push(({ method, params }) => {
+        if (method === 'Browser.downloadWillBegin') names.set(params.guid, params.suggestedFilename);
+        if (method === 'Browser.downloadProgress' && params.state === 'completed') {
+          waiting.shift()?.({ name: names.get(params.guid), path: join(folder, params.guid) });
+        }
+      });
+      return () => new Promise((resolve) => waiting.push(resolve));
+    },
+    grant(origin, permissions) {
+      return connection.send('Browser.grantPermissions', { origin, permissions });
+    },
     async close() {
       if (child.exitCode === null) {
         const exited = new Promise((resolve) => child.once('exit', resolve));

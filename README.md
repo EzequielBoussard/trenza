@@ -17,7 +17,8 @@ Con un `.pkt`, `.pka` o `.pkz`:
 - Muestra cada equipo con sus interfaces y direcciones, VLAN (también la de voz y la nativa de cada tronco), rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y dónde están aplicadas, su ubicación en la vista física y la `running-config`, que se puede copiar.
 - Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide. En el panel, el equipo del otro lado de cada conexión se elige con un clic.
 - Busca equipos por nombre, tipo o dirección y apaga en el diagrama los que no coinciden.
-- Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español, con tema claro u oscuro y, si se quiere, con los tipos de equipo en la leyenda.
+- Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español, con tema claro u oscuro y, si se quiere, con los tipos de equipo en la leyenda. También lo copia como imagen, para pegarlo directo en un documento. El SVG crece lo que haga falta para que ninguna etiqueta quede encimada, aun con miles de equipos, y cada equipo muestra su nombre, dirección y tipo al pasar el puntero.
+- Exporta el inventario en CSV: una fila por dirección de cada equipo, con interfaz, máscara, puerta de enlace, estado y ubicación.
 - En una actividad (`.pka`) muestra además sus instrucciones, con la tabla de direcciones y los comandos, y la red tal como se guardó.
 
 Con un `.pcap` o `.pcapng`:

@@ -105,7 +105,7 @@
       <div class="dialog__fields">
         <label class="field">
           <span class="field__label" data-i18n="export.name">File name</span>
-          <input class="field__input" type="text" name="name" required maxlength="80" autocomplete="off">
+          <input class="field__input" type="text" name="name" required maxlength="80" autocomplete="off" autofocus>
         </label>
 
         <fieldset class="field">
@@ -115,6 +115,7 @@
             <label class="choice__option" data-for="network"><input type="radio" name="format" value="jpg"><span>JPG</span></label>
             <label class="choice__option" data-for="network"><input type="radio" name="format" value="svg"><span>SVG</span></label>
             <label class="choice__option" data-for="network"><input type="radio" name="format" value="pdf"><span>PDF</span></label>
+            <label class="choice__option" data-for="network"><input type="radio" name="format" value="csv"><span>CSV</span></label>
             <label class="choice__option" data-for="capture"><input type="radio" name="format" value="csv"><span>CSV</span></label>
             <label class="choice__option" data-for="capture"><input type="radio" name="format" value="pcap"><span>PCAP</span></label>
           </div>
@@ -174,6 +175,7 @@
     <p class="dialog__note" data-export-note></p>
 
     <div class="dialog__actions">
+      <button type="button" class="button button--quiet" data-export-copy data-i18n="export.copy" hidden>Copy image</button>
       <button type="button" class="button button--quiet" data-export-cancel data-i18n="action.cancel">Cancel</button>
       <button type="submit" class="button button--primary" data-i18n="export.submit">Export</button>
     </div>

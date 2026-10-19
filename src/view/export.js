@@ -1,5 +1,5 @@
 import { countOf, t, withLanguage } from '../i18n.js';
-import { download } from '../download.js';
+import { csvBlob, download } from '../download.js';
 import { SvgContext, haloText, strokeGlyph } from './svg-context.js';
 import {
   ADDRESS_FONT,
@@ -48,6 +48,8 @@ const DESIGN_WIDTH = 2200;
 // Paso fijo: como fracción del rango, en redes grandes queda demasiado grueso.
 const DESIGN_STEP = 50;
 const DESIGN_STEPS = 24;
+const NATURAL_GROWTH = 1.03;
+const NATURAL_STEPS = 24;
 
 const MIN_CONTENT_WIDTH = 760;
 const MAX_CONTENT_WIDTH = 4200;
@@ -123,6 +125,32 @@ export const VECTOR_FORMATS = Object.keys(EXPORT_FORMATS).filter((name) => EXPOR
 
 export function suggestExportName(fileName) {
   return (fileName || 'red').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '-').trim() || 'red';
+}
+
+// Lo escrito a mano pasa por lo mismo, sin repetir la extensión si ya la trae.
+export function cleanExportName(typed, fileName) {
+  const name = typed.trim().replace(/[\\/:*?"<>|]/g, '-').replace(/\.(png|jpe?g|svg|pdf|csv|pcap)$/i, '').trim();
+  return name || suggestExportName(fileName);
+}
+
+// Un renglón por dirección, en el orden de la lista: es lo que pide una tabla de direcciones.
+export function inventoryCsv(model, { showInfrastructure }) {
+  const headers = ['csv.device', 'csv.kind', 'panel.model', 'table.interface', 'table.address', 'table.mask',
+    'panel.gateway', 'table.state', 'panel.location'].map((key) => t(key));
+  const collator = new Intl.Collator(undefined, { numeric: true });
+  const devices = [...selectVisible(model, showInfrastructure).devices].sort((a, b) =>
+    CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) || collator.compare(a.name, b.name));
+
+  const rows = devices.flatMap((device) => {
+    const own = [device.name, t(`category.${device.category}`), device.model];
+    const where = device.location.join(' › ');
+    const ports = device.interfaces.flatMap((entry) =>
+      (entry.addresses.length > 0 ? entry.addresses : [{ address: '', mask: '' }]).map((address) => [
+        entry.name || entry.mac, address.address, address.mask, entry.gateway || '', t(entry.enabled ? 'table.up' : 'table.down'),
+      ]));
+    return (ports.length > 0 ? ports : [['', '', '', '', '']]).map((port) => [...own, ...port, where]);
+  });
+  return { blob: csvBlob([headers, ...rows]), devices: devices.length };
 }
 
 // Una caché por exportación: en el módulo guardaría medidas hechas antes de que carguen
@@ -210,6 +238,8 @@ function drawNodes(context, devices, positions, palette, labels) {
     const { x, y } = positions.get(device.id);
     const shown = labels.get(device.id);
     const [outline, symbol] = CATEGORY_THREADS[device.category] || CATEGORY_THREADS.other;
+    const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
+    context.beginGroup?.([device.name, address?.address, t(`category.${device.category}`)].filter(Boolean).join(', '));
 
     context.beginPath();
     context.arc(x, y, 26, 0, Math.PI * 2);
@@ -245,12 +275,12 @@ function drawNodes(context, devices, positions, palette, labels) {
     context.font = LABEL_FONT;
     haloText(context, device.name, x, y + LABEL_TYPE.nameBaseline + shown.offset);
 
-    const address = device.interfaces.flatMap((entry) => entry.addresses)[0];
     if (address) {
       context.fillStyle = palette['text-muted'];
       context.font = ADDRESS_FONT;
       haloText(context, address.address, x, y + LABEL_TYPE.addressBaseline + shown.offset);
     }
+    context.endGroup?.();
   }
 }
 
@@ -337,13 +367,14 @@ function drawLegend(context, legend, { palette, chrome, left, top }) {
   });
 }
 
-// Tamaño natural: el más chico en el que las etiquetas no se pisan.
-function measureDiagram(model, { showInfrastructure, guide }, chrome, measure) {
+// Tamaño natural: el más chico en el que las etiquetas no se pisan. Con `bounded` no pasa de
+// MAX_CONTENT_WIDTH × MAX_CONTENT_HEIGHT, que es lo que entra en un lienzo; el SVG no tiene techo.
+function measureDiagram(model, { showInfrastructure, guide, bounded }, chrome, measure) {
   const context2d = measure.context;
 
   // Lo que no depende del marco se calcula una vez: spreadScaleFor es O(n²) y esto se
   // llama una vez por ancho candidato.
-  const key = showInfrastructure ? 'con' : 'sin';
+  const key = `${showInfrastructure}-${bounded}`;
   if (!measure.fixed.has(key)) {
     const visible = selectVisible(model, showInfrastructure);
     if (visible.devices.length === 0) throw new Error(t('error.noDevices'));
@@ -351,17 +382,14 @@ function measureDiagram(model, { showInfrastructure, guide }, chrome, measure) {
     const { placed, stray } = partitionDevices(visible.devices, visible.links);
     const halfWidth = (device) => halfLabelWidth(device, measure);
     const { spanX, spanY } = measureBounds(placed);
+    const required = Math.max(spreadScaleFor(placed, halfWidth), MIN_CONTENT_WIDTH / spanX);
 
     measure.fixed.set(key, {
       placed,
       stray,
       links: visible.links,
       labelReach: Math.ceil(Math.max(...visible.devices.map(halfWidth))),
-      spread: Math.min(
-        Math.max(spreadScaleFor(placed, halfWidth), MIN_CONTENT_WIDTH / spanX),
-        MAX_CONTENT_WIDTH / spanX,
-        MAX_CONTENT_HEIGHT / spanY,
-      ),
+      spread: bounded ? Math.min(required, MAX_CONTENT_WIDTH / spanX, MAX_CONTENT_HEIGHT / spanY) : required,
     });
   }
 
@@ -433,14 +461,23 @@ function designWidths(shape) {
   return Array.from({ length: DESIGN_STEPS + 1 }, (_, step) => floor + DESIGN_STEP * step);
 }
 
-function planExport(model, { showInfrastructure, guide, pixels, measure = labelMeasurer() }) {
-  const shapeFor = (width) => measureDiagram(model, { showInfrastructure, guide }, chromeFor(width), measure);
+function planExport(model, { showInfrastructure, guide, pixels, bounded = true, measure = labelMeasurer() }) {
+  const shapeFor = (width) => measureDiagram(model, { showInfrastructure, guide, bounded }, chromeFor(width), measure);
   const shape = settledShape(shapeFor);
-  if (!pixels) return { ...layoutInto(shape, shape.natural), scale: 1 };
+  const labelCount = shape.placed.length + shape.stray.length;
+  if (!pixels) {
+    const natural = layoutInto(shape, shape.natural);
+    if (bounded || natural.crowded === 0) return { ...natural, scale: 1 };
+    // Sin techo, si quedó alguna encimada el dibujo crece de a 3 % hasta duplicarse.
+    const aspect = shape.natural.width / shape.natural.height;
+    const widths = Array.from({ length: NATURAL_STEPS + 1 }, (_, step) => shape.natural.width * NATURAL_GROWTH ** step);
+    const planAt = (width, limit) => layoutInto(shapeFor(width), { width, height: width / aspect }, limit);
+    return { ...tidiestWidth(widths, planAt, labelCount), scale: 1 };
+  }
 
   const aspect = pixels.width / pixels.height;
   const planAt = (width, limit) => layoutInto(shapeFor(width), { width, height: width / aspect }, limit);
-  const best = tidiestWidth(designWidths(shape), planAt, shape.placed.length + shape.stray.length);
+  const best = tidiestWidth(designWidths(shape), planAt, labelCount);
   return { ...best, scale: pixels.width / best.design.width };
 }
 
@@ -450,7 +487,7 @@ export function offeredSizes(model, { showInfrastructure, guide, format }) {
   const measure = labelMeasurer();
   let widths;
   try {
-    widths = designWidths(settledShape((width) => measureDiagram(model, { showInfrastructure, guide }, chromeFor(width), measure)));
+    widths = designWidths(settledShape((width) => measureDiagram(model, { showInfrastructure, guide, bounded: true }, chromeFor(width), measure)));
   } catch {
     return [];
   }
@@ -496,18 +533,20 @@ function canvasSizeFor(format, size) {
   };
 }
 
-async function renderNetworkToCanvas(model, { showInfrastructure, guide, format, size, transparent, title, palette, language, budget }) {
+async function renderNetworkToCanvas(model, { showInfrastructure, guide, format, size, transparent, title, palette, language, budget, bounded = true }) {
   await labelFontsReady();
 
   // Dentro de withLanguage también el plan: el ancho de la leyenda depende del idioma.
   return withLanguage(language, () => {
     const pixels = canvasSizeFor(format, size);
-    const plan = planExport(model, { showInfrastructure, guide, pixels });
-    const { design, scale } = plan;
+    const plan = planExport(model, { showInfrastructure, guide, pixels, bounded });
+    const { design } = plan;
+    // Ajustar al diagrama no puede pasar del techo del lienzo: ahí se achica en vez de fallar.
+    const ceiling = pixels ? 1 : Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / (design.width * design.height)));
+    const scale = plan.scale * ceiling;
 
     const width = Math.round(design.width * scale);
     const height = Math.round(design.height * scale);
-    if (!budget && width * height > MAX_CANVAS_PIXELS) throw new Error(t('error.tooLarge'));
 
     // La vista previa usa el mismo plan en menos píxeles.
     const shrink = budget ? Math.min(1, budget / width) : 1;
@@ -589,8 +628,15 @@ async function deflate(bytes) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
+// Texto de PDF en UTF-16 con BOM, en hexadecimal: así entran los acentos del título.
+function pdfText(text) {
+  let hex = 'FEFF';
+  for (let i = 0; i < text.length; i++) hex += text.charCodeAt(i).toString(16).padStart(4, '0');
+  return `<${hex}>`;
+}
+
 // PDF de una página con la imagen en FlateDecode, escrito a mano.
-async function buildPdf(canvas, pointsPerPixel) {
+async function buildPdf(canvas, pointsPerPixel, title) {
   const { width, height } = canvas;
   const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
   const rgb = new Uint8Array(width * height * 3);
@@ -640,12 +686,15 @@ async function buildPdf(canvas, pointsPerPixel) {
   startObject(5);
   write(`5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}endstream\nendobj\n`);
 
+  startObject(6);
+  write(`6 0 obj\n<< /Title ${pdfText(title)} /Producer ${pdfText(SITE_URL)} >>\nendobj\n`);
+
   const xrefPosition = position;
-  write('xref\n0 6\n0000000000 65535 f \n');
-  for (let number = 1; number <= 5; number++) {
+  write('xref\n0 7\n0000000000 65535 f \n');
+  for (let number = 1; number <= 6; number++) {
     write(`${String(offsets[number]).padStart(10, '0')} 00000 n \n`);
   }
-  write(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF\n`);
+  write(`trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xrefPosition}\n%%EOF\n`);
 
   return new Blob(chunks, { type: 'application/pdf' });
 }
@@ -655,17 +704,20 @@ async function buildSvg(model, { showInfrastructure, guide, transparent, title, 
   await labelFontsReady();
 
   return withLanguage(language, () => {
-    const plan = planExport(model, { showInfrastructure, guide, pixels: null });
+    const plan = planExport(model, { showInfrastructure, guide, pixels: null, bounded: false });
     const context = new SvgContext();
+    // En unidades enteras, y el fondo hasta el borde: con decimales quedaba una franja sin pintar.
+    const width = Math.ceil(plan.design.width);
+    const height = Math.ceil(plan.design.height);
 
     if (!transparent) {
       context.fillStyle = palette.ground;
-      context.fillRect(0, 0, plan.design.width, plan.design.height);
+      context.fillRect(0, 0, width, height);
     }
     paintDiagram(context, plan, { palette, title });
 
-    const markup = context.toSvg({ width: plan.design.width, height: plan.design.height, title });
-    return { blob: new Blob([markup], { type: 'image/svg+xml' }), plan };
+    const markup = context.toSvg({ width, height, title });
+    return { blob: new Blob([markup], { type: 'image/svg+xml' }), plan, width, height };
   });
 }
 
@@ -690,6 +742,7 @@ export async function renderNetworkPreview(model, request, budget) {
     palette: readPalette(theme),
     language,
     budget,
+    bounded: !descriptor.vector,
   });
 
   return { canvas, crowded: plan.crowded, width, height, design: plan.design, magnify };
@@ -703,8 +756,8 @@ async function createNetworkExport(model, { format, name, size: choice, transpar
   const fileName = `${name}.${descriptor.extension}`;
 
   if (descriptor.vector) {
-    const { blob, plan } = await buildSvg(model, { showInfrastructure, guide, transparent, title: name, palette, language });
-    return { blob, fileName, crowded: plan.crowded, width: plan.design.width, height: plan.design.height };
+    const { blob, plan, width, height } = await buildSvg(model, { showInfrastructure, guide, transparent, title: name, palette, language });
+    return { blob, fileName, crowded: plan.crowded, width, height };
   }
 
   const { canvas, plan } = await renderNetworkToCanvas(model, {
@@ -722,7 +775,7 @@ async function createNetworkExport(model, { format, name, size: choice, transpar
   const pointsPerPixel = paper ? paper.width / canvas.width : 0.75;
 
   const blob = format === 'pdf'
-    ? await buildPdf(canvas, pointsPerPixel)
+    ? await buildPdf(canvas, pointsPerPixel, name)
     : await canvasToBlob(canvas, descriptor.mime, format === 'jpg' ? JPEG_QUALITY : undefined);
 
   return {
@@ -738,5 +791,16 @@ async function createNetworkExport(model, { format, name, size: choice, transpar
 export async function exportNetwork(model, options) {
   const result = await createNetworkExport(model, options);
   download(result.blob, result.fileName);
+  return { ...result, bytes: result.blob.size };
+}
+
+export const canCopyImage = () => Boolean(globalThis.ClipboardItem && navigator.clipboard?.write);
+
+// El portapapeles sólo acepta PNG. write() va antes de cualquier espera: Safari sólo lo deja
+// escribir dentro del gesto, y por eso recibe la imagen como promesa.
+export async function copyNetworkImage(model, options) {
+  const making = createNetworkExport(model, { ...options, format: 'png' });
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': making.then((result) => result.blob) })]);
+  const result = await making;
   return { ...result, bytes: result.blob.size };
 }
