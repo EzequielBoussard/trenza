@@ -19,6 +19,34 @@ import {
 
 const CAPTURE_NOTES = { csv: 'export.csvNote', pcap: 'export.pcapNote' };
 
+// Formato, medida y casillas de la última vez, por tipo de archivo. Idioma y tema siguen al visor.
+const CHOICES_KEY = 'trenza.export';
+
+function readChoices() {
+  try {
+    return JSON.parse(localStorage.getItem(CHOICES_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveChoices(kind, { format, size, guide, transparent }) {
+  try {
+    localStorage.setItem(CHOICES_KEY, JSON.stringify({ ...readChoices(), [kind]: { format, size, guide, transparent } }));
+  } catch {
+    // Sin almacenamiento, el diálogo arranca con lo de siempre.
+  }
+}
+
+function restoreChoices(form, kind) {
+  const saved = readChoices()[kind];
+  if (!saved) return;
+  const radio = form.querySelector(`.choice__option[data-for="${kind}"] input[value="${saved.format}"]`);
+  if (radio) radio.checked = true;
+  form.elements.guide.checked = saved.guide !== false;
+  form.elements.transparent.checked = Boolean(saved.transparent);
+}
+
 function requestFrom(elements, state) {
   const fields = elements.exportForm.elements;
   return {
@@ -35,6 +63,7 @@ function requestFrom(elements, state) {
 
 // Las medidas ilegibles no se ofrecen; no se muestran deshabilitadas.
 function updateSizeOptions(elements, state) {
+  const remembered = readChoices()[state.kind]?.size;
   const format = elements.exportForm.elements.format.value;
   const paper = format === 'pdf';
   const guide = elements.exportForm.elements.guide.checked;
@@ -52,7 +81,7 @@ function updateSizeOptions(elements, state) {
 
   // Si la medida elegida sigue disponible se respeta.
   const preferred = paper ? DEFAULT_PAPER : DEFAULT_RESOLUTION;
-  const wanted = [chosen, preferred].find((name) => offered.includes(name));
+  const wanted = [chosen, remembered, preferred].find((name) => offered.includes(name));
   select.value = wanted ?? offered[0];
 }
 
@@ -143,8 +172,12 @@ function exportInventory(state, setStatus, { name, language }) {
   }, 'ok');
 }
 
-// Dibujar una red grande bloquea la página: el aviso tiene que pintarse antes.
-const nextPaint = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
+// Dibujar una red grande bloquea la página: el aviso tiene que pintarse antes. Con la pestaña
+// oculta no hay cuadros, y el tope evita que el exporte quede esperando.
+const nextPaint = () => new Promise((resolve) => {
+  requestAnimationFrame(() => setTimeout(resolve));
+  setTimeout(resolve, 100);
+});
 
 async function exportDiagram(state, setStatus, request) {
   try {
@@ -185,6 +218,7 @@ export function wireExportDialog({ elements, state, setStatus }) {
     fields.theme.value = currentTheme();
     const capture = state.kind === 'capture';
     labelDialog(elements.exportDialog, capture);
+    restoreChoices(elements.exportForm, state.kind);
     if (capture) updateScopeOptions(elements, state);
     refresh();
     elements.exportDialog.showModal();
@@ -196,6 +230,7 @@ export function wireExportDialog({ elements, state, setStatus }) {
 
   elements.exportCopy.addEventListener('click', async () => {
     const request = requestFrom(elements, state);
+    saveChoices(state.kind, request);
     const copying = copyNetworkImage(state.model, { ...request, transparent: request.format === 'png' && request.transparent });
     elements.exportDialog.close();
     setStatus('status.copying');
@@ -214,6 +249,7 @@ export function wireExportDialog({ elements, state, setStatus }) {
   elements.exportForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const request = requestFrom(elements, state);
+    saveChoices(state.kind, request);
 
     elements.exportDialog.close();
 

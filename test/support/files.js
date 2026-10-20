@@ -37,9 +37,9 @@ export function networkXml(devices, links = []) {
 
 // Una actividad como las que arma Packet Tracer: la red guardada, la inicial y la de respuesta,
 // y las instrucciones en HTML dentro de un CDATA.
-export function activityXml(network, instructions) {
+export function activityXml(network, instructions, start = network) {
   const control = String.fromCharCode(1, 17, 2);
-  return `<PACKETTRACER5_ACTIVITY><VERSION>8.2.1</VERSION>${network}${network}${network}`
+  return `<PACKETTRACER5_ACTIVITY><VERSION>8.2.1</VERSION>${network}${start}${network}`
     + `<ACTIVITY ENABLED="no" VALUE="${control}"><INSTRUCTIONS><PAGE translate="true"><![CDATA[${instructions}]]></PAGE>`
     + '</INSTRUCTIONS></ACTIVITY></PACKETTRACER5_ACTIVITY>';
 }

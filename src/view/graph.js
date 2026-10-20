@@ -96,6 +96,29 @@ export function selectVisible(model, showInfrastructure) {
   return { devices, links };
 }
 
+// El recorrido con menos cables entre 2 equipos, con el puerto por el que entra y sale de cada
+// uno. Sigue los cables: si el tráfico pasa o no depende de cómo esté configurado cada router.
+export function cablePath(devicesById, fromId, toId) {
+  if (!devicesById.has(fromId) || !devicesById.has(toId)) return null;
+  const reachedBy = new Map([[fromId, null]]);
+  const queue = [fromId];
+  for (let at = 0; at < queue.length && !reachedBy.has(toId); at++) {
+    for (const link of devicesById.get(queue[at]).links) {
+      if (reachedBy.has(link.peerId) || !devicesById.has(link.peerId)) continue;
+      reachedBy.set(link.peerId, { from: queue[at], out: link.port, in: link.peerPort });
+      queue.push(link.peerId);
+    }
+  }
+  if (!reachedBy.has(toId)) return null;
+
+  const steps = [{ id: toId, in: '', out: '' }];
+  for (let step = reachedBy.get(toId); step; step = reachedBy.get(steps[0].id)) {
+    steps[0].in = step.in;
+    steps.unshift({ id: step.from, in: '', out: step.out });
+  }
+  return steps;
+}
+
 const TRAY_SLOT = 160;
 const TRAY_ROW_HEIGHT = 96;
 const TRAY_HEADING = 26;

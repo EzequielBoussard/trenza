@@ -403,6 +403,8 @@ export class TopologyView {
     if (this.selectedId) this.highlight(this.selectedId);
     else if (this.thread) this.paintThread();
     if (this.matches) this.markMatches(this.matches);
+    if (this.path) this.paintPath();
+    if (this.changes) this.markChanges(this.changes);
   }
 
   panelAspect() {
@@ -891,6 +893,59 @@ export class TopologyView {
     for (const node of this.svg.querySelectorAll('.node')) {
       node.classList.remove('is-selected', 'is-neighbour', 'is-dimmed');
       node.removeAttribute('aria-current');
+    }
+  }
+
+  // El camino entre 2 equipos: se apaga todo lo demás y la vista lo encuadra entero. Con null
+  // el diagrama vuelve como estaba.
+  showPath(ids) {
+    this.path = ids;
+    this.paintPath();
+    if (ids) this.frameIds(ids);
+  }
+
+  paintPath() {
+    if (!this.svg) return;
+    const on = new Set(this.path ?? []);
+    const pairs = new Set((this.path ?? []).slice(1).flatMap((id, index) => [`${this.path[index]}|${id}`, `${id}|${this.path[index]}`]));
+    this.svg.classList.toggle('has-path', Boolean(this.path));
+    for (const node of this.svg.querySelectorAll('.node')) node.classList.toggle('is-path', on.has(node.dataset.id));
+    for (const link of this.svg.querySelectorAll('.link')) link.classList.toggle('is-path', pairs.has(`${link.dataset.from}|${link.dataset.to}`));
+  }
+
+  // Si algo del camino quedó fuera de la vista, se aleja lo justo para verlo entero, centrado.
+  frameIds(ids) {
+    const points = ids.map((id) => this.positions?.get(id)).filter(Boolean);
+    if (points.length === 0 || !this.frame) return;
+    const { x, y, scale } = this.target;
+    const margin = FOCUS_MARGIN;
+    const { width, height } = this.frame;
+    const inside = points.every((point) => {
+      const at = { x: point.x * scale + x, y: point.y * scale + y };
+      return at.x >= margin && at.x <= width - margin && at.y >= margin && at.y <= height - margin;
+    });
+    if (inside) return;
+
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const box = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+    const fits = Math.min((width - margin * 2) / Math.max(1, box.right - box.left), (height - margin * 2) / Math.max(1, box.bottom - box.top));
+    const next = Math.max(MIN_SCALE, Math.min(scale, fits));
+    this.target = {
+      x: width / 2 - ((box.left + box.right) / 2) * next,
+      y: height / 2 - ((box.top + box.bottom) / 2) * next,
+      scale: next,
+    };
+    this.glide();
+  }
+
+  // Al comparar con otra versión: los equipos que cambiaron y los que no estaban.
+  markChanges(marks) {
+    this.changes = marks;
+    if (!this.svg) return;
+    for (const node of this.svg.querySelectorAll('.node')) {
+      node.classList.toggle('is-changed', Boolean(marks?.changed.has(node.dataset.id)));
+      node.classList.toggle('is-added', Boolean(marks?.added.has(node.dataset.id)));
     }
   }
 

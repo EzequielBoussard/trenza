@@ -4,6 +4,7 @@ import { cleanExportName, inventoryCsv, suggestExportName } from '../src/view/ex
 import {
   LABEL_TYPE,
   LAYOUT_STRETCH,
+  cablePath,
   frameForNetwork,
   measureBounds,
   planLabels,
@@ -153,4 +154,26 @@ test('el inventario tiene un renglón por dirección, en el orden de la lista', 
     'PC10|User device|M|FastEthernet0|10.0.0.10',
   ]);
   assert.match(lines[5], /"10\.0\.0\.1","Up","Sede › Rack"$/);
+});
+
+test('el camino entre 2 equipos va por la menor cantidad de cables y dice por qué puerto pasa', () => {
+  const device = (id, links) => [id, { id, links: links.map(([port, peerId, peerPort]) => ({ port, peerId, peerPort })) }];
+  const devices = new Map([
+    device('pc1', [['Fa0', 's1', 'Fa0/1']]),
+    device('s1', [['Fa0/1', 'pc1', 'Fa0'], ['Gi0/1', 'r1', 'Gi0/0'], ['Fa0/2', 's2', 'Fa0/24']]),
+    device('s2', [['Fa0/24', 's1', 'Fa0/2'], ['Fa0/23', 'r1', 'Gi0/2']]),
+    device('r1', [['Gi0/0', 's1', 'Gi0/1'], ['Gi0/2', 's2', 'Fa0/23'], ['Se0/0', 'isp', 'Se0/0']]),
+    device('isp', [['Se0/0', 'r1', 'Se0/0']]),
+    device('suelto', []),
+  ]);
+
+  assert.deepEqual(cablePath(devices, 'pc1', 'isp'), [
+    { id: 'pc1', in: '', out: 'Fa0' },
+    { id: 's1', in: 'Fa0/1', out: 'Gi0/1' },
+    { id: 'r1', in: 'Gi0/0', out: 'Se0/0' },
+    { id: 'isp', in: 'Se0/0', out: '' },
+  ]);
+  assert.deepEqual(cablePath(devices, 'pc1', 'pc1'), [{ id: 'pc1', in: '', out: '' }]);
+  assert.equal(cablePath(devices, 'pc1', 'suelto'), null);
+  assert.equal(cablePath(devices, 'pc1', 'no-existe'), null);
 });

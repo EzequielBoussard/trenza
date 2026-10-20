@@ -1,7 +1,7 @@
 // Pruebas en un navegador de verdad sin dependencias: un servidor estático con las cabeceras de
 // _headers y Chrome o Edge sin ventana, manejado por el protocolo de DevTools.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -131,9 +131,13 @@ class Tab {
   }
 
   async open(url) {
-    const loaded = new Promise((resolve) => { this.loaded = resolve; });
+    let timer;
+    const loaded = new Promise((resolve, reject) => {
+      this.loaded = resolve;
+      timer = setTimeout(() => reject(new Error(`no cargó: ${url}`)), 20000);
+    });
     await this.send('Page.navigate', { url });
-    await loaded;
+    await loaded.finally(() => clearTimeout(timer));
   }
 
   async evaluate(expression) {
@@ -163,6 +167,19 @@ class Tab {
   }
 }
 
+// El puerto sale del archivo que el navegador deja en su perfil: Edge 155 relanza su proceso
+// principal, y el que se lanzó termina enseguida sin escribir nada.
+async function devToolsEndpoint(profile, failed) {
+  const file = join(profile, 'DevToolsActivePort');
+  for (const until = Date.now() + 20000; Date.now() < until;) {
+    if (failed.error) throw failed.error;
+    const [port, path] = existsSync(file) ? readFileSync(file, 'utf8').split(/\r?\n/) : [];
+    if (port && path) return `ws://127.0.0.1:${port.trim()}${path.trim()}`;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('el navegador no abrió');
+}
+
 export async function launch(executable) {
   const profile = mkdtempSync(join(tmpdir(), 'trenza-'));
   const args = [
@@ -171,21 +188,10 @@ export async function launch(executable) {
   ];
   // En Ubuntu 24 el sandbox de Chrome no arranca para un usuario común sin cambiar AppArmor.
   if (process.env.CI) args.unshift('--no-sandbox');
-  const child = spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'] });
-
-  const endpoint = await new Promise((resolve, reject) => {
-    let output = '';
-    const timer = setTimeout(() => reject(new Error(`el navegador no abrió:\n${output}`)), 20000);
-    child.stderr.on('data', (chunk) => {
-      output += chunk;
-      const found = output.match(/DevTools listening on (ws:\/\/\S+)/);
-      if (found) {
-        clearTimeout(timer);
-        resolve(found[1]);
-      }
-    });
-    child.on('exit', () => reject(new Error(`el navegador se cerró:\n${output}`)));
-  });
+  const child = spawn(executable, args, { stdio: 'ignore' });
+  const failed = {};
+  child.on('error', (error) => { failed.error = error; });
+  const endpoint = await devToolsEndpoint(profile, failed);
 
   const connection = new Connection(endpoint);
   await connection.opened();
@@ -221,13 +227,21 @@ export async function launch(executable) {
     grant(origin, permissions) {
       return connection.send('Browser.grantPermissions', { origin, permissions });
     },
+    // Por DevTools: el proceso lanzado puede no ser el del navegador.
     async close() {
-      if (child.exitCode === null) {
-        const exited = new Promise((resolve) => child.once('exit', resolve));
-        await connection.send('Browser.close').catch(() => child.kill());
-        await exited;
+      const closed = new Promise((resolve) => connection.socket.addEventListener('close', resolve, { once: true }));
+      await connection.send('Browser.close').catch(() => {});
+      await Promise.race([closed, new Promise((resolve) => setTimeout(resolve, 5000))]);
+      if (child.exitCode === null) child.kill();
+      // Edge suelta los archivos del perfil unos cientos de milisegundos después de cerrar.
+      for (let attempt = 0; attempt < 50; attempt++) {
+        try {
+          rmSync(profile, { recursive: true, force: true });
+          return;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
-      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 }

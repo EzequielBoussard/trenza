@@ -7,6 +7,8 @@ import {
   readRoutingProtocols,
   readVlans,
 } from '../src/pkt/config.js';
+import { compareNetworks, configChanges } from '../src/pkt/compare.js';
+import { inSubnet, parseQuery, vlanMembers } from '../src/pkt/query.js';
 
 const SWITCH = `
 !
@@ -315,4 +317,92 @@ interface GigabitEthernet0/1
   assert.deepEqual(vlans.get('40').ports, [], 'el puerto de voz se contó como de acceso');
   assert.deepEqual(vlans.get('99').native, ['GigabitEthernet0/1']);
   assert.deepEqual(vlans.get('99').trunks, ['GigabitEthernet0/1']);
+});
+
+test('el buscador entiende subredes de IPv4 e IPv6 y VLAN', () => {
+  const v4 = parseQuery(' 192.168.1.0/24 ');
+  assert.equal(v4.kind, 'subnet');
+  assert.ok(inSubnet('192.168.1.200', v4));
+  assert.ok(!inSubnet('192.168.2.1', v4));
+  assert.ok(inSubnet('10.9.8.7', parseQuery('10.0.0.0/8')));
+  assert.ok(inSubnet('0.0.0.1', parseQuery('0.0.0.0/0')));
+
+  const v6 = parseQuery('2001:db8:acad::/48');
+  assert.ok(inSubnet('2001:DB8:ACAD:1::1/64', v6), 'IOS guarda la dirección con su prefijo');
+  assert.ok(inSubnet('FE80::1 link-local', parseQuery('fe80::/10')));
+  assert.ok(!inSubnet('2001:db8:acae::1', v6));
+  assert.ok(!inSubnet('192.168.1.1', v6), 'una IPv4 nunca entra en una red IPv6');
+
+  assert.deepEqual(parseQuery('VLAN 010'), { kind: 'vlan', id: '10' });
+  assert.equal(parseQuery('192.168.1.0/33').kind, 'text', 'un prefijo imposible es texto');
+  assert.equal(parseQuery('Router/2').kind, 'text');
+});
+
+test('en una VLAN entran el switch, el router que la enruta y lo enchufado a sus puertos de acceso', () => {
+  const vlan = (id, ports = [], voice = [], routed = []) => ({ id, name: '', ports, voice, trunks: [], native: [], routed });
+  const model = {
+    devices: [
+      { id: 's1', vlans: [vlan('10', ['FastEthernet0/1']), vlan('40', [], ['FastEthernet0/2'])],
+        links: [{ port: 'FastEthernet0/1', peerId: 'pc1' }, { port: 'fastethernet0/2', peerId: 'phone' }, { port: 'Gig0/1', peerId: 'r1' }] },
+      { id: 'r1', vlans: [vlan('10', [], [], ['Gig0/0.10'])], links: [] },
+      { id: 'pc1', vlans: [], links: [] },
+      { id: 'phone', vlans: [], links: [] },
+      { id: 'pc2', vlans: [], links: [] },
+    ],
+  };
+  const members = vlanMembers(model);
+
+  assert.deepEqual([...members.get('10')].sort(), ['pc1', 'r1', 's1']);
+  assert.deepEqual([...members.get('40')].sort(), ['phone', 's1']);
+});
+
+test('comparar 2 versiones de una red encuentra equipos, conexiones, configuración y direcciones', () => {
+  const device = (id, name, runningConfig = [], interfaces = []) => ({ id, name, runningConfig, interfaces, links: [] });
+  const pc = (id, name, address, gateway) => device(id, name, [], [{ name: '', mac: '0001', gateway, enabled: true, addresses: [{ address, mask: '255.255.255.0' }] }]);
+  const before = {
+    devices: [
+      device('s1', 'S1', ['!', 'hostname S1', '!', 'interface FastEthernet0/1', ' switchport mode access', '!', 'interface FastEthernet0/2', '!', 'end']),
+      pc('pc1', 'PC1', '192.168.1.10', '192.168.1.1'),
+      device('viejo', 'Router viejo'),
+    ],
+    links: [{ from: 's1', fromPort: 'Fa0/1', to: 'pc1', toPort: 'Fa0' }, { from: 's1', fromPort: 'Fa0/24', to: 'viejo', toPort: 'Gi0/0' }],
+  };
+  const after = {
+    devices: [
+      device('s1', 'Switch piso 1', ['!', 'hostname S1', '!', 'interface FastEthernet0/1', ' switchport access vlan 10', ' switchport mode access', '!', 'interface FastEthernet0/2', '!', 'end']),
+      pc('pc1', 'PC1', '192.168.1.20', '192.168.1.1'),
+      device('nuevo', 'R2'),
+    ],
+    links: [{ from: 'pc1', fromPort: 'Fa0', to: 's1', toPort: 'Fa0/1' }, { from: 's1', fromPort: 'Gi0/1', to: 'nuevo', toPort: 'Gi0/0' }],
+  };
+  const result = compareNetworks(before, after);
+
+  assert.deepEqual(result.added.map((d) => d.name), ['R2']);
+  assert.deepEqual(result.removed.map((d) => d.name), ['Router viejo']);
+  assert.deepEqual([...result.changed.keys()], ['s1', 'pc1']);
+  assert.equal(result.changed.get('s1').renamed, 'S1');
+  assert.deepEqual(result.changed.get('s1').config, [
+    { type: 'context', text: 'interface FastEthernet0/1' },
+    { type: 'added', text: ' switchport access vlan 10' },
+  ]);
+  assert.deepEqual(result.changed.get('pc1').addresses.map((c) => `${c.type} ${c.address}`), ['removed 192.168.1.10', 'added 192.168.1.20']);
+  assert.deepEqual(result.linksAdded.map((l) => `${l.fromPort}-${l.toPort}`), ['Gi0/1-Gi0/0'], 'la misma conexión al revés se contó como nueva');
+  assert.deepEqual(result.linksRemoved.map((l) => `${l.fromName} ${l.fromPort} ${l.toName}`), ['S1 Fa0/24 Router viejo']);
+});
+
+test('una configuración igual salvo lo que IOS reescribe al guardar no tiene cambios', () => {
+  const a = { runningConfig: ['!', 'Building configuration...', 'Current configuration : 1234 bytes', 'hostname R1', 'end'] };
+  const b = { runningConfig: ['Building configuration...', '', 'Current configuration : 1301 bytes', '!', 'hostname R1   ', '!', 'end'] };
+  assert.deepEqual(configChanges(a, b), []);
+});
+
+test('el mismo cable con el puerto nombrado distinto cambió de puerto, sin aparecer como nuevo y quitado', () => {
+  const device = (id, name) => ({ id, name, runningConfig: [], interfaces: [], links: [] });
+  const before = { devices: [device('0', 'PC'), device('1', 'Switch0')], links: [{ from: '0', fromPort: 'FastEthernet', to: '1', toPort: 'Fa0/1' }] };
+  const after = { devices: [device('a', 'PC'), device('b', 'Switch0')], links: [{ from: 'b', fromPort: 'Fa0/1', to: 'a', toPort: 'FastEthernet0' }] };
+  const result = compareNetworks(before, after);
+
+  assert.equal(result.linksAdded.length, 0);
+  assert.equal(result.linksRemoved.length, 0);
+  assert.deepEqual(result.linksMoved.map(({ before: old, after: now }) => `${old.fromPort} > ${now.toPort}`), ['FastEthernet > FastEthernet0']);
 });

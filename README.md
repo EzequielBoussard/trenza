@@ -16,7 +16,9 @@ Con un `.pkt`, `.pka` o `.pkz`:
 - Explica en una frase qué es cada tipo de equipo, con el mismo símbolo que en el diagrama. Elegir un tipo deja a la vista sólo esos equipos.
 - Muestra cada equipo con sus interfaces y direcciones, VLAN (también la de voz y la nativa de cada tronco), rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y dónde están aplicadas, su ubicación en la vista física y la `running-config`, que se puede copiar.
 - Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide. En el panel, el equipo del otro lado de cada conexión se elige con un clic.
-- Busca equipos por nombre, tipo o dirección y apaga en el diagrama los que no coinciden.
+- Busca equipos por nombre, tipo, dirección, subred (`192.168.1.0/24`) o VLAN (`vlan 10`) y apaga en el diagrama los que no coinciden. En una VLAN entran también los equipos enchufados a sus puertos de acceso.
+- Muestra el camino por cables entre 2 equipos, con el puerto por el que entra y sale en cada uno.
+- Compara la red con otra versión de la misma, de otro archivo o la red inicial de una actividad: equipos nuevos, quitados y con cambios, conexiones nuevas, quitadas o que cambiaron de puerto, y las líneas de configuración que cambiaron en cada equipo.
 - Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español, con tema claro u oscuro y, si se quiere, con los tipos de equipo en la leyenda. También lo copia como imagen, para pegarlo directo en un documento. El SVG crece lo que haga falta para que ninguna etiqueta quede encimada, aun con miles de equipos, y cada equipo muestra su nombre, dirección y tipo al pasar el puntero.
 - Exporta el inventario en CSV: una fila por dirección de cada equipo, con interfaz, máscara, puerta de enlace, estado y ubicación.
 - En una actividad (`.pka`) muestra además sus instrucciones, con la tabla de direcciones y los comandos, y la red tal como se guardó.
@@ -65,7 +67,7 @@ Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de p
 src/
   app.js        estado de la aplicación y conexión entre vistas
   i18n.js       textos en inglés y español
-  pkt/          descifrado (twofish, eax, decode) y modelo de red (model, config)
+  pkt/          descifrado (twofish, eax, decode), modelo de red (model, config), búsqueda y comparación
   pcap/         lectura de capturas, disección por capas y exportación
   view/         diagrama, reparto de etiquetas, exportación, inspector, tabla de paquetes
 sw.js           caché para uso sin conexión

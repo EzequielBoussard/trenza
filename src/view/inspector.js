@@ -1,4 +1,4 @@
-import { getLocale, t } from '../i18n.js';
+import { countOf, getLocale, t } from '../i18n.js';
 import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS, selectVisible } from './graph.js';
 import { renderRichText } from './rich-text.js';
 
@@ -215,6 +215,58 @@ function peerName(peer, { onPick, canPick } = {}) {
   return button;
 }
 
+// El resultado cambia en su lugar: rehacer el panel le sacaría el foco al selector.
+function pathSection(device, devicesById, picking) {
+  const { targets, chosen, pathTo, onChoose } = picking.path;
+  const wrapper = createElement('div', 'path');
+  const label = createElement('label', 'field');
+  label.append(createElement('span', 'panel-text', t('panel.pathAbout')));
+  const select = createElement('select', 'field__input');
+  select.append(new Option(t('panel.pathPick'), ''));
+  for (const target of targets) if (target.id !== device.id) select.append(new Option(target.name, target.id));
+  select.value = chosen ?? '';
+  label.append(select);
+
+  const result = createElement('div', 'path__result');
+  result.setAttribute('aria-live', 'polite');
+  const show = (targetId) => {
+    result.replaceChildren();
+    if (!targetId) return;
+    const steps = pathTo(targetId);
+    if (!steps) {
+      result.append(createElement('p', 'panel-text', t('panel.pathNone')));
+      return;
+    }
+    const list = createElement('ol', 'path__steps');
+    for (const step of steps) {
+      const item = createElement('li', 'path__step');
+      const ports = [step.in && t('panel.pathIn', { port: step.in }), step.out && t('panel.pathOut', { port: step.out })];
+      item.append(
+        step.id === device.id ? createElement('span', 'connections__peer', device.name) : peerName(devicesById.get(step.id), picking),
+        createElement('span', 'path__ports', ports.filter(Boolean).join(' · ')),
+      );
+      list.append(item);
+    }
+    const clear = createElement('button', 'button button--quiet button--small', t('panel.pathClear'));
+    clear.type = 'button';
+    clear.addEventListener('click', () => {
+      select.value = '';
+      onChoose(null);
+      show(null);
+      select.focus();
+    });
+    result.append(createElement('p', 'panel-text', t('panel.pathFound', { links: countOf('links', steps.length - 1) })), list, clear);
+  };
+
+  select.addEventListener('change', () => {
+    onChoose(select.value || null);
+    show(select.value);
+  });
+  show(chosen);
+  wrapper.append(label, result);
+  return wrapper;
+}
+
 function connectionList(device, devicesById, picking) {
   const meters = new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 });
   const list = createElement('ul', 'connections');
@@ -291,6 +343,7 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
   if (gateway) identity.push([t('panel.gateway'), gateway]);
   if (device.location.length > 0) identity.push([t('panel.location'), device.location.join(' › ')]);
 
+  if (picking?.change) container.append(section(t('panel.changes'), changeSection(picking.change)));
   container.append(section(t('panel.identity'), definitionList(identity)));
 
   if (device.interfaces.length > 0) {
@@ -315,6 +368,7 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
 
   if (device.links.length > 0) {
     container.append(section(t('panel.connections'), connectionList(device, devicesById, picking)));
+    if (picking?.path) container.append(section(t('panel.path'), pathSection(device, devicesById, picking)));
   }
 
   if (device.runningConfig.length > 0) {
@@ -375,6 +429,86 @@ function categoryKey(devices, { onFilter, filtering, hidden }) {
   return list;
 }
 
+// Las marcas + y - van escritas, además del color: así las lee también un lector de pantalla.
+const MARKS = { added: '+ ', removed: '- ', context: '  ' };
+
+function changeSection(change) {
+  const wrapper = createElement('div', 'change');
+  if (change.added) wrapper.append(createElement('p', 'panel-text', t('panel.changeNew')));
+  if (change.renamed) wrapper.append(createElement('p', 'panel-text', t('panel.renamed', { name: change.renamed })));
+
+  if (change.addresses.length > 0) {
+    const list = createElement('ul', 'change__addresses');
+    for (const entry of change.addresses) {
+      const text = entry.gateway
+        ? `${t('panel.gateway')}: ${entry.gateway}`
+        : [entry.port, entry.address, entry.mask].filter(Boolean).join(' ');
+      list.append(createElement('li', `diff__${entry.type}`, MARKS[entry.type] + text));
+    }
+    wrapper.append(list);
+  }
+
+  if (change.config.length > 0) {
+    const code = createElement('pre', 'code-block diff');
+    code.append(...change.config.map((entry) => createElement('span', `diff__${entry.type}`, `${MARKS[entry.type]}${entry.text}\n`)));
+    wrapper.append(code);
+  }
+  return wrapper;
+}
+
+function compareSection(model, compare) {
+  const wrapper = createElement('div', 'compare');
+  const button = (label, action) => {
+    const node = createElement('button', 'button button--quiet', label);
+    node.type = 'button';
+    node.addEventListener('click', action);
+    return node;
+  };
+
+  if (!compare.result) {
+    const actions = createElement('div', 'compare__actions');
+    actions.append(button(t('panel.compareFile'), compare.onCompareFile));
+    if (model.initial) actions.append(button(t('panel.compareInitial'), compare.onCompareInitial));
+    wrapper.append(createElement('p', 'panel-text', t('panel.compareAbout')), actions);
+    return section(t('panel.compare'), wrapper);
+  }
+
+  const { result } = compare;
+  wrapper.append(createElement('p', 'panel-text', t('panel.comparedWith', { name: compare.label })));
+  wrapper.append(definitionList([
+    [t('panel.changedDevices'), String(result.changed.size)],
+    [t('panel.addedDevices'), String(result.added.length)],
+    [t('panel.removedDevices'), String(result.removed.length)],
+    [t('panel.addedLinks'), String(result.linksAdded.length)],
+    [t('panel.removedLinks'), String(result.linksRemoved.length)],
+    ...(result.linksMoved.length > 0 ? [[t('panel.movedLinks'), String(result.linksMoved.length)]] : []),
+  ]));
+
+  const touched = [
+    ...model.devices.filter((device) => result.changed.has(device.id)).map((device) => [device, 'panel.tagChanged']),
+    ...result.added.map((device) => [device, 'panel.tagNew']),
+  ];
+  if (touched.length + result.removed.length + result.linksAdded.length + result.linksRemoved.length + result.linksMoved.length === 0) {
+    wrapper.append(createElement('p', 'panel-text', t('panel.noChanges')));
+  } else {
+    wrapper.append(createElement('p', 'panel-text', t('panel.compareLegend')));
+    const list = createElement('ul', 'compare__list');
+    for (const [device, tag] of touched) {
+      const item = createElement('li');
+      item.append(peerName(device, compare), createElement('span', 'compare__tag', t(tag)));
+      list.append(item);
+    }
+    for (const device of result.removed) {
+      const item = createElement('li');
+      item.append(createElement('span', 'connections__peer', device.name), createElement('span', 'compare__tag', t('panel.tagRemoved')));
+      list.append(item);
+    }
+    wrapper.append(list);
+  }
+  wrapper.append(button(t('panel.stopComparing'), compare.onStop));
+  return section(t('panel.compare'), wrapper);
+}
+
 // Puede ser texto o HTML de Qt, que vacío igual trae su marcado.
 function descriptionOf(text) {
   if (!text.trim()) return null;
@@ -399,7 +533,7 @@ function activitySection(pages) {
   return section(t('panel.activity'), wrapper);
 }
 
-export function renderNetworkSummary(container, model, { fileName, variant, onDownload, ...filter } = {}) {
+export function renderNetworkSummary(container, model, { fileName, variant, onDownload, compare, ...filter } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -409,6 +543,7 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
   );
   container.append(header);
   if (model.instructions.length > 0) container.append(activitySection(model.instructions));
+  if (compare) container.append(compareSection(model, compare));
   container.append(section(t('panel.inventory'), categoryKey(model.devices, filter)));
 
   const description = descriptionOf(model.description);

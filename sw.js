@@ -27,6 +27,8 @@ const SHELL = [
   '/src/pkt/decode.js',
   '/src/pkt/model.js',
   '/src/pkt/config.js',
+  '/src/pkt/query.js',
+  '/src/pkt/compare.js',
   '/src/pkt/twofish.js',
   '/src/pkt/eax.js',
   '/src/pcap/decode.js',

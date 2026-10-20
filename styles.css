@@ -1334,6 +1334,13 @@ body[data-dragging] .dropveil { display: grid; }
 .topology.has-search .link { opacity: 0.18; }
 .topology.has-search .node:not(.is-match) { opacity: 0.22; }
 
+/* El camino entre 2 equipos pisa la selección y la búsqueda: es lo último que se pidió. */
+.topology.has-path .link:not(.is-path) { opacity: 0.12; }
+.topology.has-path .node:not(.is-path) { opacity: 0.22; }
+.topology.has-path .link.is-path,
+.topology.has-path .node.is-path { opacity: 1; }
+.topology.has-path .link.is-path .link__strand { stroke-width: 3; }
+
 .node { cursor: pointer; }
 
 .node__halo {
@@ -1454,6 +1461,16 @@ body[data-dragging] .dropveil { display: grid; }
 }
 
 .node.is-dimmed { opacity: 0.22; }
+
+/* Al comparar con otra versión: anillo naranja punteado si cambió, verde si es nuevo. */
+.node.is-changed:not(.is-selected) .node__ring,
+.node.is-added:not(.is-selected) .node__ring {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.node.is-changed:not(.is-selected) .node__ring { stroke-dasharray: 5 4; }
+.node.is-added:not(.is-selected) .node__ring { stroke: var(--green); }
 
 .node.is-selected .node__halo {
   stroke: var(--orange);
@@ -1705,6 +1722,66 @@ button.key__row:hover { background: var(--raised); }
 .table__wrap { overflow-wrap: break-word; }
 
 .table__lines { white-space: pre-line; }
+
+.diff__added { color: var(--green); }
+.diff__removed { color: var(--orange); }
+.diff__context { color: var(--text-faint); }
+.code-block.diff { max-height: 18rem; }
+
+.change__addresses {
+  margin: 0.4rem 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.compare__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.compare .facts { margin: 0.6rem 0; }
+
+.compare__list {
+  margin: 0.4rem 0 0.75rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.compare__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.compare__tag { color: var(--text-muted); font-size: 0.72rem; }
+
+.path .field { gap: 0.45rem; }
+.path__result:not(:empty) { margin-top: 0.75rem; }
+.path__result .panel-text { margin-bottom: 0.4rem; }
+
+.path__steps {
+  margin: 0 0 0.6rem;
+  padding-left: 1.4rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.path__step { padding: 0.2rem 0; }
+.path__step::marker { color: var(--text-faint); }
+
+.path__ports {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
 
 .connections {
   margin: 0;

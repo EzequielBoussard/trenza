@@ -1,10 +1,12 @@
 import { countOf, getLanguage, setLanguage, t, translateDocument } from './i18n.js';
 import { decodePacketTracerFile } from './pkt/decode.js';
+import { compareNetworks } from './pkt/compare.js';
 import { buildNetworkModel } from './pkt/model.js';
+import { inSubnet, parseQuery, vlanMembers } from './pkt/query.js';
 import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
-import { CATEGORY_ORDER, labelFontsReady, selectVisible } from './view/graph.js';
+import { CATEGORY_ORDER, cablePath, labelFontsReady, selectVisible } from './view/graph.js';
 import { categoryIcon, markScrollable, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
 import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
@@ -144,6 +146,7 @@ function renderDeviceList(term = '') {
     const selected = state.devicesById.get(state.selectedDeviceId);
     if (!state.showInfrastructure && selected?.category === 'infrastructure') clearSelection();
     state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
+    if (state.comparison) compareWith(state.comparison.before, state.comparison, true);
     draw(search.value);
     // En la guía del resumen la infraestructura se puede elegir sólo si está a la vista.
     if (!state.selectedDeviceId) showNetworkSummary();
@@ -165,16 +168,19 @@ function renderDeviceList(term = '') {
 
   const draw = (term) => {
     list.replaceChildren();
-    const needle = term.trim().toLowerCase();
+    const query = parseQuery(term);
+    const filtering = query.kind !== 'text' || query.needle !== '';
     const visible = state.showInfrastructure
       ? state.model.devices
       : state.model.devices.filter((device) => device.category !== 'infrastructure');
     const matches = visible.filter((device) => {
-      if (!needle) return true;
       const addresses = device.interfaces.flatMap((entry) => entry.addresses).map((entry) => entry.address);
-      return `${device.name} ${t(`category.${device.category}`)} ${device.type} ${addresses.join(' ')}`.toLowerCase().includes(needle);
+      if (query.kind === 'subnet') return addresses.some((address) => inSubnet(address, query));
+      if (query.kind === 'vlan') return Boolean(state.vlanMembers.get(query.id)?.has(device.id));
+      if (!filtering) return true;
+      return `${device.name} ${t(`category.${device.category}`)} ${device.type} ${addresses.join(' ')}`.toLowerCase().includes(query.needle);
     });
-    state.topology.markMatches(needle ? new Set(matches.map((device) => device.id)) : null);
+    state.topology.markMatches(filtering ? new Set(matches.map((device) => device.id)) : null);
 
     for (const device of [...matches].sort(byKindAndName)) {
       const item = createElement('li');
@@ -262,11 +268,19 @@ function markChips(id) {
 function selectDevice(id) {
   const device = state.devicesById.get(id);
   if (!device) return;
+  if (id !== state.selectedDeviceId) choosePath(null);
   state.selectedDeviceId = id;
   state.topology.focus(id);
   renderDeviceInspector(elements.panel, device, state.devicesById, {
     onPick: pickPeer,
     canPick: (peer) => peer.category !== 'infrastructure' || state.showInfrastructure,
+    change: changeOf(id),
+    path: {
+      targets: selectVisible(state.model, state.showInfrastructure).devices.slice().sort(byKindAndName),
+      chosen: state.pathTarget,
+      pathTo: (target) => cablePath(state.devicesById, id, target),
+      onChoose: choosePath,
+    },
   });
   elements.panel.scrollTop = 0;
   markChips(id);
@@ -289,8 +303,16 @@ function pickPeer(id) {
   goToPanel();
 }
 
+// El camino sale del equipo elegido; cambiar de equipo o soltarlo lo borra.
+function choosePath(target) {
+  state.pathTarget = target;
+  const steps = target ? cablePath(state.devicesById, state.selectedDeviceId, target) : null;
+  state.topology?.showPath(steps ? steps.map((step) => step.id) : null);
+}
+
 function clearSelection() {
   if (state.kind !== 'network') return;
+  choosePath(null);
   state.selectedDeviceId = null;
   state.topology.clearSelection();
   markChips(null);
@@ -351,7 +373,64 @@ function showNetworkSummary() {
     onFilter: filterCategory,
     filtering: state.categoryFilter,
     hidden: (category) => category === 'infrastructure' && !state.showInfrastructure,
+    compare: {
+      result: state.comparison?.result,
+      label: state.comparison && (state.comparison.file ?? t('panel.initialNetwork')),
+      onCompareFile: () => elements.compareInput.click(),
+      onCompareInitial: () => compareWith(state.model.initial, { file: null }),
+      onStop: stopComparing,
+      onPick: pickPeer,
+      canPick: (peer) => peer.category !== 'infrastructure' || state.showInfrastructure,
+    },
   });
+}
+
+// El archivo abierto es el de después, con los mismos equipos a la vista que el diagrama. `file`
+// en null es la red inicial de la actividad, que se nombra en el idioma de la interfaz.
+function compareWith(before, { file }, quiet = false) {
+  const result = compareNetworks(selectVisible(before, state.showInfrastructure), selectVisible(state.model, state.showInfrastructure));
+  state.comparison = { file, before, result };
+  state.topology.markChanges({ changed: new Set(result.changed.keys()), added: new Set(result.added.map((device) => device.id)) });
+  if (quiet) return;
+  setStatus('status.compared', {
+    name: file ?? t('panel.initialNetwork'),
+    devices: { key: 'unit.devices', values: { count: result.changed.size + result.added.length } },
+  }, 'ok');
+  refreshPanel();
+}
+
+function stopComparing() {
+  state.comparison = null;
+  state.topology.markChanges(null);
+  refreshPanel();
+  elements.panel.querySelector('.compare button')?.focus();
+}
+
+function refreshPanel() {
+  if (state.selectedDeviceId) selectDevice(state.selectedDeviceId);
+  else showNetworkSummary();
+}
+
+function changeOf(id) {
+  const result = state.comparison?.result;
+  if (!result) return null;
+  if (result.added.some((device) => device.id === id)) return { added: true, renamed: '', config: [], addresses: [] };
+  return result.changed.get(id) ?? null;
+}
+
+async function compareFile(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (looksLikeCapture(file.name, bytes)) {
+    setStatus('error.compareCapture', null, 'error');
+    return;
+  }
+  setStatus('status.reading');
+  try {
+    const decoded = await decodePacketTracerFile(bytes);
+    compareWith(buildNetworkModel(new TextDecoder().decode(decoded.xml)), { file: file.name });
+  } catch (error) {
+    setStatus('status.compareFailed', { reason: error.message }, 'error');
+  }
 }
 
 // La vista de topología se destruye antes: si no, su ResizeObserver vuelve a dibujar encima.
@@ -400,8 +479,10 @@ async function showNetwork(bytes) {
   state.model = model;
   state.variant = decoded.variant;
   state.devicesById = new Map(model.devices.map((device) => [device.id, device]));
+  state.vlanMembers = vlanMembers(model);
   state.selectedDeviceId = null;
   state.categoryFilter = null;
+  state.comparison = null;
 
   paintNetwork();
   // Los equipos de red: una regleta o un rack no cuentan, igual que en el diagrama.
@@ -493,6 +574,7 @@ async function open(name, bytes) {
   state.file = { name, bytes };
   state.kind = null;
   state.model = null;
+  state.comparison = null;
   state.capture = null;
   delete document.body.dataset.view;
   elements.peek.hidden = true;
@@ -542,6 +624,22 @@ async function openFile(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   go('/');
   await open(file.name, bytes);
+}
+
+// Un selector aparte: el de abrir reemplazaría la red que se está mirando.
+function wireCompareInput() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.hidden = true;
+  input.dataset.compareInput = '';
+  input.accept = elements.fileInput.getAttribute('accept') ?? '';
+  input.addEventListener('change', () => {
+    const [file] = input.files;
+    input.value = '';
+    if (file && state.kind === 'network') compareFile(file);
+  });
+  document.body.append(input);
+  elements.compareInput = input;
 }
 
 function wireFileInput() {
@@ -762,6 +860,7 @@ function closeFile() {
   state.file = null;
   state.kind = null;
   state.model = null;
+  state.comparison = null;
   state.capture = null;
   state.selectedDeviceId = null;
   state.categoryFilter = null;
@@ -811,6 +910,7 @@ async function start() {
   wireLanguage();
   wireTheme();
   wireFileInput();
+  wireCompareInput();
   wireActions();
   wireGrip(elements.railGrip, elements.rail, 'rail', 1, [200, 480]);
   wireGrip(elements.panelGrip, elements.panel, 'panel', -1, [280, 600]);

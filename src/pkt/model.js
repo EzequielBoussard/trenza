@@ -220,11 +220,25 @@ export function buildNetworkModel(xmlText) {
   const root = document.documentElement;
   const network = root.getElementsByTagName('NETWORK')[0];
   if (!network) throw new Error(t('error.noTopology'));
+  const { devices, links } = readNetwork(network, readPlaces(root));
 
+  // Una actividad guarda también la red con la que arranca el alumno; la de respuesta no se lee.
+  const start = root.tagName === 'PACKETTRACER5_ACTIVITY' ? childrenNamed(root, 'PACKETTRACER5')[1] : null;
+  const startNetwork = start?.getElementsByTagName('NETWORK')[0];
+
+  return {
+    version: childText(root, 'VERSION') || t('panel.unknownVersion'),
+    description: childText(network, 'DESCRIPTION'),
+    instructions: readInstructions(root),
+    devices,
+    links,
+    initial: startNetwork ? readNetwork(startNetwork, readPlaces(start)) : null,
+  };
+}
+
+function readNetwork(network, places) {
   const devicesNode = childNamed(network, 'DEVICES');
   const linksNode = childNamed(network, 'LINKS');
-
-  const places = readPlaces(root);
   const devices = devicesNode
     ? childrenNamed(devicesNode, 'DEVICE').map((node, index) => readDevice(node, index, places)).filter(Boolean)
     : [];
@@ -239,11 +253,5 @@ export function buildNetworkModel(xmlText) {
     byId.get(link.to).links.push({ port: link.toPort, peerId: link.from, peerPort: link.fromPort, length });
   }
 
-  return {
-    version: childText(root, 'VERSION') || t('panel.unknownVersion'),
-    description: childText(network, 'DESCRIPTION'),
-    instructions: readInstructions(root),
-    devices,
-    links: connected,
-  };
+  return { devices, links: connected };
 }

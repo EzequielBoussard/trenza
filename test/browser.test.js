@@ -22,11 +22,11 @@ before(async () => {
   browser = await launch(executable);
   folder = mkdtempSync(join(tmpdir(), 'trenza-archivos-'));
   nextDownload = await browser.downloads(folder);
-});
+}, { timeout: 60000 });
 
 after(async () => {
   if (skip) return;
-  await browser.close();
+  await browser?.close();
   site.close();
   rmSync(folder, { recursive: true, force: true });
 });
@@ -83,7 +83,7 @@ const INSTRUCTIONS = `<html><head><title>Configurar VLAN y OSPF</title><style>p 
 <p style="color:red" onclick="window.injected = 3">Ver <a href="javascript:window.injected = 4">la guía</a>.</p>
 </body></html>`;
 
-test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', { skip }, async () => {
+test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await tab.open(`${site.url}/demo`);
   await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
@@ -94,7 +94,7 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   await tab.close();
 });
 
-test('una actividad muestra sus instrucciones limpias y la configuración de IOS', { skip }, async () => {
+test('una actividad muestra sus instrucciones limpias y la configuración de IOS', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await openFile(tab, 'actividad.pka', buildLegacyFile(activityXml(LAB, INSTRUCTIONS)));
 
@@ -145,7 +145,7 @@ test('una actividad muestra sus instrucciones limpias y la configuración de IOS
   await tab.close();
 });
 
-test('una tabla o un bloque que se desplaza es una parada del tabulador con nombre', { skip }, async () => {
+test('una tabla o un bloque que se desplaza es una parada del tabulador con nombre', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab({ storage: { 'trenza.panel': JSON.stringify({ width: 280 }) } });
   await openFile(tab, 'red.pkt', buildLegacyFile(LAB));
   await tab.evaluate("[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('S1')).click()");
@@ -160,7 +160,7 @@ test('una tabla o un bloque que se desplaza es una parada del tabulador con nomb
   await tab.close();
 });
 
-test('el zoom con la rueda deja quieto lo que está bajo el puntero', { skip }, async () => {
+test('el zoom con la rueda deja quieto lo que está bajo el puntero', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await openFile(tab, 'red.pkt', buildLegacyFile(LAB));
   const where = "(() => { const r = document.querySelector('.node[data-id=\"save-ref-id:1\"] .node__disc').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, size: r.width }; })()";
@@ -177,7 +177,7 @@ test('el zoom con la rueda deja quieto lo que está bajo el puntero', { skip }, 
   await tab.close();
 });
 
-test('con más de 500 equipos las etiquetas esperan a leerse y el zoom llega a leerlas', { skip }, async () => {
+test('con más de 500 equipos las etiquetas esperan a leerse y el zoom llega a leerlas', { skip, timeout: 60000 }, async () => {
   const devices = [];
   for (let i = 0; i < 600; i++) {
     devices.push(deviceXml({
@@ -201,7 +201,7 @@ test('con más de 500 equipos las etiquetas esperan a leerse y el zoom llega a l
   await tab.close();
 });
 
-test('el diálogo de exportar entra directo al nombre y entrega PNG, inventario e imagen copiada', { skip }, async () => {
+test('el diálogo de exportar entra directo al nombre y entrega PNG, inventario e imagen copiada', { skip, timeout: 60000 }, async () => {
   await browser.grant(site.url, ['clipboardReadWrite', 'clipboardSanitizedWrite']);
   const tab = await browser.tab();
   await openFile(tab, 'red.pkt', buildLegacyFile(LAB));
@@ -259,6 +259,92 @@ test('el diálogo de exportar entra directo al nombre y entrega PNG, inventario 
     return [document.querySelector('[role=status]').textContent, bitmap.width, bitmap.height];
   })()`);
   assert.deepEqual(copied, ['Image copied, 1920×1080 px: it can be pasted into any document.', 1920, 1080]);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('el buscador encuentra por subred y por VLAN, y el camino entre 2 equipos se marca entero', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab();
+  await openFile(tab, 'red.pkt', buildLegacyFile(LAB));
+  const search = async (text) => tab.evaluate(`(() => {
+    const input = document.querySelector('.rail__search');
+    input.value = ${JSON.stringify(text)};
+    input.dispatchEvent(new Event('input'));
+    return [...document.querySelectorAll('.device-chip .device-chip__name')].map((name) => name.textContent).sort();
+  })()`);
+
+  assert.deepEqual(await search('192.0.2.0/24'), ['PC1', 'R1']);
+  assert.deepEqual(await search('vlan 10'), ['PC1', 'S1']);
+  assert.deepEqual(await search('10.0.0.0/8'), []);
+  await search('');
+
+  await tab.evaluate("[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('PC1')).click()");
+  await tab.waitFor("document.querySelector('.path select')");
+  const path = await tab.evaluate(`(() => {
+    const select = document.querySelector('.path select');
+    select.value = [...select.options].find((option) => option.text === 'R1').value;
+    select.dispatchEvent(new Event('change'));
+    return {
+      steps: [...document.querySelectorAll('.path__step')].map((step) => step.firstChild.textContent),
+      nodes: document.querySelectorAll('.node.is-path').length,
+      links: document.querySelectorAll('.link.is-path').length,
+    };
+  })()`);
+  assert.deepEqual(path, { steps: ['PC1', 'S1', 'R1'], nodes: 3, links: 2 });
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('comparar una actividad con su red inicial y con otro archivo marca lo que cambió', { skip, timeout: 60000 }, async () => {
+  const start = networkXml([
+    deviceXml({ id: 'save-ref-id:1', name: 'S1', type: 'Switch', model: '2960-24TT', x: 300, y: 200, config: ['hostname S1', '!', 'interface FastEthernet0/1', '!'] }),
+    deviceXml({ id: 'save-ref-id:3', name: 'PC1', type: 'Pc', model: 'PC-PT', x: 150, y: 340, ports: [{ ip: '192.0.2.99', mask: '255.255.255.0' }] }),
+  ], [linkXml('save-ref-id:1', 'FastEthernet0/1', 'save-ref-id:3', 'FastEthernet0')]);
+  const tab = await browser.tab();
+  await openFile(tab, 'actividad.pka', buildLegacyFile(activityXml(LAB, '<html><body><p>Hola</p></body></html>', start)));
+
+  await tab.evaluate("[...document.querySelectorAll('.compare button')].find((b) => b.textContent === 'Compare with the starting network').click()");
+  await tab.waitFor("document.querySelector('.compare dl')");
+  const summary = await tab.evaluate(`(() => ({
+    counts: [...document.querySelectorAll('.compare dd')].map((dd) => dd.textContent),
+    tags: [...document.querySelectorAll('.compare__list li')].map((li) => li.textContent),
+    changed: [...document.querySelectorAll('.node.is-changed')].map((node) => node.dataset.id).sort(),
+    added: [...document.querySelectorAll('.node.is-added')].map((node) => node.dataset.id),
+    status: document.querySelector('[role=status]').textContent,
+  }))()`);
+  assert.deepEqual(summary.counts, ['2', '1', '0', '1', '0']);
+  assert.deepEqual(summary.changed, ['save-ref-id:1', 'save-ref-id:3']);
+  assert.deepEqual(summary.added, ['save-ref-id:2']);
+  assert.match(summary.status, /^Compared with the starting network of the activity: 3 devices with changes/);
+
+  await tab.evaluate("[...document.querySelectorAll('.compare__list button')].find((b) => b.textContent === 'S1').click()");
+  await tab.waitFor("document.querySelector('.panel-head__title')?.textContent === 'S1'");
+  const diff = await tab.evaluate("document.querySelector('.code-block.diff').textContent");
+  assert.match(diff, /^\+ banner motd/m);
+  assert.match(diff, /^ {2}interface FastEthernet0\/1\n\+ {2}switchport access vlan 10/m);
+
+  // Contra otro archivo, desde el selector propio de comparar.
+  await tab.evaluate("document.querySelector('.panel-head__title')?.blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await tab.waitFor("document.querySelector('.compare')");
+  await tab.evaluate("[...document.querySelectorAll('.compare button')].find((b) => b.textContent === 'Stop comparing').click()");
+  assert.equal(await tab.evaluate("document.querySelectorAll('.node.is-changed, .node.is-added').length"), 0);
+  await tab.chooseFile('[data-compare-input]', saveFile('otra.pkt', buildLegacyFile(LAB)));
+  await tab.waitFor("document.querySelector('[role=status]').textContent.startsWith('Compared with otra.pkt')");
+  assert.equal(await tab.evaluate("document.querySelector('.compare .panel-text').textContent"), 'Compared with otra.pkt.');
+  assert.match(await tab.evaluate("document.querySelector('.compare').textContent"), /There are no differences/);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('el diálogo de exportar arranca con el formato y la medida de la última vez', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab({ storage: { 'trenza.export': JSON.stringify({ network: { format: 'jpg', size: 'qhd', guide: false, transparent: false } }) } });
+  await openFile(tab, 'red.pkt', buildLegacyFile(LAB));
+  const opened = await tab.evaluate(`(() => {
+    document.querySelector('[data-export]').click();
+    const form = document.querySelector('[data-export-form]');
+    return [form.elements.format.value, form.elements.size.value, form.elements.guide.checked];
+  })()`);
+  assert.deepEqual(opened, ['jpg', 'qhd', false]);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
