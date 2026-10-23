@@ -1,5 +1,6 @@
 import { linkTypeName, toHexDump } from '../pcap/dissect.js';
-import { getLocale, t } from '../i18n.js';
+import { parseConversation } from '../pkt/query.js';
+import { countOf, getLocale, t } from '../i18n.js';
 
 const PAGE_SIZE = 300;
 
@@ -186,6 +187,20 @@ export class PacketTableView {
 
     if (!this.haystacks) this.haystacks = haystacksFor(this.packets);
 
+    if (this.conversation) {
+      const haystacks = this.haystacks;
+      const [a, b] = this.conversation;
+      const matching = [];
+      for (let index = 0; index < this.packets.length; index++) {
+        const source = haystacks[index * SEARCHED.length + 1];
+        const destination = haystacks[index * SEARCHED.length + 2];
+        if ((source === a && destination === b) || (source === b && destination === a)) matching.push(index);
+      }
+      this.matching = null;
+      this.searched = '';
+      return matching.map((index) => this.packets[index]);
+    }
+
     const needle = this.filter;
     const previous = this.matching && this.searched && needle.includes(this.searched) ? this.matching : null;
     const matching = [];
@@ -212,12 +227,19 @@ export class PacketTableView {
 
   // Filtrar y ordenar van siempre juntos; por separado, uno deshace al otro.
   refresh() {
+    this.conversation = parseConversation(this.filter);
     const filtered = this.filtered();
 
     this.visible = this.sort ? this.sorted(filtered) : filtered;
     this.rendered = 0;
     this.anchor = null;
     this.draw();
+  }
+
+  // En una conversación se marcan las 2 direcciones enteras y nada más.
+  needleFor(address) {
+    if (!this.conversation) return this.filter;
+    return address ? this.conversation.find((end) => end === address.toLowerCase()) ?? '' : '';
   }
 
   sorted(packets) {
@@ -295,11 +317,11 @@ export class PacketTableView {
       row.append(
         createElement('td', 'table__mono', String(packet.index)),
         createElement('td', 'table__mono', formatTime(packet.timestamp, this.origin)),
-        cell('table__mono', packet.source || '-', this.filter),
-        cell('table__mono', packet.destination || '-', this.filter),
-        cell(null, packet.protocol, this.filter),
+        cell('table__mono', packet.source || '-', this.needleFor(packet.source)),
+        cell('table__mono', packet.destination || '-', this.needleFor(packet.destination)),
+        cell(null, packet.protocol, this.needleFor()),
         createElement('td', 'table__mono', String(packet.originalLength)),
-        cell('table__detail', packet.summary, this.filter),
+        cell('table__detail', packet.summary, this.needleFor()),
       );
       // Shift+clic selecciona texto por defecto.
       row.addEventListener('mousedown', (event) => {
@@ -353,7 +375,7 @@ export class PacketTableView {
   }
 }
 
-export function renderPacketInspector(container, packet) {
+export function renderPacketInspector(container, packet, { onConversation } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -364,6 +386,14 @@ export function renderPacketInspector(container, packet) {
   // Qué hace el protocolo, en una línea, si es uno de los comunes.
   const key = `protocol.${packet.protocol}`;
   if (t(key) !== key) header.append(createElement('p', 'panel-head__about', t(key)));
+  if (onConversation && packet.source && packet.destination) {
+    const ends = [packet.source, packet.destination];
+    const button = createElement('button', 'button button--quiet button--small panel-head__action', t('panel.onlyConversation'));
+    button.type = 'button';
+    button.dataset.conversation = ends.join(' ');
+    button.addEventListener('click', () => onConversation(ends, packet));
+    header.append(button);
+  }
   container.append(header);
 
   for (const layer of packet.layers) {
@@ -383,7 +413,7 @@ export function renderPacketInspector(container, packet) {
   container.append(dump);
 }
 
-export function renderCaptureSummary(container, capture, packets, { title } = {}) {
+export function renderCaptureSummary(container, capture, packets, { title, onConversation } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -393,12 +423,7 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
   );
   container.append(header);
 
-  const protocols = new Map();
-  let bytes = 0;
-  for (const packet of packets) {
-    protocols.set(packet.protocol, (protocols.get(packet.protocol) || 0) + 1);
-    bytes += packet.originalLength;
-  }
+  const { protocols, bytes, conversations } = statsOf(packets);
 
   const span = packets.length > 1 ? packets[packets.length - 1].timestamp - packets[0].timestamp : 0;
   const seconds = new Intl.NumberFormat(getLocale(), { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -431,4 +456,53 @@ export function renderCaptureSummary(container, capture, packets, { title } = {}
   const protocolSection = createElement('section', 'panel-section');
   protocolSection.append(createElement('h3', 'panel-section__title', t('panel.protocols')), breakdown);
   container.append(protocolSection);
+
+  if (conversations.length === 0) return;
+  const list = createElement('ul', 'conversations');
+  for (const { ends, count } of conversations) {
+    const button = createElement(onConversation ? 'button' : 'span', 'conversations__pick');
+    if (onConversation) {
+      button.type = 'button';
+      button.dataset.conversation = ends.join(' ');
+      button.addEventListener('click', () => onConversation(ends));
+    }
+    button.append(
+      createElement('span', 'conversations__end', ends[0]),
+      createElement('span', 'visually-hidden', ` ${t('panel.conversationAnd')} `),
+      createElement('span', 'conversations__end', ends[1]),
+      createElement('span', 'visually-hidden', ', '),
+      createElement('span', 'conversations__count', countOf('packets', count)),
+    );
+    const item = createElement('li');
+    item.append(button);
+    list.append(item);
+  }
+  const conversationSection = createElement('section', 'panel-section');
+  conversationSection.append(createElement('h3', 'panel-section__title', t('panel.conversations')), list);
+  container.append(conversationSection);
+}
+
+// Se guarda por arreglo: el resumen de la captura entera se dibuja otra vez con cada tecla del filtro.
+const statsCache = new WeakMap();
+
+// Las conversaciones van por par de direcciones, sin importar el sentido, y quedan las 10 mayores.
+function statsOf(packets) {
+  if (statsCache.has(packets)) return statsCache.get(packets);
+  const protocols = new Map();
+  const pairs = new Map();
+  let bytes = 0;
+  for (const packet of packets) {
+    protocols.set(packet.protocol, (protocols.get(packet.protocol) || 0) + 1);
+    bytes += packet.originalLength;
+    if (!packet.source || !packet.destination) continue;
+    const ends = packet.source < packet.destination ? [packet.source, packet.destination] : [packet.destination, packet.source];
+    const key = `${ends[0]} ${ends[1]}`;
+    const pair = pairs.get(key);
+    if (pair) pair.count++;
+    else pairs.set(key, { ends, count: 1 });
+  }
+  const conversations = [...pairs.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+  const stats = { protocols, bytes, conversations };
+  statsCache.set(packets, stats);
+  return stats;
 }

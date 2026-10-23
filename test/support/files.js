@@ -18,7 +18,7 @@ const escape = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').repla
 
 export function deviceXml({ id, name, type, model, x, y, config = [], ports = [] }) {
   const lines = config.map((line) => `<LINE>${escape(line)}</LINE>`).join('');
-  const portXml = ports.map((port) => `<PORT><IP>${port.ip}</IP><SUBNET>${port.mask}</SUBNET></PORT>`).join('');
+  const portXml = ports.map((port) => `<PORT><IP>${port.ip}</IP><SUBNET>${port.mask}</SUBNET>${port.mac ? `<MACADDRESS>${port.mac}</MACADDRESS>` : ''}</PORT>`).join('');
   return `<DEVICE><ENGINE><TYPE model="${model}">${type}</TYPE><NAME>${escape(name)}</NAME>`
     + `<SAVE_REF_ID>${id}</SAVE_REF_ID><MODULE>${portXml}</MODULE>`
     + `<RUNNINGCONFIG>${lines}</RUNNINGCONFIG></ENGINE>`

@@ -1519,6 +1519,8 @@ body[data-dragging] .dropveil { display: grid; }
   color: var(--text-muted);
 }
 
+.panel-head__action { margin-top: 0.6rem; }
+
 /* Símbolo de cada tipo de equipo, igual al del diagrama; el color lo pone el código. */
 .glyph {
   flex: none;
@@ -1831,6 +1833,45 @@ button.key__row:hover { background: var(--raised); }
 
 @media (pointer: coarse) {
   .connections__peer--pick { min-height: 2rem; }
+}
+
+.conversations {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.conversations__pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+  width: 100%;
+  padding: 0.3rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+button.conversations__pick { cursor: pointer; }
+button.conversations__pick:hover .conversations__end { text-decoration: underline; text-decoration-color: var(--orange); }
+
+.conversations__end {
+  grid-column: 1;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.conversations__count {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--text-muted);
 }
 
 .connections__length {

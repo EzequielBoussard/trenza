@@ -1,5 +1,5 @@
-// Lo que se escribe en el buscador de equipos: una subred (192.168.1.0/24, 2001:db8::/32), una
-// VLAN ("vlan 10") o texto. No depende del DOM, así se prueba con node.
+// Lo que se escribe en los buscadores. En el de equipos: una subred (192.168.1.0/24, 2001:db8::/32),
+// una VLAN ("vlan 10"), una MAC o texto; en el de paquetes, además, una conversación.
 
 function parseIPv4(text) {
   const parts = text.split('.');
@@ -37,6 +37,27 @@ export function parseQuery(text) {
   }
 
   return { kind: 'text', needle: term.toLowerCase() };
+}
+
+// La MAC como la muestra una captura (00:01:63:43:a2:b1), como la guarda IOS (0001.6343.a2b1) o
+// pegada, entera o un pedazo. Devuelve sólo los dígitos, que es como la guarda el modelo.
+const MAC_FORMATS = [
+  /^[0-9a-f]{2}(?:[:-][0-9a-f]{2}){1,5}[:-]?[0-9a-f]?$/,
+  /^[0-9a-f]{4}(?:\.[0-9a-f]{1,4}){1,2}\.?$/,
+  /^[0-9a-f]{12}$/,
+];
+
+export function macDigits(needle) {
+  return MAC_FORMATS.some((format) => format.test(needle)) ? needle.replace(/[^0-9a-f]/g, '') : '';
+}
+
+const CAPTURED_MAC = /^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$/;
+
+// 2 direcciones separadas por un espacio: los paquetes entre ellas, en los 2 sentidos.
+export function parseConversation(text) {
+  const ends = text.trim().toLowerCase().split(/\s+/);
+  if (ends.length !== 2) return null;
+  return ends.every((end) => CAPTURED_MAC.test(end) || (!end.includes('/') && parseAddress(end))) ? ends : null;
 }
 
 export function inSubnet(address, query) {

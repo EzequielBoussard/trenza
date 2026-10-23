@@ -16,16 +16,17 @@ Con un `.pkt`, `.pka` o `.pkz`:
 - Explica en una frase qué es cada tipo de equipo, con el mismo símbolo que en el diagrama. Elegir un tipo deja a la vista sólo esos equipos.
 - Muestra cada equipo con sus interfaces y direcciones, VLAN (también la de voz y la nativa de cada tronco), rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y dónde están aplicadas, su ubicación en la vista física y la `running-config`, que se puede copiar.
 - Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide. En el panel, el equipo del otro lado de cada conexión se elige con un clic.
-- Busca equipos por nombre, tipo, dirección, subred (`192.168.1.0/24`) o VLAN (`vlan 10`) y apaga en el diagrama los que no coinciden. En una VLAN entran también los equipos enchufados a sus puertos de acceso.
+- Busca equipos por nombre, tipo, dirección, subred (`192.168.1.0/24`), VLAN (`vlan 10`) o MAC, como la muestra una captura o como la guarda IOS, y apaga en el diagrama los que no coinciden. En una VLAN entran también los equipos enchufados a sus puertos de acceso.
 - Muestra el camino por cables entre 2 equipos, con el puerto por el que entra y sale en cada uno.
 - Compara la red con otra versión de la misma, de otro archivo o la red inicial de una actividad: equipos nuevos, quitados y con cambios, conexiones nuevas, quitadas o que cambiaron de puerto, y las líneas de configuración que cambiaron en cada equipo.
 - Exporta el diagrama como PNG, JPG, SVG o PDF, en inglés o español, con tema claro u oscuro y, si se quiere, con los tipos de equipo en la leyenda. También lo copia como imagen, para pegarlo directo en un documento. El SVG crece lo que haga falta para que ninguna etiqueta quede encimada, aun con miles de equipos, y cada equipo muestra su nombre, dirección y tipo al pasar el puntero.
 - Exporta el inventario en CSV: una fila por dirección de cada equipo, con interfaz, máscara, puerta de enlace, estado y ubicación.
-- En una actividad (`.pka`) muestra además sus instrucciones, con la tabla de direcciones y los comandos, y la red tal como se guardó.
+- En una actividad (`.pka`) muestra además sus instrucciones, con la tabla de direcciones y los comandos, y la red tal como se guardó. La red de respuesta no se muestra: en Packet Tracer la protege la contraseña de la actividad.
 
 Con un `.pcap` o `.pcapng`:
 
 - Lista los paquetes con tiempo, direcciones y protocolo, con filtro y orden por columna.
+- Resume las conversaciones (los pares de direcciones con más paquetes). Elegir una, o un paquete de ella, deja en la tabla sólo esa conversación.
 - Desglosa cada paquete por capas y muestra el volcado hexadecimal. Los protocolos comunes (DHCP, DNS, ARP, ping y otros) traen una línea que dice para qué sirven.
 - Exporta la captura, o los paquetes seleccionados, como CSV o pcap.
 
@@ -61,7 +62,7 @@ Son módulos ES servidos tal cual, sin dependencias ni paso de compilación.
 npm test
 ```
 
-Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. Las que necesitan una página abren Chrome o Edge sin ventana y lo manejan por el protocolo de DevTools, sin dependencias: la red de ejemplo, una actividad con sus instrucciones, el zoom y una red de 600 equipos. Si no hay ninguno instalado se saltan, y `CHROME_PATH` indica otro. GitHub Actions las corre todas en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. Las que necesitan una página abren Chrome o Edge sin ventana y lo manejan por el protocolo de DevTools, sin dependencias: la red de ejemplo, una actividad con sus instrucciones, el zoom, una red de 600 equipos, el exporte, el buscador, el camino, la comparación y las conversaciones de una captura. Si no hay ninguno instalado se saltan (en CI fallan), y `CHROME_PATH` indica otro. GitHub Actions las corre todas en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/

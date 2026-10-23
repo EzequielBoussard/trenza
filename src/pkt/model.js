@@ -78,6 +78,16 @@ function interfacesFromPorts(engine) {
   return interfaces;
 }
 
+// Todas, también las de puertos sin dirección, y sólo los dígitos: se buscan en cualquier formato.
+function macsOf(engine) {
+  const macs = new Set();
+  for (const port of engine.getElementsByTagName('PORT')) {
+    const mac = childText(port, 'MACADDRESS').replace(/[^0-9a-f]/gi, '').toLowerCase();
+    if (mac) macs.add(mac);
+  }
+  return [...macs];
+}
+
 const PLACE_ROOT = '0';
 const PLACE_DEVICE = '6';
 
@@ -134,6 +144,7 @@ function readDevice(deviceNode, index, places) {
     y: logical ? Number(childText(logical, 'Y')) || 0 : 0,
     location: workspace ? locationOf(childText(workspace, 'PHYSICAL'), places) : [],
     interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
+    macs: macsOf(engine),
     vlans: readVlans(configLines, configured, vlansFromEngine(engine)),
     routes: readRoutes(configLines),
     routing: readRoutingProtocols(configLines, configured),

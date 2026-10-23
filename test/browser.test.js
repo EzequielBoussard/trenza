@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { findBrowser, launch, serve } from './support/browser.js';
 import { activityXml, buildLegacyFile, deviceXml, linkXml, networkXml } from './support/files.js';
 
-// Lo que depende del DOM se prueba en Chrome o Edge. Sin ninguno instalado, se salta.
+// Lo que depende del DOM se prueba en Chrome o Edge. Sin ninguno instalado se salta, salvo en CI:
+// ahí saltarse en silencio dejaría de probar la mitad del sitio sin que nadie lo note.
 const executable = findBrowser();
+if (!executable && process.env.CI) throw new Error('no hay Chrome ni Edge en CI (CHROME_PATH lo indica a mano)');
 const skip = executable ? false : 'no hay Chrome ni Edge (CHROME_PATH lo indica a mano)';
 
 let site;
@@ -63,7 +65,7 @@ const LAB = networkXml([
       'line vty 0 4', ' access-class ADMIN in', '!',
     ],
   }),
-  deviceXml({ id: 'save-ref-id:3', name: 'PC1', type: 'Pc', model: 'PC-PT', x: 150, y: 340, ports: [{ ip: '192.0.2.10', mask: '255.255.255.0' }] }),
+  deviceXml({ id: 'save-ref-id:3', name: 'PC1', type: 'Pc', model: 'PC-PT', x: 150, y: 340, ports: [{ ip: '192.0.2.10', mask: '255.255.255.0', mac: '0001.6343.A2B1' }] }),
 ], [
   linkXml('save-ref-id:2', 'GigabitEthernet0/0/0', 'save-ref-id:1', 'GigabitEthernet0/1'),
   linkXml('save-ref-id:1', 'FastEthernet0/1', 'save-ref-id:3', 'FastEthernet0'),
@@ -276,6 +278,8 @@ test('el buscador encuentra por subred y por VLAN, y el camino entre 2 equipos s
   assert.deepEqual(await search('192.0.2.0/24'), ['PC1', 'R1']);
   assert.deepEqual(await search('vlan 10'), ['PC1', 'S1']);
   assert.deepEqual(await search('10.0.0.0/8'), []);
+  assert.deepEqual(await search('00:01:63:43:a2:b1'), ['PC1'], 'la MAC como la muestra una captura');
+  assert.deepEqual(await search('6343.a2'), ['PC1']);
   await search('');
 
   await tab.evaluate("[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('PC1')).click()");
@@ -332,6 +336,48 @@ test('comparar una actividad con su red inicial y con otro archivo marca lo que 
   await tab.waitFor("document.querySelector('[role=status]').textContent.startsWith('Compared with otra.pkt')");
   assert.equal(await tab.evaluate("document.querySelector('.compare .panel-text').textContent"), 'Compared with otra.pkt.');
   assert.match(await tab.evaluate("document.querySelector('.compare').textContent"), /There are no differences/);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('una conversación filtra la captura a ese par, desde el resumen o desde un paquete', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab();
+  await tab.open(`${site.url}/`);
+  await tab.evaluate("document.querySelector('[data-example=capture]').click()");
+  await tab.waitFor("document.querySelector('.packet-row') && document.querySelector('.conversations__pick')");
+  const shown = (ends) => `(() => {
+    const rows = [...document.querySelectorAll('.packet-row')];
+    const ends = ${JSON.stringify(ends)};
+    return {
+      filter: document.querySelector('.rail__search').value,
+      rows: rows.length,
+      inPair: rows.every((row) => ends.includes(row.cells[2].textContent) && ends.includes(row.cells[3].textContent)),
+      marked: rows.every((row) => row.cells[2].querySelector('mark') && row.cells[3].querySelector('mark')),
+      focused: document.activeElement.dataset.conversation,
+    };
+  })()`;
+
+  const first = await tab.evaluate(`(() => {
+    const pick = document.querySelector('.conversations__pick');
+    pick.click();
+    return { ends: pick.dataset.conversation.split(' '), count: parseInt(pick.querySelector('.conversations__count').textContent, 10) };
+  })()`);
+  assert.deepEqual(await tab.evaluate(shown(first.ends)), {
+    filter: first.ends.join(' '), rows: first.count, inPair: true, marked: true, focused: first.ends.join(' '),
+  });
+
+  await tab.evaluate("(() => { const search = document.querySelector('.rail__search'); search.value = ''; search.dispatchEvent(new Event('input')); })()");
+  const packet = await tab.evaluate(`(() => {
+    const row = document.querySelectorAll('.packet-row')[3];
+    row.click();
+    document.querySelector('.panel-head__action').click();
+    return { index: row.dataset.index, ends: [row.cells[2].textContent, row.cells[3].textContent] };
+  })()`);
+  const after = await tab.evaluate(shown(packet.ends));
+  assert.equal(after.filter, packet.ends.join(' '));
+  assert.ok(after.rows > 0 && after.inPair && after.marked);
+  assert.equal(after.focused, packet.ends.join(' '));
+  assert.equal(await tab.evaluate("document.querySelector('.packet-row.is-selected')?.dataset.index"), packet.index, 'el paquete sigue elegido');
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });

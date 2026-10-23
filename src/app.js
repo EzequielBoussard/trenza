@@ -2,7 +2,7 @@ import { countOf, getLanguage, setLanguage, t, translateDocument } from './i18n.
 import { decodePacketTracerFile } from './pkt/decode.js';
 import { compareNetworks } from './pkt/compare.js';
 import { buildNetworkModel } from './pkt/model.js';
-import { inSubnet, parseQuery, vlanMembers } from './pkt/query.js';
+import { inSubnet, macDigits, parseQuery, vlanMembers } from './pkt/query.js';
 import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
@@ -170,6 +170,7 @@ function renderDeviceList(term = '') {
     list.replaceChildren();
     const query = parseQuery(term);
     const filtering = query.kind !== 'text' || query.needle !== '';
+    const digits = query.kind === 'text' ? macDigits(query.needle) : '';
     const visible = state.showInfrastructure
       ? state.model.devices
       : state.model.devices.filter((device) => device.category !== 'infrastructure');
@@ -178,6 +179,7 @@ function renderDeviceList(term = '') {
       if (query.kind === 'subnet') return addresses.some((address) => inSubnet(address, query));
       if (query.kind === 'vlan') return Boolean(state.vlanMembers.get(query.id)?.has(device.id));
       if (!filtering) return true;
+      if (digits && device.macs.some((mac) => mac.includes(digits))) return true;
       return `${device.name} ${t(`category.${device.category}`)} ${device.type} ${addresses.join(' ')}`.toLowerCase().includes(query.needle);
     });
     state.topology.markMatches(filtering ? new Set(matches.map((device) => device.id)) : null);
@@ -539,12 +541,26 @@ function showPacketSelection(selection, last) {
   state.packetSelection = selection.map((packet) => packet.index);
 
   if (selection.length === 1 || (last && selection.length === 0)) {
-    renderPacketInspector(elements.panel, last ?? selection[0]);
+    renderPacketInspector(elements.panel, last ?? selection[0], { onConversation: showConversation });
   } else if (selection.length > 1) {
-    renderCaptureSummary(elements.panel, state.capture, selection, { title: t('panel.selection') });
+    renderCaptureSummary(elements.panel, state.capture, selection, { title: t('panel.selection'), onConversation: showConversation });
   } else {
-    renderCaptureSummary(elements.panel, state.capture, state.packets);
+    renderCaptureSummary(elements.panel, state.capture, state.packets, { onConversation: showConversation });
   }
+}
+
+// El filtro pasa a ser el par, como si se hubiera escrito. El panel se dibuja de nuevo, así que el
+// foco vuelve al mismo botón; desde un paquete, ese paquete sigue elegido.
+function showConversation(ends, packet) {
+  const search = elements.rail.querySelector('.rail__search');
+  search.value = ends.join(' ');
+  search.dispatchEvent(new Event('input'));
+  if (packet) {
+    state.packetTable.select([packet.index]);
+    showPacketSelection([packet], packet);
+  }
+  const key = ends.join(' ');
+  [...elements.panel.querySelectorAll('[data-conversation]')].find((button) => button.dataset.conversation === key)?.focus();
 }
 
 function showCapture(bytes) {

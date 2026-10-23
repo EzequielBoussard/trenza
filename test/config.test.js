@@ -8,7 +8,7 @@ import {
   readVlans,
 } from '../src/pkt/config.js';
 import { compareNetworks, configChanges } from '../src/pkt/compare.js';
-import { inSubnet, parseQuery, vlanMembers } from '../src/pkt/query.js';
+import { inSubnet, macDigits, parseConversation, parseQuery, vlanMembers } from '../src/pkt/query.js';
 
 const SWITCH = `
 !
@@ -336,6 +336,27 @@ test('el buscador entiende subredes de IPv4 e IPv6 y VLAN', () => {
   assert.deepEqual(parseQuery('VLAN 010'), { kind: 'vlan', id: '10' });
   assert.equal(parseQuery('192.168.1.0/33').kind, 'text', 'un prefijo imposible es texto');
   assert.equal(parseQuery('Router/2').kind, 'text');
+});
+
+test('una MAC se busca como la muestra la captura, como la guarda IOS o pegada', () => {
+  assert.equal(macDigits('00:01:63:43:a2:b1'), '00016343a2b1');
+  assert.equal(macDigits('00-01-63'), '000163');
+  assert.equal(macDigits('00:01:6'), '00016', 'mientras se escribe');
+  assert.equal(macDigits('0001.6343.a2b1'), '00016343a2b1');
+  assert.equal(macDigits('00016343a2b1'), '00016343a2b1');
+  assert.equal(macDigits('192.168.1'), '', 'una IPv4 a medio escribir no es una MAC');
+  assert.equal(macDigits('fe80::1'), '');
+  assert.equal(macDigits('router'), '');
+});
+
+test('2 direcciones en el filtro de paquetes son una conversación', () => {
+  assert.deepEqual(parseConversation(' 192.0.2.1   198.51.100.7 '), ['192.0.2.1', '198.51.100.7']);
+  assert.deepEqual(parseConversation('2001:DB8::1 2001:db8::2'), ['2001:db8::1', '2001:db8::2']);
+  assert.deepEqual(parseConversation('00:00:5e:00:53:01 00:00:5e:00:53:02'), ['00:00:5e:00:53:01', '00:00:5e:00:53:02']);
+  assert.equal(parseConversation('tcp 80'), null);
+  assert.equal(parseConversation('192.0.2.1'), null);
+  assert.equal(parseConversation('192.0.2.0/24 192.0.2.1'), null, 'una subred no es un extremo');
+  assert.equal(parseConversation('192.0.2.1 198.51.100.7 203.0.113.9'), null);
 });
 
 test('en una VLAN entran el switch, el router que la enruta y lo enchufado a sus puertos de acceso', () => {
