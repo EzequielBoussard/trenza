@@ -413,7 +413,7 @@ export function renderPacketInspector(container, packet, { onConversation } = {}
   container.append(dump);
 }
 
-export function renderCaptureSummary(container, capture, packets, { title, onConversation } = {}) {
+export function renderCaptureSummary(container, capture, packets, { title, onConversation, activeConversation } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -458,20 +458,22 @@ export function renderCaptureSummary(container, capture, packets, { title, onCon
   container.append(protocolSection);
 
   if (conversations.length === 0) return;
-  const list = createElement('ul', 'conversations');
+  const list = createElement('ul', 'pick-list');
   for (const { ends, count } of conversations) {
-    const button = createElement(onConversation ? 'button' : 'span', 'conversations__pick');
+    const button = createElement(onConversation ? 'button' : 'span', 'pick-list__pick');
     if (onConversation) {
       button.type = 'button';
       button.dataset.conversation = ends.join(' ');
+      button.setAttribute('aria-pressed', String(conversationKey(ends) === activeConversation));
       button.addEventListener('click', () => onConversation(ends));
     }
+    // Con espacios duros: los comunes se pierden al armar el nombre del botón.
     button.append(
-      createElement('span', 'conversations__end', ends[0]),
-      createElement('span', 'visually-hidden', ` ${t('panel.conversationAnd')} `),
-      createElement('span', 'conversations__end', ends[1]),
-      createElement('span', 'visually-hidden', ', '),
-      createElement('span', 'conversations__count', countOf('packets', count)),
+      createElement('span', 'pick-list__text', ends[0]),
+      createElement('span', 'visually-hidden', `\u00a0${t('panel.conversationAnd')}\u00a0`),
+      createElement('span', 'pick-list__text', ends[1]),
+      createElement('span', 'visually-hidden', ',\u00a0'),
+      createElement('span', 'pick-list__count', countOf('packets', count)),
     );
     const item = createElement('li');
     item.append(button);
@@ -481,6 +483,9 @@ export function renderCaptureSummary(container, capture, packets, { title, onCon
   conversationSection.append(createElement('h3', 'panel-section__title', t('panel.conversations')), list);
   container.append(conversationSection);
 }
+
+// El mismo par escrito en cualquier orden o con mayúsculas.
+export const conversationKey = (ends) => ends.map((end) => end.toLowerCase()).sort().join(' ');
 
 // Se guarda por arreglo: el resumen de la captura entera se dibuja otra vez con cada tecla del filtro.
 const statsCache = new WeakMap();

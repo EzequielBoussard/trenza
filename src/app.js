@@ -8,7 +8,7 @@ import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
 import { CATEGORY_ORDER, cablePath, labelFontsReady, selectVisible } from './view/graph.js';
 import { categoryIcon, markScrollable, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
-import { PacketTableView, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
+import { PacketTableView, conversationKey, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
 import { wireExportDialog } from './view/export-dialog.js';
 import { download } from './download.js';
@@ -224,7 +224,7 @@ function renderDeviceList(term = '') {
   elements.rail.append(announcer.region);
   search.addEventListener('input', () => {
     const { shown, total } = draw(search.value);
-    markCategoryFilter(search.value);
+    markFilters(search.value);
     announcer.say(shown === 0 ? t('rail.noMatches') : t('rail.matches', { shown, total: countOf('devices', total) }));
   });
   draw(term);
@@ -237,9 +237,10 @@ function filterAnnouncer() {
   let pending = 0;
   return {
     region,
+    // Con el mismo texto la región no cambia y el lector calla: un espacio duro lo hace distinto.
     say(text) {
       clearTimeout(pending);
-      pending = setTimeout(() => { region.textContent = text; }, 500);
+      pending = setTimeout(() => { region.textContent = region.textContent === text ? `${text}\u00a0` : text; }, 500);
     },
   };
 }
@@ -357,9 +358,19 @@ function filterCategory(category) {
   search.dispatchEvent(new Event('input'));
 }
 
-// Escribir a mano el nombre de un tipo también lo marca en la guía.
-function markCategoryFilter(term) {
+function filterSubnet(cidr) {
+  const search = elements.rail.querySelector('.rail__search');
+  if (!search) return;
+  search.value = search.value.trim().toLowerCase() === cidr ? '' : cidr;
+  search.dispatchEvent(new Event('input'));
+}
+
+// Escribir a mano el nombre de un tipo o una red también la marca en el resumen.
+function markFilters(term) {
   const needle = term.trim().toLowerCase();
+  for (const button of elements.panel.querySelectorAll('[data-subnet]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.subnet === needle));
+  }
   const categories = new Set(state.model.devices.map((device) => device.category));
   state.categoryFilter = [...categories].find((category) => needle && t(`category.${category}`).toLowerCase() === needle) ?? null;
   for (const button of elements.panel.querySelectorAll('[data-category]')) {
@@ -374,6 +385,8 @@ function showNetworkSummary() {
     onDownload: () => download(new Blob([state.file.bytes]), state.file.name),
     onFilter: filterCategory,
     filtering: state.categoryFilter,
+    onSubnet: filterSubnet,
+    subnetFilter: elements.rail.querySelector('.rail__search')?.value.trim().toLowerCase(),
     hidden: (category) => category === 'infrastructure' && !state.showInfrastructure,
     compare: {
       result: state.comparison?.result,
@@ -399,6 +412,12 @@ function compareWith(before, { file }, quiet = false) {
     devices: { key: 'unit.devices', values: { count: result.changed.size + result.added.length } },
   }, 'ok');
   refreshPanel();
+  // El botón pulsado ya no está: el foco va al título de la sección, que sigue con el resultado.
+  const heading = elements.panel.querySelector('.compare')?.closest('section')?.querySelector('h3');
+  if (heading) {
+    heading.tabIndex = -1;
+    heading.focus();
+  }
 }
 
 function stopComparing() {
@@ -539,21 +558,25 @@ function paintCapture(keep = false) {
 
 function showPacketSelection(selection, last) {
   state.packetSelection = selection.map((packet) => packet.index);
+  const pair = state.packetTable.conversation;
+  const conversation = { onConversation: showConversation, activeConversation: pair ? conversationKey(pair) : null };
 
   if (selection.length === 1 || (last && selection.length === 0)) {
-    renderPacketInspector(elements.panel, last ?? selection[0], { onConversation: showConversation });
+    renderPacketInspector(elements.panel, last ?? selection[0], conversation);
   } else if (selection.length > 1) {
-    renderCaptureSummary(elements.panel, state.capture, selection, { title: t('panel.selection'), onConversation: showConversation });
+    renderCaptureSummary(elements.panel, state.capture, selection, { title: t('panel.selection'), ...conversation });
   } else {
-    renderCaptureSummary(elements.panel, state.capture, state.packets, { onConversation: showConversation });
+    renderCaptureSummary(elements.panel, state.capture, state.packets, conversation);
   }
 }
 
-// El filtro pasa a ser el par, como si se hubiera escrito. El panel se dibuja de nuevo, así que el
-// foco vuelve al mismo botón; desde un paquete, ese paquete sigue elegido.
+// Como si se hubiera escrito el par; la misma del resumen otra vez lo borra. El panel se rehace:
+// el foco vuelve al mismo botón y, desde un paquete, ese paquete sigue elegido.
 function showConversation(ends, packet) {
   const search = elements.rail.querySelector('.rail__search');
-  search.value = ends.join(' ');
+  const pair = state.packetTable.conversation;
+  const again = !packet && pair && conversationKey(pair) === conversationKey(ends);
+  search.value = again ? '' : ends.join(' ');
   search.dispatchEvent(new Event('input'));
   if (packet) {
     state.packetTable.select([packet.index]);

@@ -1725,8 +1725,8 @@ button.key__row:hover { background: var(--raised); }
 
 .table__lines { white-space: pre-line; }
 
-.diff__added { color: var(--green); }
-.diff__removed { color: var(--orange); }
+.diff__added { color: var(--green); text-decoration: none; }
+.diff__removed { color: var(--orange); text-decoration: none; }
 .diff__context { color: var(--text-faint); }
 .code-block.diff { max-height: 18rem; }
 
@@ -1835,7 +1835,8 @@ button.key__row:hover { background: var(--raised); }
   .connections__peer--pick { min-height: 2rem; }
 }
 
-.conversations {
+/* Redes IP del resumen y conversaciones de la captura: cada fila filtra, como la guía de tipos. */
+.pick-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1843,31 +1844,42 @@ button.key__row:hover { background: var(--raised); }
   line-height: 1.35;
 }
 
-.conversations__pick {
+.pick-list__pick {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 0.75rem;
   width: 100%;
-  padding: 0.3rem 0;
-  border: 0;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 0.3rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   background: none;
   color: inherit;
   font: inherit;
   text-align: start;
 }
 
-button.conversations__pick { cursor: pointer; }
-button.conversations__pick:hover .conversations__end { text-decoration: underline; text-decoration-color: var(--orange); }
+button.pick-list__pick { cursor: pointer; }
+button.pick-list__pick:hover { background: var(--raised); }
+.pick-list__pick[aria-pressed='true'] { border-color: var(--line); background: var(--raised); }
 
-.conversations__end {
+@media (pointer: coarse) {
+  button.pick-list__pick { min-height: 40px; }
+}
+
+.pick-list__text {
   grid-column: 1;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   overflow-wrap: anywhere;
 }
 
-.conversations__count {
+.pick-list__note {
+  grid-column: 1;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.pick-list__count {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
@@ -2003,6 +2015,7 @@ button.conversations__pick:hover .conversations__end { text-decoration: underlin
   .device-chip.is-selected,
   .packet-row.is-selected,
   .key__row[aria-pressed='true'],
+  .pick-list__pick[aria-pressed='true'],
   .legend__item.is-active {
     outline: 2px solid Highlight;
     outline-offset: -2px;

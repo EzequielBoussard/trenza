@@ -1,6 +1,7 @@
 import { countOf, getLocale, t } from '../i18n.js';
 import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS, selectVisible } from './graph.js';
 import { renderRichText } from './rich-text.js';
+import { subnetsOf } from '../pkt/query.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -229,8 +230,18 @@ function pathSection(device, devicesById, picking) {
 
   const result = createElement('div', 'path__result');
   result.setAttribute('aria-live', 'polite');
+  // Fuera de la región que se anuncia: si no, el lector leería el botón como parte del camino.
+  const clear = createElement('button', 'button button--quiet button--small', t('panel.pathClear'));
+  clear.type = 'button';
+  clear.addEventListener('click', () => {
+    select.value = '';
+    onChoose(null);
+    show(null);
+    select.focus();
+  });
   const show = (targetId) => {
     result.replaceChildren();
+    clear.hidden = !targetId;
     if (!targetId) return;
     const steps = pathTo(targetId);
     if (!steps) {
@@ -241,21 +252,15 @@ function pathSection(device, devicesById, picking) {
     for (const step of steps) {
       const item = createElement('li', 'path__step');
       const ports = [step.in && t('panel.pathIn', { port: step.in }), step.out && t('panel.pathOut', { port: step.out })];
+      // El espacio duro sobrevive al armado del nombre; uno común se pierde y queda "PC1sale".
       item.append(
         step.id === device.id ? createElement('span', 'connections__peer', device.name) : peerName(devicesById.get(step.id), picking),
+        createElement('span', 'visually-hidden', ',\u00a0'),
         createElement('span', 'path__ports', ports.filter(Boolean).join(' · ')),
       );
       list.append(item);
     }
-    const clear = createElement('button', 'button button--quiet button--small', t('panel.pathClear'));
-    clear.type = 'button';
-    clear.addEventListener('click', () => {
-      select.value = '';
-      onChoose(null);
-      show(null);
-      select.focus();
-    });
-    result.append(createElement('p', 'panel-text', t('panel.pathFound', { links: countOf('links', steps.length - 1) })), list, clear);
+    result.append(createElement('p', 'panel-text', t('panel.pathFound', { links: countOf('links', steps.length - 1) })), list);
   };
 
   select.addEventListener('change', () => {
@@ -263,7 +268,7 @@ function pathSection(device, devicesById, picking) {
     show(select.value);
   });
   show(chosen);
-  wrapper.append(label, result);
+  wrapper.append(label, result, clear);
   return wrapper;
 }
 
@@ -429,8 +434,38 @@ function categoryKey(devices, { onFilter, filtering, hidden }) {
   return list;
 }
 
-// Las marcas + y - van escritas, además del color: así las lee también un lector de pantalla.
+const AUTOMATIC_IPV4 = '169.254.0.0/16';
+
+function subnetList(subnets, { onSubnet, subnetFilter }) {
+  const list = createElement('ul', 'pick-list');
+  for (const { cidr, count } of subnets) {
+    const row = createElement(onSubnet ? 'button' : 'span', 'pick-list__pick');
+    row.append(createElement('span', 'pick-list__text', cidr));
+    // La que el equipo se pone solo cuando el DHCP no le contesta: casi siempre es un error.
+    if (cidr === AUTOMATIC_IPV4) {
+      row.append(createElement('span', 'visually-hidden', ',\u00a0'), createElement('span', 'pick-list__note', t('panel.subnetAutomatic')));
+    }
+    row.append(
+      createElement('span', 'visually-hidden', ',\u00a0'),
+      createElement('span', 'pick-list__count', countOf('devices', count)),
+    );
+    if (onSubnet) {
+      row.type = 'button';
+      row.dataset.subnet = cidr;
+      row.setAttribute('aria-pressed', String(cidr === subnetFilter));
+      row.addEventListener('click', () => onSubnet(cidr));
+    }
+    const item = createElement('li');
+    item.append(row);
+    list.append(item);
+  }
+  return list;
+}
+
+// Las marcas + y - van escritas, además del color. NVDA no lee el guion, así que lo agregado y lo
+// quitado van en ins y del, que sí anuncia.
 const MARKS = { added: '+ ', removed: '- ', context: '  ' };
+const DIFF_TAGS = { added: 'ins', removed: 'del', context: 'span' };
 
 function changeSection(change) {
   const wrapper = createElement('div', 'change');
@@ -443,14 +478,16 @@ function changeSection(change) {
       const text = entry.gateway
         ? `${t('panel.gateway')}: ${entry.gateway}`
         : [entry.port, entry.address, entry.mask].filter(Boolean).join(' ');
-      list.append(createElement('li', `diff__${entry.type}`, MARKS[entry.type] + text));
+      const item = createElement('li');
+      item.append(createElement(DIFF_TAGS[entry.type], `diff__${entry.type}`, MARKS[entry.type] + text));
+      list.append(item);
     }
     wrapper.append(list);
   }
 
   if (change.config.length > 0) {
     const code = createElement('pre', 'code-block diff');
-    code.append(...change.config.map((entry) => createElement('span', `diff__${entry.type}`, `${MARKS[entry.type]}${entry.text}\n`)));
+    code.append(...change.config.map((entry) => createElement(DIFF_TAGS[entry.type], `diff__${entry.type}`, `${MARKS[entry.type]}${entry.text}\n`)));
     wrapper.append(code);
   }
   return wrapper;
@@ -545,6 +582,8 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
   if (model.instructions.length > 0) container.append(activitySection(model.instructions));
   if (compare) container.append(compareSection(model, compare));
   container.append(section(t('panel.inventory'), categoryKey(model.devices, filter)));
+  const subnets = subnetsOf(model.devices.filter((device) => !filter.hidden?.(device.category)));
+  if (subnets.length > 0) container.append(section(t('panel.subnets'), subnetList(subnets, filter)));
 
   const description = descriptionOf(model.description);
   if (description) container.append(section(t('panel.description'), description));

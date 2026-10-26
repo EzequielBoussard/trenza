@@ -282,6 +282,20 @@ test('el buscador encuentra por subred y por VLAN, y el camino entre 2 equipos s
   assert.deepEqual(await search('6343.a2'), ['PC1']);
   await search('');
 
+  // Las redes IP del resumen filtran con el mismo buscador, y la misma otra vez lo borra.
+  const subnet = await tab.evaluate(`(() => {
+    const rows = [...document.querySelectorAll('[data-subnet]')];
+    rows[0].click();
+    return {
+      rows: rows.map((row) => row.textContent),
+      search: document.querySelector('.rail__search').value,
+      pressed: rows[0].getAttribute('aria-pressed'),
+      chips: [...document.querySelectorAll('.device-chip__name')].map((name) => name.textContent).sort(),
+    };
+  })()`);
+  assert.deepEqual(subnet, { rows: ['192.0.2.0/24,\u00a02 devices'], search: '192.0.2.0/24', pressed: 'true', chips: ['PC1', 'R1'] });
+  assert.equal(await tab.evaluate("document.querySelector('[data-subnet]').click(), document.querySelector('.rail__search').value"), '');
+
   await tab.evaluate("[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('PC1')).click()");
   await tab.waitFor("document.querySelector('.path select')");
   const path = await tab.evaluate(`(() => {
@@ -290,11 +304,13 @@ test('el buscador encuentra por subred y por VLAN, y el camino entre 2 equipos s
     select.dispatchEvent(new Event('change'));
     return {
       steps: [...document.querySelectorAll('.path__step')].map((step) => step.firstChild.textContent),
+      spoken: document.querySelector('.path__step').textContent.includes(',\\u00a0'),
+      clearOutside: !document.querySelector('.path__result .button') && Boolean(document.querySelector('.path > .button:not([hidden])')),
       nodes: document.querySelectorAll('.node.is-path').length,
       links: document.querySelectorAll('.link.is-path').length,
     };
   })()`);
-  assert.deepEqual(path, { steps: ['PC1', 'S1', 'R1'], nodes: 3, links: 2 });
+  assert.deepEqual(path, { steps: ['PC1', 'S1', 'R1'], spoken: true, clearOutside: true, nodes: 3, links: 2 });
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
@@ -320,11 +336,13 @@ test('comparar una actividad con su red inicial y con otro archivo marca lo que 
   assert.deepEqual(summary.changed, ['save-ref-id:1', 'save-ref-id:3']);
   assert.deepEqual(summary.added, ['save-ref-id:2']);
   assert.match(summary.status, /^Compared with the starting network of the activity: 3 devices with changes/);
+  assert.equal(await tab.evaluate("document.activeElement.tagName + ' ' + document.activeElement.textContent"), 'H3 Compare', 'el foco no se pierde con el botón');
 
   await tab.evaluate("[...document.querySelectorAll('.compare__list button')].find((b) => b.textContent === 'S1').click()");
   await tab.waitFor("document.querySelector('.panel-head__title')?.textContent === 'S1'");
   const diff = await tab.evaluate("document.querySelector('.code-block.diff').textContent");
   assert.match(diff, /^\+ banner motd/m);
+  assert.equal(await tab.evaluate("document.querySelector('.code-block.diff ins').textContent.slice(0, 2)"), '+ ', 'lo agregado va en ins, que el lector anuncia');
   assert.match(diff, /^ {2}interface FastEthernet0\/1\n\+ {2}switchport access vlan 10/m);
 
   // Contra otro archivo, desde el selector propio de comparar.
@@ -344,7 +362,7 @@ test('una conversación filtra la captura a ese par, desde el resumen o desde un
   const tab = await browser.tab();
   await tab.open(`${site.url}/`);
   await tab.evaluate("document.querySelector('[data-example=capture]').click()");
-  await tab.waitFor("document.querySelector('.packet-row') && document.querySelector('.conversations__pick')");
+  await tab.waitFor("document.querySelector('.packet-row') && document.querySelector('.pick-list__pick[data-conversation]')");
   const shown = (ends) => `(() => {
     const rows = [...document.querySelectorAll('.packet-row')];
     const ends = ${JSON.stringify(ends)};
@@ -358,13 +376,18 @@ test('una conversación filtra la captura a ese par, desde el resumen o desde un
   })()`;
 
   const first = await tab.evaluate(`(() => {
-    const pick = document.querySelector('.conversations__pick');
+    const pick = document.querySelector('.pick-list__pick[data-conversation]');
     pick.click();
-    return { ends: pick.dataset.conversation.split(' '), count: parseInt(pick.querySelector('.conversations__count').textContent, 10) };
+    return { ends: pick.dataset.conversation.split(' '), count: parseInt(pick.querySelector('.pick-list__count').textContent, 10) };
   })()`);
   assert.deepEqual(await tab.evaluate(shown(first.ends)), {
     filter: first.ends.join(' '), rows: first.count, inPair: true, marked: true, focused: first.ends.join(' '),
   });
+  assert.deepEqual(await tab.evaluate(`(() => {
+    const pressed = document.activeElement.getAttribute('aria-pressed');
+    document.activeElement.click();
+    return [pressed, document.querySelector('.rail__search').value, document.activeElement.getAttribute('aria-pressed')];
+  })()`), ['true', '', 'false'], 'la misma conversación otra vez borra el filtro');
 
   await tab.evaluate("(() => { const search = document.querySelector('.rail__search'); search.value = ''; search.dispatchEvent(new Event('input')); })()");
   const packet = await tab.evaluate(`(() => {

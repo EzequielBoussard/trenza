@@ -8,7 +8,7 @@ import {
   readVlans,
 } from '../src/pkt/config.js';
 import { compareNetworks, configChanges } from '../src/pkt/compare.js';
-import { inSubnet, macDigits, parseConversation, parseQuery, vlanMembers } from '../src/pkt/query.js';
+import { inSubnet, macDigits, parseConversation, parseQuery, subnetsOf, vlanMembers } from '../src/pkt/query.js';
 
 const SWITCH = `
 !
@@ -347,6 +347,24 @@ test('una MAC se busca como la muestra la captura, como la guarda IOS o pegada',
   assert.equal(macDigits('192.168.1'), '', 'una IPv4 a medio escribir no es una MAC');
   assert.equal(macDigits('fe80::1'), '');
   assert.equal(macDigits('router'), '');
+});
+
+test('las redes IP salen de las interfaces, en orden, y cada una se puede buscar', () => {
+  const device = (...addresses) => ({ interfaces: [{ addresses: addresses.map(([address, mask = '']) => ({ address, mask })) }] });
+  const devices = [
+    device(['192.168.10.1', '255.255.255.0'], ['10.0.0.1', '255.255.255.252'], ['2001:DB8:ACAD:10::1/64'], ['FE80::1']),
+    device(['192.168.10.20', '255.255.255.0'], ['192.168.10.21', '255.255.255.0']),
+    device(['10.0.0.2', '255.255.255.252'], ['0.0.0.0', '0.0.0.0'], ['2001:db8:acad:10::2/64']),
+    device(['192.168.2.5', '255.0.255.0'], ['dhcp'], ['172.16.0.9', '']),
+  ];
+  const subnets = subnetsOf(devices);
+  assert.deepEqual(subnets, [
+    { cidr: '10.0.0.0/30', count: 2 },
+    { cidr: '192.168.10.0/24', count: 2 },
+    { cidr: '2001:db8:acad:10::/64', count: 2 },
+  ], 'una máscara salteada, una dirección sin máscara y la de enlace local no cuentan');
+  for (const { cidr } of subnets) assert.equal(parseQuery(cidr).kind, 'subnet');
+  assert.equal(subnetsOf([device(['2001:0:0:1:0:0:0:1/128'])])[0].cidr, '2001:0:0:1::1/128');
 });
 
 test('2 direcciones en el filtro de paquetes son una conversación', () => {

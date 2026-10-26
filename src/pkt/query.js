@@ -60,6 +60,73 @@ export function parseConversation(text) {
   return ends.every((end) => CAPTURED_MAC.test(end) || (!end.includes('/') && parseAddress(end))) ? ends : null;
 }
 
+const IPV4_ALL = (1n << 32n) - 1n;
+
+function maskLength(mask) {
+  const parsed = parseIPv4(mask);
+  if (!parsed) return null;
+  for (let length = 0; length <= 32; length++) {
+    if (parsed.value === (IPV4_ALL ^ ((1n << BigInt(32 - length)) - 1n))) return length;
+  }
+  return null;
+}
+
+// En minúscula y con el tramo de ceros más largo como "::", como pide el RFC 5952.
+function formatIPv6(value) {
+  const groups = Array.from({ length: 8 }, (_, index) => Number((value >> BigInt(112 - index * 16)) & 0xffffn));
+  let best = { at: -1, length: 1 };
+  for (let at = 0; at < 8; at++) {
+    let length = 0;
+    while (at + length < 8 && groups[at + length] === 0) length++;
+    if (length > best.length) best = { at, length };
+  }
+  const hex = groups.map((group) => group.toString(16));
+  if (best.at < 0) return hex.join(':');
+  return `${hex.slice(0, best.at).join(':')}::${hex.slice(best.at + best.length).join(':')}`;
+}
+
+function formatAddress(value, width) {
+  if (width === 128) return formatIPv6(value);
+  return [24n, 16n, 8n, 0n].map((shift) => String((value >> shift) & 255n)).join('.');
+}
+
+// La de enlace local (fe80::/10) la tiene cada interfaz con IPv6 y 0.0.0.0 es la de quien espera
+// DHCP: ninguna dice cómo está armada la red.
+function networkOf({ address, mask }) {
+  const parsed = parseAddress(address);
+  if (!parsed || parsed.value === 0n) return null;
+  let length;
+  if (parsed.width === 32) {
+    length = maskLength(mask);
+  } else {
+    const prefix = String(address).match(/\/(\d{1,3})/);
+    length = prefix && Number(prefix[1]) <= 128 && parsed.value >> 118n !== 0x3fan ? Number(prefix[1]) : null;
+  }
+  if (length === null) return null;
+  const shift = BigInt(parsed.width - length);
+  const value = (parsed.value >> shift) << shift;
+  return { width: parsed.width, value, length, cidr: `${formatAddress(value, parsed.width)}/${length}` };
+}
+
+// Las redes IP que aparecen en las interfaces y cuántos equipos tienen una dirección en cada una,
+// IPv4 primero y en orden numérico. El texto de cada una, escrito en el buscador, las filtra.
+export function subnetsOf(devices) {
+  const subnets = new Map();
+  for (const device of devices) {
+    const own = new Set();
+    for (const entry of device.interfaces.flatMap((item) => item.addresses)) {
+      const network = networkOf(entry);
+      if (!network || own.has(network.cidr)) continue;
+      own.add(network.cidr);
+      if (!subnets.has(network.cidr)) subnets.set(network.cidr, { ...network, count: 0 });
+      subnets.get(network.cidr).count++;
+    }
+  }
+  return [...subnets.values()]
+    .sort((a, b) => a.width - b.width || (a.value === b.value ? a.length - b.length : a.value < b.value ? -1 : 1))
+    .map(({ cidr, count }) => ({ cidr, count }));
+}
+
 export function inSubnet(address, query) {
   const parsed = parseAddress(address);
   return Boolean(parsed) && parsed.width === query.width && parsed.value >> query.shift === query.prefix;

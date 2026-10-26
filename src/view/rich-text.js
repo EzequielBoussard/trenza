@@ -34,12 +34,12 @@ function commandLine(node) {
   return node.textContent.replace(/\u00a0/g, ' ').replace(/\r?\n/g, ' ').replace(/\s+$/, '');
 }
 
-// Sin esto la política de seguridad anota un aviso en la consola por cada estilo de Word, aunque
-// el documento sea inerte.
+// Sin esto la política de seguridad anota un aviso en la consola por cada estilo de Word y cada
+// atributo on..., aunque el documento sea inerte y no los ejecute.
 function unstyled(page) {
   return page
     .replace(/<style[\s\S]*?<\/style\s*>/gi, '')
-    .replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+    .replace(/\s(?:style|on[a-z]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 }
 
 function rebuild(node, into) {
