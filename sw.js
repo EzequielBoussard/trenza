@@ -29,6 +29,7 @@ const SHELL = [
   '/src/pkt/config.js',
   '/src/pkt/query.js',
   '/src/pkt/compare.js',
+  '/src/pkt/review.js',
   '/src/pkt/twofish.js',
   '/src/pkt/eax.js',
   '/src/pcap/decode.js',

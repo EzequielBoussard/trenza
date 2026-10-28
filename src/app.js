@@ -3,6 +3,7 @@ import { decodePacketTracerFile } from './pkt/decode.js';
 import { compareNetworks } from './pkt/compare.js';
 import { buildNetworkModel } from './pkt/model.js';
 import { inSubnet, macDigits, parseQuery, vlanMembers } from './pkt/query.js';
+import { reviewNetwork } from './pkt/review.js';
 import { decodeCapture } from './pcap/decode.js';
 import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
@@ -147,6 +148,7 @@ function renderDeviceList(term = '') {
     if (!state.showInfrastructure && selected?.category === 'infrastructure') clearSelection();
     state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
     if (state.comparison) compareWith(state.comparison.before, state.comparison, true);
+    state.review = reviewNetwork(selectVisible(state.model, state.showInfrastructure).devices);
     draw(search.value);
     // En la guía del resumen la infraestructura se puede elegir sólo si está a la vista.
     if (!state.selectedDeviceId) showNetworkSummary();
@@ -278,6 +280,7 @@ function selectDevice(id) {
     onPick: pickPeer,
     canPick: (peer) => peer.category !== 'infrastructure' || state.showInfrastructure,
     change: changeOf(id),
+    review: state.review.filter((finding) => finding.devices.includes(id)),
     path: {
       targets: selectVisible(state.model, state.showInfrastructure).devices.slice().sort(byKindAndName),
       chosen: state.pathTarget,
@@ -388,6 +391,11 @@ function showNetworkSummary() {
     onSubnet: filterSubnet,
     subnetFilter: elements.rail.querySelector('.rail__search')?.value.trim().toLowerCase(),
     hidden: (category) => category === 'infrastructure' && !state.showInfrastructure,
+    review: {
+      findings: state.review,
+      onPick: pickPeer,
+      canPick: (peer) => peer.category !== 'infrastructure' || state.showInfrastructure,
+    },
     compare: {
       result: state.comparison?.result,
       label: state.comparison && (state.comparison.file ?? t('panel.initialNetwork')),
@@ -501,6 +509,7 @@ async function showNetwork(bytes) {
   state.variant = decoded.variant;
   state.devicesById = new Map(model.devices.map((device) => [device.id, device]));
   state.vlanMembers = vlanMembers(model);
+  state.review = reviewNetwork(selectVisible(model, state.showInfrastructure).devices);
   state.selectedDeviceId = null;
   state.categoryFilter = null;
   state.comparison = null;

@@ -92,7 +92,7 @@ function formatAddress(value, width) {
 
 // La de enlace local (fe80::/10) la tiene cada interfaz con IPv6 y 0.0.0.0 es la de quien espera
 // DHCP: ninguna dice cómo está armada la red.
-function networkOf({ address, mask }) {
+export function networkOf({ address, mask }) {
   const parsed = parseAddress(address);
   if (!parsed || parsed.value === 0n) return null;
   let length;

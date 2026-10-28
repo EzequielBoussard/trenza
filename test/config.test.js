@@ -8,6 +8,7 @@ import {
   readVlans,
 } from '../src/pkt/config.js';
 import { compareNetworks, configChanges } from '../src/pkt/compare.js';
+import { reviewNetwork } from '../src/pkt/review.js';
 import { inSubnet, macDigits, parseConversation, parseQuery, subnetsOf, vlanMembers } from '../src/pkt/query.js';
 
 const SWITCH = `
@@ -444,4 +445,38 @@ test('el mismo cable con el puerto nombrado distinto cambió de puerto, sin apar
   assert.equal(result.linksAdded.length, 0);
   assert.equal(result.linksRemoved.length, 0);
   assert.deepEqual(result.linksMoved.map(({ before: old, after: now }) => `${old.fromPort} > ${now.toPort}`), ['FastEthernet > FastEthernet0']);
+});
+
+test('la revisión encuentra direcciones repetidas, puertas de enlace, puertos apagados y cables entre redes', () => {
+  const pc = (id, address, gateway) => ({
+    id, interfaces: [{ name: '', addresses: [{ address, mask: '255.255.255.0' }], gateway, enabled: true }], links: [],
+  });
+  const router = (id, ports, links) => ({
+    id,
+    interfaces: ports.map(([name, address, mask, enabled = true]) => ({ name, addresses: address ? [{ address, mask }] : [], enabled })),
+    links: links.map(([port, peerId, peerPort]) => ({ port, peerId, peerPort })),
+  });
+  const devices = [
+    pc('pc1', '192.168.1.10', '192.168.1.1'),
+    pc('pc2', '192.168.1.10', '192.168.1.1'),
+    pc('pc3', '192.168.1.30', '192.168.10.1'),
+    pc('pc4', '169.254.7.8', '192.168.1.1'),
+    router('r1', [['GigabitEthernet0/0', '10.0.0.1', '255.255.255.252'], ['GigabitEthernet0/1', '', '', false]],
+      [['GigabitEthernet0/0', 'r2', 'GigabitEthernet0/0'], ['GigabitEthernet0/1', 'r3', 'GigabitEthernet0/0']]),
+    router('r2', [['GigabitEthernet0/0', '10.0.1.2', '255.255.255.252']], [['GigabitEthernet0/0', 'r1', 'GigabitEthernet0/0']]),
+    router('r3', [['GigabitEthernet0/0', '10.0.2.1', '255.255.255.252']], [['GigabitEthernet0/0', 'r1', 'GigabitEthernet0/1']]),
+  ];
+  assert.deepEqual(reviewNetwork(devices), [
+    { kind: 'duplicate', devices: ['pc1', 'pc2'], address: '192.168.1.10' },
+    { kind: 'subnets', devices: ['r1', 'r2'], ports: ['GigabitEthernet0/0', 'GigabitEthernet0/0'], addresses: ['10.0.0.1/30', '10.0.1.2/30'] },
+    { kind: 'shutdown', devices: ['r1', 'r3'], port: 'GigabitEthernet0/1' },
+    { kind: 'gateway', devices: ['pc3'], gateway: '192.168.10.1', network: '192.168.1.0/24' },
+    { kind: 'automatic', devices: ['pc4'], address: '169.254.7.8' },
+  ]);
+
+  const fixed = devices.map((device) => (device.id === 'r2'
+    ? router('r2', [['GigabitEthernet0/0', '10.0.0.2', '255.255.255.252']], [['GigabitEthernet0/0', 'r1', 'GigabitEthernet0/0']])
+    : device));
+  assert.ok(!reviewNetwork(fixed).some((finding) => finding.kind === 'subnets'), 'la misma red en las 2 puntas no se marca');
+  assert.deepEqual(reviewNetwork([pc('a', '192.168.1.5', ''), pc('b', '192.168.1.6', '0.0.0.0')]), []);
 });

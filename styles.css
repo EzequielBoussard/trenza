@@ -1835,6 +1835,17 @@ button.key__row:hover { background: var(--raised); }
   .connections__peer--pick { min-height: 2rem; }
 }
 
+.review {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.review__item { margin-bottom: 0.4rem; overflow-wrap: anywhere; }
+.review__item::marker { color: var(--orange); }
+.review__more { list-style: none; color: var(--text-muted); }
+
 /* Redes IP del resumen y conversaciones de la captura: cada fila filtra, como la guía de tipos. */
 .pick-list {
   margin: 0;

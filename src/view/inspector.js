@@ -348,6 +348,7 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
   if (gateway) identity.push([t('panel.gateway'), gateway]);
   if (device.location.length > 0) identity.push([t('panel.location'), device.location.join(' › ')]);
 
+  if (picking?.review?.length > 0) container.append(section(t('panel.review'), reviewList(picking.review, devicesById, picking, device.id)));
   if (picking?.change) container.append(section(t('panel.changes'), changeSection(picking.change)));
   container.append(section(t('panel.identity'), definitionList(identity)));
 
@@ -430,6 +431,52 @@ function categoryKey(devices, { onFilter, filtering, hidden }) {
     }
     item.append(row, about);
     list.append(item);
+  }
+  return list;
+}
+
+// En una red de miles de equipos copiados, un aviso puede nombrar a 100 y haber cientos de avisos.
+const REVIEW_SHOWN = 20;
+const NAMES_SHOWN = 5;
+
+// Cada {nombre} de la plantilla es un texto o un equipo, que va como botón para elegirlo. El equipo
+// cuyo panel está abierto va sin botón, y varios se unen como los escribiría una persona.
+function reviewList(findings, devicesById, picking, currentId) {
+  const name = (id) => (id === currentId
+    ? createElement('span', 'connections__peer', devicesById.get(id)?.name ?? '')
+    : peerName(devicesById.get(id), picking));
+  const joined = (ids) => {
+    const shown = ids.length > NAMES_SHOWN + 1 ? ids.slice(0, NAMES_SHOWN) : ids;
+    const items = shown.map(name);
+    if (shown.length < ids.length) items.push(t('panel.reviewOthers', { count: ids.length - shown.length }));
+    const fragment = document.createDocumentFragment();
+    const parts = new Intl.ListFormat(getLocale(), { type: 'conjunction' }).formatToParts(items.map((_, index) => String(index)));
+    for (const part of parts) fragment.append(part.type === 'element' ? items[Number(part.value)] : part.value);
+    return fragment;
+  };
+
+  const list = createElement('ul', 'review');
+  for (const finding of findings.slice(0, REVIEW_SHOWN)) {
+    const [first, second] = finding.devices;
+    const values = {
+      device: () => name(first),
+      peer: () => name(second),
+      devices: () => joined(finding.devices),
+      address: () => finding.address ?? finding.addresses[0],
+      peerAddress: () => finding.addresses[1],
+      port: () => finding.port ?? finding.ports[0],
+      peerPort: () => finding.ports[1],
+      gateway: () => finding.gateway,
+      network: () => finding.network,
+    };
+    const item = createElement('li', 'review__item');
+    t(`review.${finding.kind}`).split(/\{(\w+)\}/).forEach((piece, index) => {
+      item.append(index % 2 === 0 ? piece : values[piece]());
+    });
+    list.append(item);
+  }
+  if (findings.length > REVIEW_SHOWN) {
+    list.append(createElement('li', 'review__item review__more', t('panel.reviewMore', { count: findings.length - REVIEW_SHOWN })));
   }
   return list;
 }
@@ -570,7 +617,7 @@ function activitySection(pages) {
   return section(t('panel.activity'), wrapper);
 }
 
-export function renderNetworkSummary(container, model, { fileName, variant, onDownload, compare, ...filter } = {}) {
+export function renderNetworkSummary(container, model, { fileName, variant, onDownload, compare, review, ...filter } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
@@ -580,6 +627,12 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
   );
   container.append(header);
   if (model.instructions.length > 0) container.append(activitySection(model.instructions));
+  if (review?.findings.length > 0) {
+    const devicesById = new Map(model.devices.map((device) => [device.id, device]));
+    const wrapper = createElement('div');
+    wrapper.append(createElement('p', 'panel-text', t('panel.reviewAbout')), reviewList(review.findings, devicesById, review));
+    container.append(section(t('panel.review'), wrapper));
+  }
   if (compare) container.append(compareSection(model, compare));
   container.append(section(t('panel.inventory'), categoryKey(model.devices, filter)));
   const subnets = subnetsOf(model.devices.filter((device) => !filter.hidden?.(device.category)));

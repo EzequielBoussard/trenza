@@ -92,6 +92,9 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
 
   assert.equal(await tab.evaluate("document.querySelector('[role=status]').textContent"), '71 devices and 68 connections');
   assert.equal(await tab.evaluate("new URL(document.querySelector('link[rel=canonical]').href).pathname"), '/demo');
+  // La red de ejemplo tiene 2 errores de verdad y 2 equipos sin respuesta del DHCP.
+  assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.review__item')].map((item) => item.textContent.split(' ')[0])"),
+    ['192.168.10.21', 'IoT022', 'Pos', 'Provedor']);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
