@@ -87,16 +87,17 @@ function cables(devices) {
   return findings;
 }
 
+// Sólo si es lo único que tiene: una tablet anda por Wi-Fi y deja una 169.254 en la interfaz que no usa.
 function automatic(devices) {
   const findings = [];
   for (const device of devices) {
-    const address = device.interfaces.flatMap((entry) => entry.addresses)
-      .map(({ address: text }) => text)
-      .find((text) => {
-        const parsed = parseAddress(text);
-        return parsed && isAutomatic(parsed);
-      });
-    if (address) findings.push({ kind: 'automatic', devices: [device.id], address: bare(address) });
+    const ipv4 = device.interfaces.flatMap((entry) => entry.addresses)
+      .map(({ address }) => ({ address, parsed: parseAddress(address) }))
+      .filter((entry) => entry.parsed?.width === 32 && entry.parsed.value !== 0n);
+    const fallback = ipv4.find((entry) => isAutomatic(entry.parsed));
+    if (fallback && ipv4.every((entry) => isAutomatic(entry.parsed))) {
+      findings.push({ kind: 'automatic', devices: [device.id], address: bare(fallback.address) });
+    }
   }
   return findings;
 }

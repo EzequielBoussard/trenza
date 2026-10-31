@@ -127,6 +127,24 @@ export function subnetsOf(devices) {
     .map(({ cidr, count }) => ({ cidr, count }));
 }
 
+// Las VLAN de un equipo sin configuración de VLAN propia: las del puerto de acceso o de voz del
+// switch donde está enchufado.
+export function accessVlans(device, devicesById) {
+  if (device.vlans.length > 0) return [];
+  const found = [];
+  for (const link of device.links) {
+    const peer = devicesById.get(link.peerId);
+    const port = String(link.peerPort).toLowerCase();
+    const has = (ports) => ports.some((name) => name.toLowerCase() === port);
+    for (const vlan of peer?.vlans ?? []) {
+      const via = { id: vlan.id, name: vlan.name, switchName: peer.name, port: link.peerPort };
+      if (has(vlan.ports)) found.push({ ...via, voice: false });
+      if (has(vlan.voice)) found.push({ ...via, voice: true });
+    }
+  }
+  return found;
+}
+
 export function inSubnet(address, query) {
   const parsed = parseAddress(address);
   return Boolean(parsed) && parsed.width === query.width && parsed.value >> query.shift === query.prefix;

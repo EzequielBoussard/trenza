@@ -479,4 +479,7 @@ test('la revisión encuentra direcciones repetidas, puertas de enlace, puertos a
     : device));
   assert.ok(!reviewNetwork(fixed).some((finding) => finding.kind === 'subnets'), 'la misma red en las 2 puntas no se marca');
   assert.deepEqual(reviewNetwork([pc('a', '192.168.1.5', ''), pc('b', '192.168.1.6', '0.0.0.0')]), []);
+  const tablet = pc('t', '192.168.1.9', '192.168.1.1');
+  tablet.interfaces.push({ name: '', addresses: [{ address: '169.254.1.2', mask: '255.255.0.0' }], gateway: '192.168.1.1', enabled: true });
+  assert.deepEqual(reviewNetwork([tablet]), [], 'una 169.254 en una interfaz que no se usa no es un error');
 });

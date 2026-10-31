@@ -14,10 +14,10 @@ Con un `.pkt`, `.pka` o `.pkz`:
 
 - Dibuja la topología lógica con las posiciones guardadas en el archivo.
 - Explica en una frase qué es cada tipo de equipo, con el mismo símbolo que en el diagrama. Elegir un tipo deja a la vista sólo esos equipos.
-- Muestra cada equipo con sus interfaces y direcciones, VLAN (también la de voz y la nativa de cada tronco), rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y dónde están aplicadas, su ubicación en la vista física y la `running-config`, que se puede copiar.
+- Muestra cada equipo con sus interfaces y direcciones, VLAN (también la de voz y la nativa de cada tronco, y en una computadora la del puerto del switch donde está enchufada), rutas estáticas, protocolos de enrutamiento (RIP, OSPF, EIGRP), listas de acceso y dónde están aplicadas, su ubicación en la vista física y la `running-config`, que se puede copiar.
 - Cada cable dice qué equipos y puertos une, de qué tipo es y cuánto mide. En el panel, el equipo del otro lado de cada conexión se elige con un clic.
 - Busca equipos por nombre, tipo, dirección, subred (`192.168.1.0/24`), VLAN (`vlan 10`) o MAC, como la muestra una captura o como la guarda IOS, y apaga en el diagrama los que no coinciden. En una VLAN entran también los equipos enchufados a sus puertos de acceso.
-- Señala errores frecuentes de configuración, sin simular la red: direcciones repetidas, puertas de enlace fuera de la red del equipo, puertos apagados con un cable conectado, cables entre interfaces de redes distintas y equipos sin respuesta del DHCP.
+- Señala errores frecuentes de configuración, sin simular la red: direcciones repetidas, puertas de enlace fuera de la red del equipo, puertos apagados con un cable conectado, cables entre interfaces de redes distintas y equipos sin respuesta del DHCP. Los equipos con avisos llevan una marca en el diagrama.
 - Lista las redes IP con cuántos equipos tiene cada una, y elegir una deja a la vista sólo esos. Avisa cuando un equipo tiene una `169.254.x.x`, la que se pone solo si el DHCP no le contesta.
 - Muestra el camino por cables entre 2 equipos, con el puerto por el que entra y sale en cada uno.
 - Compara la red con otra versión de la misma, de otro archivo o la red inicial de una actividad: equipos nuevos, quitados y con cambios, conexiones nuevas, quitadas o que cambiaron de puerto, y las líneas de configuración que cambiaron en cada equipo.
@@ -70,7 +70,7 @@ Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de p
 src/
   app.js        estado de la aplicación y conexión entre vistas
   i18n.js       textos en inglés y español
-  pkt/          descifrado (twofish, eax, decode), modelo de red (model, config), búsqueda y comparación
+  pkt/          descifrado (twofish, eax, decode), modelo de red (model, config), búsqueda, comparación y revisión
   pcap/         lectura de capturas, disección por capas y exportación
   view/         diagrama, reparto de etiquetas, exportación, inspector, tabla de paquetes
 sw.js           caché para uso sin conexión
@@ -82,7 +82,7 @@ Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define 
 
 ## Compatibilidad
 
-Safari 16.4, Chrome 80 y Firefox 113 en adelante. El límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
+Safari 16.4, Chrome 86 y Firefox 113 en adelante. En Safari y Firefox el límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`; en Chrome, `replaceChildren`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
 Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en menos de un segundo, una de 4000 en 3 y una de 16000 en 12, sin etiquetas encimadas; de lejos los nombres se dibujan recién cuando se pueden leer, y el zoom llega hasta leerlos. El formato sin cifrar sólo se probó con archivos generados. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
 

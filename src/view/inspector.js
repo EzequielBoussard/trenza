@@ -1,7 +1,7 @@
 import { countOf, getLocale, t } from '../i18n.js';
 import { CATEGORY_GLYPHS, CATEGORY_ORDER, CATEGORY_THREADS, selectVisible } from './graph.js';
 import { renderRichText } from './rich-text.js';
-import { subnetsOf } from '../pkt/query.js';
+import { accessVlans, subnetsOf } from '../pkt/query.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -346,6 +346,13 @@ export function renderDeviceInspector(container, device, devicesById, picking) {
     [t('panel.links'), String(device.links.length)],
   ];
   if (gateway) identity.push([t('panel.gateway'), gateway]);
+  for (const vlan of accessVlans(device, devicesById)) {
+    identity.push([t(vlan.voice ? 'panel.voiceVlan' : 'panel.vlan'), t('panel.vlanVia', {
+      vlan: vlan.name ? `${vlan.id} ${vlan.name}` : vlan.id,
+      port: vlan.port,
+      device: vlan.switchName,
+    })]);
+  }
   if (device.location.length > 0) identity.push([t('panel.location'), device.location.join(' › ')]);
 
   if (picking?.review?.length > 0) container.append(section(t('panel.review'), reviewList(picking.review, devicesById, picking, device.id)));

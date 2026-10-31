@@ -1472,6 +1472,9 @@ body[data-dragging] .dropveil { display: grid; }
 .node.is-changed:not(.is-selected) .node__ring { stroke-dasharray: 5 4; }
 .node.is-added:not(.is-selected) .node__ring { stroke: var(--green); }
 
+.node__flag circle { fill: var(--orange); stroke: var(--ground); stroke-width: 2; }
+.node__flag path { fill: none; stroke: var(--on-accent); stroke-width: 2.2; stroke-linecap: round; }
+
 .node.is-selected .node__halo {
   stroke: var(--orange);
   stroke-width: 2;

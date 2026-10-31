@@ -405,6 +405,7 @@ export class TopologyView {
     if (this.matches) this.markMatches(this.matches);
     if (this.path) this.paintPath();
     if (this.changes) this.markChanges(this.changes);
+    if (this.findings) this.markFindings(this.findings);
   }
 
   panelAspect() {
@@ -946,6 +947,30 @@ export class TopologyView {
     for (const node of this.svg.querySelectorAll('.node')) {
       node.classList.toggle('is-changed', Boolean(marks?.changed.has(node.dataset.id)));
       node.classList.toggle('is-added', Boolean(marks?.added.has(node.dataset.id)));
+    }
+  }
+
+  // Los equipos con avisos de la revisión llevan una marca, y el lector la dice después del nombre.
+  // Se agrega sólo a esos: en una red de miles, 2 elementos más por equipo pesan.
+  markFindings(ids) {
+    this.findings = ids;
+    if (!this.svg) return;
+    const suffix = `, ${t('panel.reviewFlag')}`;
+    for (const node of this.svg.querySelectorAll('.node')) {
+      const flagged = ids.has(node.dataset.id);
+      const flag = node.querySelector('.node__flag');
+      if (flagged === Boolean(flag)) continue;
+      const label = node.getAttribute('aria-label');
+      if (flagged) {
+        const mark = element('g', { class: 'node__flag', transform: 'translate(19 -19)' });
+        mark.append(element('circle', { r: 8 }), element('path', { d: 'M0 -4V0.5M0 3.6V3.7' }));
+        node.append(mark);
+        node.setAttribute('aria-label', label + suffix);
+      } else {
+        flag.remove();
+        node.setAttribute('aria-label', label.slice(0, -suffix.length));
+      }
+      node.querySelector('title').textContent = node.getAttribute('aria-label');
     }
   }
 

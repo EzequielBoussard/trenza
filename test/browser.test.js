@@ -92,9 +92,10 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
 
   assert.equal(await tab.evaluate("document.querySelector('[role=status]').textContent"), '71 devices and 68 connections');
   assert.equal(await tab.evaluate("new URL(document.querySelector('link[rel=canonical]').href).pathname"), '/demo');
-  // La red de ejemplo tiene 2 errores de verdad y 2 equipos sin respuesta del DHCP.
+  // La red de ejemplo tiene 2 errores de verdad; las 2 tablets con una 169.254 andan por Wi-Fi.
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.review__item')].map((item) => item.textContent.split(' ')[0])"),
-    ['192.168.10.21', 'IoT022', 'Pos', 'Provedor']);
+    ['192.168.10.21', 'IoT022']);
+  assert.equal(await tab.evaluate("document.querySelectorAll('.node .node__flag').length"), 3, 'IoT20, IoT21 e IoT022 llevan la marca');
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
@@ -314,6 +315,12 @@ test('el buscador encuentra por subred y por VLAN, y el camino entre 2 equipos s
     };
   })()`);
   assert.deepEqual(path, { steps: ['PC1', 'S1', 'R1'], spoken: true, clearOutside: true, nodes: 3, links: 2 });
+
+  // La VLAN de una computadora sale del puerto del switch donde está enchufada.
+  const vlans = await tab.evaluate("[...document.querySelectorAll('.panel dt')].filter((dt) => dt.textContent.includes('VLAN')).map((dt) => `${dt.textContent}: ${dt.nextElementSibling.textContent}`)");
+  assert.deepEqual(vlans, ['VLAN: 10 Ventas, through FastEthernet0/1 on S1', 'Voice VLAN: 40 Voz, through FastEthernet0/1 on S1']);
+  await tab.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await tab.waitFor("document.querySelector('.rail [role=status]').textContent === 'PC1 is no longer selected'");
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });

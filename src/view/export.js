@@ -706,7 +706,7 @@ async function buildSvg(model, { showInfrastructure, guide, transparent, title, 
   return withLanguage(language, () => {
     const plan = planExport(model, { showInfrastructure, guide, pixels: null, bounded: false });
     const context = new SvgContext();
-    // En unidades enteras, y el fondo hasta el borde: con decimales quedaba una franja sin pintar.
+    // En unidades enteras: con decimales el fondo no llega al borde y queda una franja sin pintar.
     const width = Math.ceil(plan.design.width);
     const height = Math.ceil(plan.design.height);
 

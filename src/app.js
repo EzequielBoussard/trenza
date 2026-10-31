@@ -149,6 +149,7 @@ function renderDeviceList(term = '') {
     state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
     if (state.comparison) compareWith(state.comparison.before, state.comparison, true);
     state.review = reviewNetwork(selectVisible(state.model, state.showInfrastructure).devices);
+    state.topology.markFindings(flaggedIds());
     draw(search.value);
     // En la guía del resumen la infraestructura se puede elegir sólo si está a la vista.
     if (!state.selectedDeviceId) showNetworkSummary();
@@ -223,6 +224,7 @@ function renderDeviceList(term = '') {
   });
 
   const announcer = filterAnnouncer();
+  state.announcer = announcer;
   elements.rail.append(announcer.region);
   search.addEventListener('input', () => {
     const { shown, total } = draw(search.value);
@@ -315,6 +317,8 @@ function choosePath(target) {
   const steps = target ? cablePath(state.devicesById, state.selectedDeviceId, target) : null;
   state.topology?.showPath(steps ? steps.map((step) => step.id) : null);
 }
+
+const flaggedIds = () => new Set(state.review.flatMap((finding) => finding.devices));
 
 function clearSelection() {
   if (state.kind !== 'network') return;
@@ -480,6 +484,7 @@ function paintNetwork() {
     legendHost: elements.stage,
   });
   state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
+  state.topology.markFindings(flaggedIds());
   renderDeviceList();
   showNetworkSummary();
 }
@@ -940,7 +945,12 @@ function wireActions() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !elements.exportDialog.open) clearSelection();
+    // Soltar el equipo no mueve el foco, así que el lector no diría nada sin el aviso.
+    if (event.key === 'Escape' && !elements.exportDialog.open) {
+      const released = state.kind === 'network' && state.devicesById.get(state.selectedDeviceId);
+      clearSelection();
+      if (released) state.announcer?.say(t('rail.released', { name: released.name }));
+    }
 
     // "/" lleva al buscador de la columna, salvo mientras se escribe en otro campo.
     const typing = event.target.closest?.('input, select, textarea, [contenteditable]');
