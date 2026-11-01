@@ -16,7 +16,7 @@ import {
 const INSETS = { left: 120, right: 120, top: 150, bottom: 130 };
 
 test('propone el nombre del archivo abierto, sin extensión', () => {
-  assert.equal(suggestExportName('red-supermercado-2023.pkt'), 'red-supermercado-2023');
+  assert.equal(suggestExportName('red-supermercado.pkt'), 'red-supermercado');
   assert.equal(suggestExportName('lab/final.pka'), 'lab-final');
   assert.equal(suggestExportName(''), 'red');
 });

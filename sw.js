@@ -9,7 +9,7 @@ const SHELL = [
   '/site.webmanifest',
   '/favicon.svg',
   '/apple-touch-icon.png',
-  '/showcase/red-supermercado-2023.pkt',
+  '/showcase/red-supermercado.pkt',
   '/showcase/captura-ejemplo.pcap',
   // Sólo el subconjunto latino; latin-ext se guarda si alguna vez se pide.
   '/fonts/sans-latin.woff2',
@@ -52,6 +52,12 @@ function isOwn(request) {
   return request.method === 'GET' && new URL(request.url).origin === self.location.origin;
 }
 
+// Un módulo o un ejemplo que ya no está en la lista cambió de nombre o se sacó: nadie lo va a pedir.
+function isRetired(request) {
+  const { pathname } = new URL(request.url);
+  return /^\/(src\/.+\.js|showcase\/.+\.(pkt|pcap))$/.test(pathname) && !SHELL.includes(pathname);
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
@@ -61,9 +67,9 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
       .then(() => caches.open(CACHE))
-      // La caché no tiene versión, así que lo ajeno que haya quedado de antes se borra acá.
+      // La caché no tiene versión, así que lo ajeno y lo retirado que hayan quedado se borran acá.
       .then((cache) => cache.keys().then((saved) => Promise.all(
-        saved.filter((request) => !isOwn(request)).map((request) => cache.delete(request)),
+        saved.filter((request) => !isOwn(request) || isRetired(request)).map((request) => cache.delete(request)),
       )))
       .then(() => self.clients.claim()),
   );

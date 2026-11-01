@@ -54,7 +54,7 @@ const elements = {
 };
 
 const EXAMPLES = {
-  network: '/showcase/red-supermercado-2023.pkt',
+  network: '/showcase/red-supermercado.pkt',
   capture: '/showcase/captura-ejemplo.pcap',
 };
 

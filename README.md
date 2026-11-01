@@ -52,7 +52,7 @@ El formato no está documentado. Packet Tracer guarda el XML interno así, y el 
 3. Ofuscación interior: otra máscara por posición sobre el texto descifrado.
 4. zlib, con el tamaño descomprimido en los primeros 4 bytes.
 
-Hay un formato más viejo que sólo tiene los pasos 3 y 4, y el visor también lo lee; un archivo guardado con 5.3.3 ya viene cifrado. Un `.pkz` es un ZIP con el `.pkt` adentro. Hasta la versión 5.x los equipos no tienen identificador y los enlaces los nombran por su posición en la lista. El formato lo documentaron antes [pka2xml](https://github.com/mircodz/pka2xml) y [ptexplorer](https://github.com/axcheron/ptexplorer); Trenza reimplementa la lectura en JavaScript para que corra en el navegador. Twofish está escrito a mano porque WebCrypto no lo incluye, y se prueba contra los vectores del paper original.
+Hay un formato más viejo que sólo tiene los pasos 3 y 4, y el visor también lo lee: así viene un archivo guardado con 5.0, y uno guardado con 5.3.3 ya viene cifrado. Un `.pkz` es un ZIP con el `.pkt` adentro. Hasta la versión 5.x los equipos no tienen identificador y los enlaces los nombran por su posición en la lista. El formato lo documentaron antes [pka2xml](https://github.com/mircodz/pka2xml) y [ptexplorer](https://github.com/axcheron/ptexplorer); Trenza reimplementa la lectura en JavaScript para que corra en el navegador. Twofish está escrito a mano porque WebCrypto no lo incluye, y se prueba contra los vectores del paper original.
 
 El resto de los datos sale del XML y de la `running-config` de cada equipo. Las VLAN, por ejemplo, hay que cruzarlas: el XML guarda número y nombre, y la configuración dice qué puerto pertenece a cuál.
 
@@ -84,7 +84,7 @@ Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define 
 
 Safari 16.4, Chrome 86 y Firefox 113 en adelante. En Safari y Firefox el límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`; en Chrome, `replaceChildren`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
-Está probado con archivos reales de Packet Tracer 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en menos de un segundo, una de 4000 en 3 y una de 16000 en 12, sin etiquetas encimadas; de lejos los nombres se dibujan recién cuando se pueden leer, y el zoom llega hasta leerlos. El formato sin cifrar sólo se probó con archivos generados. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
+Está probado con archivos reales de Packet Tracer 5.0, 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en menos de un segundo, una de 4000 en 3 y una de 16000 en 12, sin etiquetas encimadas; de lejos los nombres se dibujan recién cuando se pueden leer, y el zoom llega hasta leerlos. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
 
 ## Contribuir
 

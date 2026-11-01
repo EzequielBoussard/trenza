@@ -32,7 +32,7 @@
 <link rel="preload" href="/fonts/condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!-- Antes de la hoja de estilo, que si no lo frena: tema e idioma, /demo y ?src= abren el visor, y la
      portada precarga su imagen (sólo Chromium: Safari no reusa la precarga en una imagen diferida). -->
-<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),s=localStorage.getItem('trenza.language'),n=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).map(function(x){return x.slice(0,2);}).filter(function(x){return x==='es'||x==='en';})[0],l=s==='es'||s==='en'?s:n;if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);var q=/[?&]src=/.test(location.search);if(q||/^\/demo\/?$/.test(location.pathname)){d.dataset.loaded='true';if(!q)window.pendingExample=fetch('/showcase/red-supermercado-2023.pkt');}else if(navigator.userAgentData){var p=document.createElement('link'),b='/showcase/preview-'+(t==='light'?'light':'dark');p.rel='preload';p.as='image';p.fetchPriority='high';p.imageSizes='(max-width: 62rem) calc(100vw - 2rem), 44rem';p.imageSrcset=b+'-720.webp 720w, '+b+'-1080.webp 1080w, '+b+'.webp 1440w';document.head.appendChild(p);}}catch(e){}</script>
+<script>var d=document.documentElement;d.dataset.js='';try{var t=localStorage.getItem('trenza.theme'),s=localStorage.getItem('trenza.language'),n=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).map(function(x){return x.slice(0,2);}).filter(function(x){return x==='es'||x==='en';})[0],l=s==='es'||s==='en'?s:n;if(t==='light'||t==='dark')d.dataset.theme=t;if(l==='es'){d.lang=l;d.dataset.translating='';}setTimeout(function(){delete d.dataset.translating;},1200);var q=/[?&]src=/.test(location.search);if(q||/^\/demo\/?$/.test(location.pathname)){d.dataset.loaded='true';if(!q)window.pendingExample=fetch('/showcase/red-supermercado.pkt');}else if(navigator.userAgentData){var p=document.createElement('link'),b='/showcase/preview-'+(t==='light'?'light':'dark');p.rel='preload';p.as='image';p.fetchPriority='high';p.imageSizes='(max-width: 62rem) calc(100vw - 2rem), 44rem';p.imageSrcset=b+'-720.webp 720w, '+b+'-1080.webp 1080w, '+b+'.webp 1440w';document.head.appendChild(p);}}catch(e){}</script>
 <!-- Rutas absolutas: con relativas, /demo/ pediría los archivos un nivel más adentro. -->
 <link rel="stylesheet" href="/styles.css">
 </head>
@@ -213,7 +213,7 @@
             sizes="(max-width: 62rem) calc(100vw - 2rem), 44rem"
             width="1440" height="810" loading="lazy" decoding="async" alt="Part of the example network: a router, a server, two camera switches and the IP cameras connected to them, each with its name and address." data-i18n-alt="intro.shotAlt">
         </a>
-        <figcaption class="intro__caption" data-i18n="intro.shotCaption">The example is a supermarket network designed in 2023: 71 devices, with IP cameras and Wi-Fi.</figcaption>
+        <figcaption class="intro__caption" data-i18n="intro.shotCaption">The example is a supermarket network designed in 2021: 71 devices, with IP cameras and Wi-Fi.</figcaption>
       </figure>
     </div>
 

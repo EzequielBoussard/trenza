@@ -339,7 +339,8 @@ export class TopologyView {
       if (address) {
         const addressLabel = element('text', { class: 'node__address', y: LABEL_TYPE.addressBaseline, 'text-anchor': 'middle' });
         addressLabel.textContent = address.address;
-        labels.append(addressLabel);
+        // El SVG no pinta el espacio, pero sin él quien junta el texto visible lee "PC16192.168.1.16".
+        labels.append(' ', addressLabel);
       }
       node.append(labels);
 

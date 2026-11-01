@@ -2024,6 +2024,10 @@ button.pick-list__pick:hover { background: var(--raised); }
   }
 }
 
+@media (max-width: 1180px) and (pointer: coarse) {
+  .peek:not([hidden]) { padding-block: 0.75rem; }
+}
+
 /* Con colores forzados el fondo que marca lo elegido se pierde: va un contorno del sistema. */
 @media (forced-colors: active) {
   .device-chip.is-selected,

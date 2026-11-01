@@ -36,7 +36,7 @@ const DICTIONARIES = {
     'intro.hint': 'You can also drag the file onto the page.',
     'intro.drop': 'Drop the file to open it',
     'intro.shotAlt': 'Part of the example network: a router, a server, two camera switches and the IP cameras connected to them, each with its name and address.',
-    'intro.shotCaption': 'The example is a supermarket network designed in 2023: 71 devices, with IP cameras and Wi-Fi.',
+    'intro.shotCaption': 'The example is a supermarket network designed in 2021: 71 devices, with IP cameras and Wi-Fi.',
 
     'about.pktTerm': '.pkt and .pka',
     'about.pktBody': 'Networks built in Cisco Packet Tracer. Opening one usually requires installing Packet Tracer and signing in with a Cisco account.',
@@ -413,7 +413,7 @@ const DICTIONARIES = {
     'intro.hint': 'También podés arrastrar el archivo a la página.',
     'intro.drop': 'Soltá el archivo para abrirlo',
     'intro.shotAlt': 'Parte de la red de ejemplo: un router, un servidor, dos switches de cámaras y las cámaras IP conectadas a ellos, cada una con su nombre y su dirección.',
-    'intro.shotCaption': 'El ejemplo es la red de un supermercado diseñada en 2023: 71 equipos, con cámaras IP y Wi-Fi.',
+    'intro.shotCaption': 'El ejemplo es la red de un supermercado diseñada en 2021: 71 equipos, con cámaras IP y Wi-Fi.',
 
     'about.pktTerm': '.pkt y .pka',
     'about.pktBody': 'Redes armadas en Cisco Packet Tracer. Para abrir una normalmente hay que instalar Packet Tracer y entrar con una cuenta de Cisco.',
