@@ -109,6 +109,10 @@ const OVERSCROLL = 70;
 // Movimiento, en píxeles, por debajo del cual soltar cuenta como clic.
 const CLICK_SLOP = 5;
 
+// Un dedo que se corre de costado más que esto pide el aviso de usar 2, que dura HINT_MS.
+const HINT_SLOP = 12;
+const HINT_MS = 1600;
+
 // Una muesca de rueda manda deltaY 100 y acerca ×1,17.
 const WHEEL_SENSITIVITY = 0.0016;
 
@@ -198,6 +202,7 @@ export class TopologyView {
   destroy() {
     this.shapeWatcher.disconnect();
     clearTimeout(this.still);
+    clearTimeout(this.hintTimer);
     if (this.legend) this.legend.remove();
     this.legend = null;
     this.last = null;
@@ -377,7 +382,12 @@ export class TopologyView {
     const viewport = document.createElement('div');
     viewport.className = 'topology-viewport';
     viewport.append(svg);
-    this.container.append(viewport, this.buildControls());
+    // Sólo para la vista: con el teclado o un lector de pantalla el diagrama no se arrastra.
+    this.hint = document.createElement('p');
+    this.hint.className = 'stage__hint';
+    this.hint.setAttribute('aria-hidden', 'true');
+    this.hint.textContent = t('zoom.twoFingers');
+    this.container.append(viewport, this.buildControls(), this.hint);
 
     this.svg = svg;
     this.viewport = viewport;
@@ -517,6 +527,9 @@ export class TopologyView {
     // Un puntero arrastra, 2 pellizcan. `raw` es la vista sin límite que va pidiendo el
     // gesto; lo que se muestra es esa vista frenada contra el límite.
     const pointers = new Map();
+    // Apiladas, la hoja de estilo deja que un dedo desplace la página (pan-y): el diagrama se
+    // mueve con 2, como un mapa dentro de una página.
+    const sharesPage = (event) => event.pointerType === 'touch' && getComputedStyle(surface).touchAction !== 'none';
     let origin = null;
     let raw = null;
     let spread = null;
@@ -591,17 +604,35 @@ export class TopologyView {
         this.target = { ...this.transform };
         this.settle();
         raw = { ...this.target };
-        origin = { x: event.clientX, y: event.clientY, onNode: Boolean(event.target.closest('.node')) };
-        if (!origin.onNode) startPan();
+        origin = {
+          x: event.clientX,
+          y: event.clientY,
+          onNode: Boolean(event.target.closest('.node')),
+          shared: sharesPage(event),
+        };
+        if (!origin.onNode && !origin.shared) startPan();
       } else {
         spread = spreadOf();
         startPan();
       }
     });
 
+    // Con 2 dedos el gesto es del diagrama: sin esto el navegador desplazaría la página a la vez.
+    surface.addEventListener('touchmove', (event) => {
+      if (event.touches.length > 1 && event.cancelable) event.preventDefault();
+    }, { passive: false });
+
     surface.addEventListener('pointermove', (event) => {
       const last = pointers.get(event.pointerId);
       if (!last) return;
+      // Un dedo solo: hacia abajo desplaza la página el navegador; de costado no hace nada, y se
+      // explica cómo mover el diagrama.
+      if (pointers.size === 1 && origin?.shared) {
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        const dx = Math.abs(event.clientX - origin.x);
+        if (dx > HINT_SLOP && dx > Math.abs(event.clientY - origin.y)) this.showHint();
+        return;
+      }
       if (!panning) {
         if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < CLICK_SLOP) return;
         startPan();
@@ -629,7 +660,9 @@ export class TopologyView {
       if (pointers.size === 1) spread = null;
       if (pointers.size > 0) return;
 
+      // Un dedo que terminó desplazando la página llega como pointercancel: no es un toque.
       const click = origin
+        && event.type === 'pointerup'
         && !origin.onNode
         && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < CLICK_SLOP;
 
@@ -649,6 +682,13 @@ export class TopologyView {
     surface.addEventListener('pointercancel', endDrag);
     // Si el navegador suelta la captura por su cuenta, el puntero no puede quedar colgado.
     surface.addEventListener('lostpointercapture', endDrag);
+  }
+
+  showHint() {
+    if (!this.hint) return;
+    this.hint.classList.add('is-visible');
+    clearTimeout(this.hintTimer);
+    this.hintTimer = setTimeout(() => this.hint.classList.remove('is-visible'), HINT_MS);
   }
 
   // Del puntero a unidades del lienzo sin zoom. La matriz del <svg> ya incluye su transformación.

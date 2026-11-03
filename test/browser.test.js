@@ -183,6 +183,50 @@ test('el zoom con la rueda deja quieto lo que está bajo el puntero', { skip, ti
   await tab.close();
 });
 
+// Los dedos van por DevTools, el mismo camino que un toque de verdad: el navegador decide si desplaza.
+async function touchDrag(tab, fingers, steps = 12) {
+  const at = (i) => fingers.map((finger, id) => ({
+    id,
+    x: finger.from.x + ((finger.to.x - finger.from.x) * i) / steps,
+    y: finger.from.y + ((finger.to.y - finger.from.y) * i) / steps,
+  }));
+  await tab.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) });
+  for (let i = 1; i <= steps; i++) await tab.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(i) });
+  await tab.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+}
+
+test('en un teléfono un dedo desplaza la página aunque esté sobre el diagrama, y 2 lo mueven', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab({ width: 390, height: 844 });
+  await tab.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await tab.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await tab.open(`${site.url}/demo`);
+  await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
+  const state = "({ scroll: Math.round(scrollY), view: getComputedStyle(document.querySelector('svg.topology')).transform, scale: new DOMMatrix(getComputedStyle(document.querySelector('svg.topology')).transform).a, list: getComputedStyle(document.querySelector('.device-list')).display })";
+  const center = await tab.evaluate("(() => { const b = document.querySelector('.topology-viewport').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()");
+
+  const start = await tab.evaluate(state);
+  assert.equal(start.list, 'none', 'la lista empieza plegada');
+  await touchDrag(tab, [{ from: center, to: { x: center.x, y: center.y - 200 } }]);
+  const scrolled = await tab.evaluate(state);
+  assert.ok(scrolled.scroll > 100, `un dedo no desplazó la página: ${scrolled.scroll}`);
+  assert.equal(scrolled.view, start.view, 'un dedo no mueve el diagrama');
+
+  await tab.evaluate('scrollTo(0, 0)');
+  await touchDrag(tab, [
+    { from: { x: center.x - 30, y: center.y }, to: { x: center.x - 110, y: center.y } },
+    { from: { x: center.x + 30, y: center.y }, to: { x: center.x + 110, y: center.y } },
+  ], 14);
+  const pinched = await tab.evaluate(state);
+  assert.equal(pinched.scroll, 0, '2 dedos no desplazan la página');
+  assert.ok(pinched.scale > 2, `2 dedos no acercaron el diagrama: ${pinched.view}`);
+
+  await tab.evaluate("document.querySelector('.rail__expand').click()");
+  assert.equal(await tab.evaluate("getComputedStyle(document.querySelector('.device-list')).display"), 'block');
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
 test('con más de 500 equipos las etiquetas esperan a leerse y el zoom llega a leerlas', { skip, timeout: 60000 }, async () => {
   const devices = [];
   for (let i = 0; i < 600; i++) {

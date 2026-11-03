@@ -82,6 +82,8 @@ const state = {
   showInfrastructure: false,
   // El tipo elegido en la guía del resumen; se traduce si cambia el idioma.
   categoryFilter: null,
+  // En un teléfono la lista de equipos va plegada hasta que se la pide.
+  listOpen: false,
   topology: null,
   packetTable: null,
   variant: null,
@@ -166,8 +168,25 @@ function renderDeviceList(term = '') {
   search.value = term;
   elements.rail.append(search);
 
+  // En un teléfono la lista va plegada y sin desplazamiento propio: con él, el dedo quedaba
+  // atrapado entre la lista y el diagrama. Al buscar se muestra sola (`is-searching`).
   const list = createElement('ul', 'device-list');
-  elements.rail.append(list);
+  list.id = 'device-list';
+  const expander = createElement('button', 'button rail__expand');
+  expander.type = 'button';
+  expander.setAttribute('aria-controls', list.id);
+  const markExpander = () => {
+    expander.setAttribute('aria-expanded', String(state.listOpen));
+    expander.textContent = t(state.listOpen ? 'rail.hideList' : 'rail.showList');
+    elements.rail.classList.toggle('is-open', state.listOpen);
+    elements.rail.classList.toggle('is-searching', search.value.trim() !== '');
+  };
+  expander.addEventListener('click', () => {
+    state.listOpen = !state.listOpen;
+    markExpander();
+  });
+  markExpander();
+  elements.rail.append(expander, list);
 
   const draw = (term) => {
     list.replaceChildren();
@@ -228,6 +247,7 @@ function renderDeviceList(term = '') {
   elements.rail.append(announcer.region);
   search.addEventListener('input', () => {
     const { shown, total } = draw(search.value);
+    markExpander();
     markFilters(search.value);
     announcer.say(shown === 0 ? t('rail.noMatches') : t('rail.matches', { shown, total: countOf('devices', total) }));
   });
@@ -518,6 +538,7 @@ async function showNetwork(bytes) {
   state.selectedDeviceId = null;
   state.categoryFilter = null;
   state.comparison = null;
+  state.listOpen = false;
 
   paintNetwork();
   // Los equipos de red: una regleta o un rack no cuentan, igual que en el diagrama.
@@ -785,12 +806,29 @@ function crossfade(change, origin) {
     const box = origin.getBoundingClientRect();
     const x = box.left + box.width / 2;
     const y = box.top + box.height / 2;
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const { width, height } = revealArea();
+    const radius = Math.hypot(Math.max(x, width - x), Math.max(y, height - y));
     root.animate(
       { clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-      { duration: 420, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+      { duration: REVEAL_MS, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', pseudoElement: '::view-transition-new(root)' },
     );
   }).catch(() => {});
+}
+
+// En un teléfono el círculo cruza unos 900 px: con menos tiempo se ve como un salto.
+const REVEAL_MS = 700;
+
+// La imagen de la transición cubre también lo que tapan las barras del navegador (100lvh en un
+// iPhone): medido con innerHeight, el círculo no llegaba a las esquinas de abajo.
+function revealArea() {
+  const probe = document.createElement('div');
+  for (const [name, value] of [['position', 'fixed'], ['top', '0'], ['left', '0'], ['width', '100lvw'], ['height', '100lvh'], ['visibility', 'hidden']]) {
+    probe.style.setProperty(name, value);
+  }
+  document.body.append(probe);
+  const { width, height } = probe.getBoundingClientRect();
+  probe.remove();
+  return { width: Math.max(width, innerWidth), height: Math.max(height, innerHeight) };
 }
 
 // "Tema claro, presionado": el lector dice cuál está puesto, cosa que el icono sólo muestra.

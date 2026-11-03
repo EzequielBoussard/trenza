@@ -225,7 +225,7 @@ body {
 .skip {
   position: fixed;
   top: 0.5rem;
-  left: 0.5rem;
+  left: max(0.5rem, env(safe-area-inset-left));
   z-index: 10;
   transform: translateY(-200%);
   padding: 0.5rem 0.85rem;
@@ -253,6 +253,7 @@ html[data-translating] [data-i18n-html] { visibility: hidden; }
   align-items: center;
   gap: 1.5rem;
   padding: 0.75rem 1.25rem;
+  padding-top: max(0.75rem, env(safe-area-inset-top));
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
   border-bottom: 1px solid var(--line);
@@ -441,6 +442,12 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
   mix-blend-mode: normal;
 }
 
+/* Adentro del círculo los colores ya están puestos: con sus transiciones, la cabecera que el
+   círculo destapa primero seguía cambiando de color. El icono del tema sí se anima. */
+:root.is-revealing :not(.theme-icon, .theme-icon *),
+:root.is-revealing ::before,
+:root.is-revealing ::after { transition: none !important; }
+
 .masthead__actions,
 .masthead__prefs {
   display: flex;
@@ -525,7 +532,7 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 /* Diálogo de exportación */
 
 .dialog {
-  width: min(26rem, calc(100vw - 2rem));
+  width: min(26rem, calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -555,11 +562,11 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 .dialog__preview { gap: 0.35rem; }
 
 @media (min-width: 34rem) {
-  .dialog--wide { width: min(40rem, calc(100vw - 2rem)); }
+  .dialog--wide { width: min(40rem, calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right))); }
 }
 
 @media (min-width: 50rem) {
-  .dialog--wide { width: min(88rem, calc(100vw - 4rem)); }
+  .dialog--wide { width: min(88rem, calc(100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right))); }
 
   .dialog--wide .dialog__body {
     flex-direction: row;
@@ -737,6 +744,8 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 .statusbar {
   margin: 0;
   padding: 0.4rem 1.25rem;
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
   border-bottom: 1px solid var(--line-soft);
   background: var(--ground);
   font-family: var(--font-mono);
@@ -900,6 +909,30 @@ html:not([data-loaded]) .workspace {
   }
 }
 
+/* Aparece si un dedo solo intenta mover el diagrama cuando la página se desplaza (topology.js). */
+.stage__hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  display: none;
+  max-width: calc(100% - 2rem);
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.stage__hint.is-visible { display: block; }
+
 .zoom__icon {
   display: block;
   width: 16px;
@@ -1016,6 +1049,8 @@ html:not([data-js]) .intro {
   align-content: start;
   gap: clamp(2rem, 5vh, 3.5rem);
   padding: clamp(1.5rem, 6vh, 4rem) clamp(1rem, 4vw, 3rem) 2rem;
+  padding-left: max(clamp(1rem, 4vw, 3rem), env(safe-area-inset-left));
+  padding-right: max(clamp(1rem, 4vw, 3rem), env(safe-area-inset-right));
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -2060,11 +2095,31 @@ button.pick-list__pick:hover { background: var(--raised); }
     min-height: 100%;
   }
 
+  /* Con el teléfono acostado el notch y las esquinas piden margen a los costados: cada zona lo
+     pone adentro, así su fondo llega al borde y el diagrama ocupa el ancho entero. */
   .workspace {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto auto;
     grid-template-areas: 'rail' 'grip' 'stage' 'panel';
+    padding-left: 0;
+    padding-right: 0;
   }
+
+  .rail,
+  .panel {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .stage > .legend {
+    padding-left: max(0.9rem, env(safe-area-inset-left));
+    padding-right: max(0.9rem, env(safe-area-inset-right));
+  }
+
+  .zoom { right: max(0.75rem, env(safe-area-inset-right)); }
+
+  /* La página se desplaza con un dedo aunque esté sobre el diagrama; el diagrama, con 2. */
+  .topology-viewport { touch-action: pan-y; }
 
   /* Con el teléfono acostado, 60vh deja el diagrama en 190 px. */
   .stage { height: clamp(16rem, 60vh, 30rem); }
@@ -2130,6 +2185,33 @@ button.pick-list__pick:hover { background: var(--raised); }
   }
 }
 
+/* En una pantalla táctil la lista no se desplaza adentro de la página: va plegada detrás de un
+   botón y, abierta o al buscar, ocupa lo que mide. El separador de alto ya no hace falta. */
+.rail__expand { display: none; }
+
+@media (max-width: 1180px) and (pointer: coarse) {
+  .rail {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  /* Lo que mide plegada (título, buscador y botón): mientras abre, el diagrama no se corre. */
+  .rail:empty { height: 10.75rem; }
+
+  .grip--rail { display: none; }
+
+  .rail__expand {
+    display: block;
+    width: calc(100% - 2rem);
+    min-height: 44px;
+    margin: 0 1rem 0.75rem;
+  }
+
+  .rail:not(.is-open):not(.is-searching) .device-list { display: none; }
+  .rail.is-searching .rail__expand { display: none; }
+}
+
 /* Marca a la izquierda y preferencias a la derecha; el archivo abierto, abajo. */
 @media (max-width: 60rem) {
   .masthead {
@@ -2151,11 +2233,15 @@ button.pick-list__pick:hover { background: var(--raised); }
       'actions actions';
     gap: 0.45rem 1rem;
     padding-block: 0.6rem;
+    padding-top: max(0.6rem, env(safe-area-inset-top));
     padding-left: max(1rem, env(safe-area-inset-left));
     padding-right: max(1rem, env(safe-area-inset-right));
   }
 
-  .statusbar { padding-inline: 1rem; }
+  .statusbar {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
   .panel-head { padding: 0.9rem 1rem 0.6rem; }
   .panel-section { padding: 0.75rem 1rem; }
 

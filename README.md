@@ -41,6 +41,7 @@ Es sólo un visor: para editar o simular sigue haciendo falta Packet Tracer.
 - `/demo` abre la red de ejemplo de `showcase/`. La portada también ofrece una captura de ejemplo.
 - El nombre de un equipo después de `#` lo deja elegido al abrir: [`/demo#Router Principal`](https://trenza.pages.dev/demo#Router%20Principal). Sirve también con `?src=`.
 - Teclado: `/` va al buscador, las flechas recorren la lista, el diagrama y la tabla de paquetes, y Escape quita la selección.
+- En un teléfono, 1 dedo desplaza la página aunque esté sobre el diagrama, y 2 lo mueven y lo acercan. La lista de equipos va plegada y se muestra al buscar.
 - Funciona sin conexión después de la primera visita y se puede instalar como aplicación.
 
 ## Cómo se lee un `.pkt`
