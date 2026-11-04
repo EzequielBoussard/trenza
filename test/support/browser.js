@@ -52,7 +52,12 @@ export async function serve(root) {
     response.end(body);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return { url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+  // También las conexiones abiertas: el navegador las reusaría y la prueba sin conexión tendría red.
+  const close = () => {
+    server.close();
+    server.closeAllConnections();
+  };
+  return { url: `http://127.0.0.1:${server.address().port}`, close };
 }
 
 const INSTALLED = [
