@@ -9,6 +9,8 @@ const SHELL = [
   '/site.webmanifest',
   '/favicon.svg',
   '/apple-touch-icon.png',
+  // El navegador lo pide al leer el manifiesto, también sin conexión.
+  '/web-app-manifest-192x192.png',
   '/showcase/red-supermercado.pkt',
   '/showcase/captura-ejemplo.pcap',
   // Sólo el subconjunto latino; latin-ext se guarda si alguna vez se pide.

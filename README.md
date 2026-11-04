@@ -65,7 +65,7 @@ Son módulos ES servidos tal cual, sin dependencias ni paso de compilación.
 npm test
 ```
 
-Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. Las que necesitan una página abren Chrome o Edge sin ventana y lo manejan por el protocolo de DevTools, sin dependencias: la red de ejemplo, una actividad con sus instrucciones, el zoom, una red de 600 equipos, el exporte, el buscador, el camino, la comparación y las conversaciones de una captura. Si no hay ninguno instalado se saltan (en CI fallan), y `CHROME_PATH` indica otro. GitHub Actions las corre todas en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
+Las pruebas, con `node:test`, cubren el descifrado, los `.pkz`, los parsers de pcap y de configuración IOS, el reparto del diagrama, las traducciones, el logo y los 2 archivos de ejemplo. Las que necesitan una página abren Chrome o Edge sin ventana y lo manejan por el protocolo de DevTools, sin dependencias: la red de ejemplo, una actividad con sus instrucciones, el zoom, una red de 600 equipos, el exporte, el buscador, el camino, la comparación, las conversaciones de una captura, los gestos en un teléfono y el uso sin conexión. Si no hay ninguno instalado se saltan (en CI fallan), y `CHROME_PATH` indica otro. GitHub Actions las corre todas en cada push. Para probar en el navegador alcanza con servir la carpeta con cualquier servidor estático; abriendo `index.html` desde el disco los módulos no cargan.
 
 ```
 src/

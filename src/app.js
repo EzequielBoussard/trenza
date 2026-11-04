@@ -603,6 +603,7 @@ function showPacketSelection(selection, last) {
   } else {
     renderCaptureSummary(elements.panel, state.capture, state.packets, conversation);
   }
+  markScrollable(elements.panel);
 }
 
 // Como si se hubiera escrito el par; la misma del resumen otra vez lo borra. El panel se rehace:
@@ -767,6 +768,13 @@ function wireFileInput() {
       event.preventDefault();
       openExample(trigger.dataset.example);
     });
+  }
+
+  // Sin conexión la imagen puede no estar guardada (si sólo se visitó /demo): mejor sin recuadro roto.
+  const shot = document.querySelector('.intro__shot');
+  for (const image of shot.querySelectorAll('img')) {
+    image.addEventListener('error', () => { shot.hidden = true; });
+    if (image.complete && image.currentSrc && image.naturalWidth === 0) shot.hidden = true;
   }
 }
 

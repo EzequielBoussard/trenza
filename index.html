@@ -145,8 +145,8 @@
         <label class="field" data-scope-field>
           <span class="field__label" data-i18n="export.scope">Packets</span>
           <select class="field__input" name="scope">
-            <option value="all"></option>
-            <option value="selection"></option>
+            <option value="all">The whole capture</option>
+            <option value="selection">Only the selection</option>
           </select>
         </label>
 
@@ -184,10 +184,10 @@
 
 <main class="workspace" id="workspace" tabindex="-1">
 
-  <section class="nojs">
+  <div class="nojs">
     <p lang="en">Trenza runs entirely in the browser, so it needs JavaScript. Nothing is uploaded anywhere: the file is read on your own machine.</p>
     <p lang="es">Trenza corre entero en el navegador, así que necesita JavaScript. No se sube nada a ningún lado: el archivo se lee en tu propia máquina.</p>
-  </section>
+  </div>
 
   <section class="intro">
     <div class="intro__main">
@@ -248,7 +248,7 @@
 
   <aside class="rail" data-rail aria-labelledby="rail-title"></aside>
   <div class="grip grip--rail" data-rail-grip role="separator" tabindex="0" data-i18n-label="action.resizeList"></div>
-  <section class="stage" data-stage></section>
+  <div class="stage" data-stage></div>
   <button type="button" class="peek" data-peek hidden></button>
   <aside class="panel" data-panel data-i18n-label="panel.label"></aside>
   <div class="grip grip--panel" data-panel-grip role="separator" tabindex="0" data-i18n-label="action.resizePanel"></div>

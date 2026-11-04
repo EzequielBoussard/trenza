@@ -1104,6 +1104,7 @@ html:not([data-js]) .intro {
 }
 
 .intro__shot { margin: 0; }
+.intro__main:has(> .intro__shot[hidden]) { grid-template-columns: minmax(0, 36rem); }
 
 .intro__shot-link {
   display: block;

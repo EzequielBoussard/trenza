@@ -163,6 +163,14 @@ test('una tabla o un bloque que se desplaza es una parada del tabulador con nomb
   })()`);
   assert.deepEqual(config, [0, 'region', 'running-config']);
   assert.equal(await tab.evaluate("[...document.querySelectorAll('.panel .table-scroller')].filter((box) => box.scrollWidth <= box.clientWidth && box.hasAttribute('tabindex')).length"), 0);
+
+  // Los bytes de un paquete también.
+  await tab.open(`${site.url}/`);
+  await tab.evaluate("document.querySelector('[data-example=capture]').click()");
+  await tab.waitFor("document.querySelectorAll('.packet-row').length === 30");
+  await tab.evaluate("document.querySelectorAll('.packet-row')[3].click()");
+  const bytes = await tab.evaluate("(() => { const box = document.querySelector('.panel pre.code-block'); return [box.tabIndex, box.getAttribute('role'), box.getAttribute('aria-label')]; })()");
+  assert.deepEqual(bytes, [0, 'region', 'Bytes']);
   await tab.close();
 });
 
@@ -469,5 +477,27 @@ test('el diálogo de exportar arranca con el formato y la medida de la última v
   })()`);
   assert.deepEqual(opened, ['jpg', 'qhd', false]);
   assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+// Con un servidor propio, que la prueba apaga: el trabajador queda registrado sólo para ese origen.
+test('sin conexión el visor sale de la caché: la portada, la captura y /demo con su equipo', { skip, timeout: 60000 }, async () => {
+  const own = await serve(fileURLToPath(new URL('..', import.meta.url)));
+  const tab = await browser.tab();
+  await tab.open(`${own.url}/demo`);
+  await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
+  await tab.evaluate('navigator.serviceWorker.ready.then(() => true)');
+  own.close();
+
+  // Sólo se visitó /demo, así que la imagen de la portada no quedó guardada: sin recuadro roto.
+  await tab.open(`${own.url}/`);
+  await tab.waitFor("document.querySelector('.intro__shot').hidden");
+  await tab.evaluate("document.querySelector('[data-example=capture]').click()");
+  await tab.waitFor("document.querySelectorAll('.packet-row').length === 30");
+
+  await tab.open(`${own.url}/demo#Router%20Principal`);
+  await tab.waitFor("document.querySelector('svg.topology .node.is-selected')");
+  assert.match(await tab.evaluate("document.querySelector('.node.is-selected').getAttribute('aria-label')"), /^Router Principal,/);
+  assert.deepEqual(tab.problems.filter((problem) => !problem.includes('net::ERR_FAILED')), []);
   await tab.close();
 });
