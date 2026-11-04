@@ -421,11 +421,11 @@ export function dissectPacket(packet) {
   };
 }
 
-export function toHexDump(bytes) {
+export function toHexDump(bytes, width = 16) {
   const lines = [];
-  for (let offset = 0; offset < bytes.length; offset += 16) {
-    const slice = bytes.subarray(offset, offset + 16);
-    const hex = Array.from(slice).map(hex2).join(' ').padEnd(47, ' ');
+  for (let offset = 0; offset < bytes.length; offset += width) {
+    const slice = bytes.subarray(offset, offset + width);
+    const hex = Array.from(slice).map(hex2).join(' ').padEnd(width * 3 - 1, ' ');
     const ascii = Array.from(slice)
       .map((byte) => (byte >= 0x20 && byte < 0x7f ? String.fromCharCode(byte) : '.'))
       .join('');

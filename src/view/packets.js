@@ -3,6 +3,7 @@ import { parseConversation } from '../pkt/query.js';
 import { countOf, getLocale, t } from '../i18n.js';
 
 const PAGE_SIZE = 300;
+const dumpBytes = new WeakMap();
 
 const ROW_STEPS = {
   ArrowDown: 1,
@@ -271,6 +272,8 @@ export class PacketTableView {
 
       const button = createElement('button', 'sortable', label);
       button.type = 'button';
+      // Se llega con la flecha arriba desde la primera fila: la rejilla entera es una parada.
+      button.tabIndex = -1;
       button.setAttribute('aria-label', t('table.sortBy', { column: label }));
       // El span va siempre, aunque esté vacío, para que ordenar no mueva los títulos.
       button.append(createElement('span', 'sortable__mark', sorting ? (this.sort.descending ? '▾' : '▴') : ''));
@@ -281,6 +284,7 @@ export class PacketTableView {
       headRow.append(heading);
     });
     head.append(headRow);
+    headRow.addEventListener('keydown', (event) => this.navigateHead(event));
     this.body = createElement('tbody');
     this.body.addEventListener('keydown', (event) => this.navigate(event));
     table.append(head, this.body);
@@ -290,6 +294,8 @@ export class PacketTableView {
     this.container.append(scroller);
 
     if (this.visible.length === 0) {
+      // Sin filas la parada queda en los encabezados.
+      headRow.querySelector('button').tabIndex = 0;
       this.container.append(createElement('p', 'empty-note', t('table.noPackets')));
       return;
     }
@@ -327,7 +333,10 @@ export class PacketTableView {
       row.addEventListener('mousedown', (event) => {
         if (event.shiftKey) event.preventDefault();
       });
-      row.addEventListener('click', (event) => this.choose(packet, event));
+      row.addEventListener('click', (event) => {
+        this.moveStop(row);
+        this.choose(packet, event);
+      });
       fragment.append(row);
     }
 
@@ -351,7 +360,34 @@ export class PacketTableView {
     const step = ROW_STEPS[event.key];
     if (step === undefined) return;
     event.preventDefault();
+    if (event.key === 'ArrowUp' && row.sectionRowIndex === 0) {
+      this.headButtons()[this.sort?.column ?? 0].focus();
+      return;
+    }
     this.moveRow(row, step);
+  }
+
+  headButtons() {
+    return [...this.container.querySelectorAll('thead button')];
+  }
+
+  // Izquierda y derecha entre columnas, abajo vuelve a la fila que tiene la parada.
+  navigateHead(event) {
+    const buttons = this.headButtons();
+    const at = buttons.indexOf(event.target);
+    if (at < 0) return;
+    const to = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: buttons.length - 1 }[event.key];
+    if (to !== undefined) {
+      event.preventDefault();
+      buttons[Math.max(0, Math.min(to, buttons.length - 1))].focus();
+      return;
+    }
+    if (event.key === 'ArrowDown' && this.body.firstElementChild) {
+      event.preventDefault();
+      const row = this.body.querySelector('[tabindex="0"]') ?? this.body.firstElementChild;
+      row.focus();
+      row.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   moveRow(row, step) {
@@ -368,10 +404,15 @@ export class PacketTableView {
 
     const next = rows[Math.max(0, to)];
     if (!next || next === row) return;
-    row.tabIndex = -1;
-    next.tabIndex = 0;
+    this.moveStop(next);
     next.focus();
     next.scrollIntoView({ block: 'nearest' });
+  }
+
+  moveStop(row) {
+    const current = this.body.querySelector('[tabindex="0"]');
+    if (current) current.tabIndex = -1;
+    row.tabIndex = 0;
   }
 }
 
@@ -409,8 +450,20 @@ export function renderPacketInspector(container, packet, { onConversation } = {}
 
   const dump = createElement('section', 'panel-section');
   dump.append(createElement('h3', 'panel-section__title', t('panel.bytes')));
-  dump.append(createElement('pre', 'code-block', toHexDump(packet.bytes)));
+  const block = createElement('pre', 'code-block code-block--bytes', toHexDump(packet.bytes));
+  dumpBytes.set(block, packet.bytes);
+  dump.append(block);
   container.append(dump);
+}
+
+// 16 bytes por renglón si entran y si no 8: en el panel angosto no hay que desplazarse de costado.
+export function fitHexDumps(container) {
+  for (const block of container.querySelectorAll('.code-block--bytes')) {
+    const bytes = dumpBytes.get(block);
+    const wide = toHexDump(bytes, 16);
+    if (block.textContent !== wide) block.textContent = wide;
+    if (block.scrollWidth > block.clientWidth + 1) block.textContent = toHexDump(bytes, 8);
+  }
 }
 
 export function renderCaptureSummary(container, capture, packets, { title, onConversation, activeConversation } = {}) {

@@ -164,13 +164,28 @@ test('una tabla o un bloque que se desplaza es una parada del tabulador con nomb
   assert.deepEqual(config, [0, 'region', 'running-config']);
   assert.equal(await tab.evaluate("[...document.querySelectorAll('.panel .table-scroller')].filter((box) => box.scrollWidth <= box.clientWidth && box.hasAttribute('tabindex')).length"), 0);
 
-  // Los bytes de un paquete también.
+  // Los bytes de un paquete también, de a 8 por renglón en el panel angosto.
   await tab.open(`${site.url}/`);
   await tab.evaluate("document.querySelector('[data-example=capture]').click()");
   await tab.waitFor("document.querySelectorAll('.packet-row').length === 30");
   await tab.evaluate("document.querySelectorAll('.packet-row')[3].click()");
-  const bytes = await tab.evaluate("(() => { const box = document.querySelector('.panel pre.code-block'); return [box.tabIndex, box.getAttribute('role'), box.getAttribute('aria-label')]; })()");
-  assert.deepEqual(bytes, [0, 'region', 'Bytes']);
+  const bytes = await tab.evaluate("(() => { const box = document.querySelector('.panel pre.code-block'); return [box.tabIndex, box.getAttribute('role'), box.getAttribute('aria-label'), box.textContent.split('\\n')[0].length]; })()");
+  assert.deepEqual(bytes, [0, 'region', 'Bytes', 39]);
+
+  // La rejilla de paquetes es una sola parada, que sigue al clic; a los encabezados se llega con las flechas.
+  const grid = await tab.evaluate(`(() => {
+    const rows = document.querySelectorAll('.packet-row');
+    const press = (key) => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    rows[0].focus();
+    press('ArrowUp');
+    const up = document.activeElement.textContent;
+    press('ArrowRight');
+    const right = document.activeElement.textContent;
+    press('ArrowDown');
+    const stops = document.querySelectorAll('[role=grid] [tabindex="0"], [role=grid] button:not([tabindex="-1"])').length;
+    return [stops, up, right, document.activeElement === rows[3]];
+  })()`);
+  assert.deepEqual(grid, [1, '#', 'Time', true]);
   await tab.close();
 });
 
@@ -231,6 +246,11 @@ test('en un teléfono un dedo desplaza la página aunque esté sobre el diagrama
 
   await tab.evaluate("document.querySelector('.rail__expand').click()");
   assert.equal(await tab.evaluate("getComputedStyle(document.querySelector('.device-list')).display"), 'block');
+
+  // Sin mouse no se ofrece arrastrar, y exportar no levanta el teclado con el nombre.
+  assert.equal(await tab.evaluate("getComputedStyle(document.querySelector('.intro__hint')).display"), 'none');
+  await tab.evaluate("document.querySelector('[data-export]').click()");
+  assert.equal(await tab.evaluate('document.activeElement.name'), 'format');
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });

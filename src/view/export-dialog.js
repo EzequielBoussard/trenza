@@ -21,6 +21,7 @@ const CAPTURE_NOTES = { csv: 'export.csvNote', pcap: 'export.pcapNote' };
 
 // Formato, medida y casillas de la última vez, por tipo de archivo. Idioma y tema siguen al visor.
 const CHOICES_KEY = 'trenza.export';
+const TOUCH_ONLY = matchMedia('(any-pointer: coarse) and (any-hover: none)');
 
 function readChoices() {
   try {
@@ -221,8 +222,12 @@ export function wireExportDialog({ elements, state, setStatus }) {
     restoreChoices(elements.exportForm, state.kind);
     if (capture) updateScopeOptions(elements, state);
     refresh();
+    // Sólo con dedos el foco entra por el formato: en el nombre levantaría el teclado y taparía el diálogo.
+    const first = TOUCH_ONLY.matches ? elements.exportForm.querySelector('input[name=format]:checked') : fields.name;
+    for (const field of elements.exportForm.querySelectorAll('[autofocus]')) field.autofocus = false;
+    first.autofocus = true;
     elements.exportDialog.showModal();
-    fields.name.select();
+    if (first === fields.name) fields.name.select();
   });
 
   elements.exportForm.addEventListener('change', refresh);

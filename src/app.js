@@ -9,7 +9,7 @@ import { dissectPacket } from './pcap/dissect.js';
 import { TopologyView } from './view/topology.js';
 import { CATEGORY_ORDER, cablePath, labelFontsReady, selectVisible } from './view/graph.js';
 import { categoryIcon, markScrollable, renderDeviceInspector, renderNetworkSummary } from './view/inspector.js';
-import { PacketTableView, conversationKey, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
+import { PacketTableView, conversationKey, fitHexDumps, renderPacketInspector, renderCaptureSummary } from './view/packets.js';
 import { readSourceFromLocation } from './share.js';
 import { wireExportDialog } from './view/export-dialog.js';
 import { download } from './download.js';
@@ -584,7 +584,7 @@ function paintCapture(keep = false) {
   elements.rail.append(
     search,
     createElement('p', 'rail__hint', t('rail.filterHint')),
-    createElement('p', 'rail__hint', t('rail.multiselect')),
+    createElement('p', 'rail__hint rail__hint--keys', t('rail.multiselect')),
     announcer.region,
   );
 
@@ -603,6 +603,12 @@ function showPacketSelection(selection, last) {
   } else {
     renderCaptureSummary(elements.panel, state.capture, state.packets, conversation);
   }
+  fitPanel();
+}
+
+// Los bytes antes: con 8 por renglón el bloque puede dejar de desplazarse.
+function fitPanel() {
+  fitHexDumps(elements.panel);
   markScrollable(elements.panel);
 }
 
@@ -892,7 +898,7 @@ function wireGrip(grip, pane, name, sign, widths) {
     if (sizes[dimension]) document.documentElement.style.setProperty(`--${name}-${dimension}`, `${sizes[dimension]}px`);
     else document.documentElement.style.removeProperty(`--${name}-${dimension}`);
     show();
-    markScrollable(elements.panel);
+    fitPanel();
   };
   const save = () => {
     try {
@@ -1019,7 +1025,7 @@ async function start() {
   wireGrip(elements.railGrip, elements.rail, 'rail', 1, [200, 480]);
   wireGrip(elements.panelGrip, elements.panel, 'panel', -1, [280, 600]);
   window.addEventListener('resize', readGrips);
-  window.addEventListener('resize', () => markScrollable(elements.panel));
+  window.addEventListener('resize', fitPanel);
   wireExportDialog({ elements, state, setStatus });
   setStatus('status.idle');
 

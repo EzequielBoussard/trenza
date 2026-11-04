@@ -1106,6 +1106,12 @@ html:not([data-js]) .intro {
 .intro__shot { margin: 0; }
 .intro__main:has(> .intro__shot[hidden]) { grid-template-columns: minmax(0, 36rem); }
 
+/* Sólo con dedos no hay archivo que arrastrar ni teclas que sostener. */
+@media (any-pointer: coarse) and (any-hover: none) {
+  .intro__hint,
+  .rail__hint--keys { display: none; }
+}
+
 .intro__shot-link {
   display: block;
   overflow: hidden;
@@ -2030,7 +2036,8 @@ button.pick-list__pick:hover { background: var(--raised); }
 @media (hover: hover) {
   .packet-row:hover { background: var(--surface); }
 }
-.packet-row.is-selected { background: var(--raised); }
+.packet-row.is-selected { background: var(--raised); color: var(--text-strong); }
+.packet-row.is-selected td:first-child { box-shadow: inset 3px 0 var(--orange); }
 
 .peek { display: none; }
 
