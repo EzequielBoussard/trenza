@@ -19,4 +19,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - run: npm test
+      # Lo mismo que npm test, y además una anotación por prueba que falla.
+      - run: >-
+          node --test --test-reporter=spec --test-reporter-destination=stdout
+          --test-reporter=./test/support/github.js --test-reporter-destination=stdout "test/*.test.js"
