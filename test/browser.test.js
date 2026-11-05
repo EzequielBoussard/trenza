@@ -220,6 +220,16 @@ async function touchDrag(tab, fingers, steps = 12) {
   await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
+// El desplazamiento sigue por inercia después de soltar: en una máquina lenta, más allá de los 300 ms.
+async function stillPage(tab) {
+  let last = null;
+  for (let calm = 0; calm < 3; await new Promise((resolve) => setTimeout(resolve, 100))) {
+    const now = await tab.evaluate('scrollY');
+    calm = now === last ? calm + 1 : 0;
+    last = now;
+  }
+}
+
 test('en un teléfono un dedo desplaza la página aunque esté sobre el diagrama, y 2 lo mueven', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab({ width: 390, height: 844 });
   await tab.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
@@ -232,11 +242,14 @@ test('en un teléfono un dedo desplaza la página aunque esté sobre el diagrama
   const start = await tab.evaluate(state);
   assert.equal(start.list, 'none', 'la lista empieza plegada');
   await touchDrag(tab, [{ from: center, to: { x: center.x, y: center.y - 200 } }]);
+  await stillPage(tab);
   const scrolled = await tab.evaluate(state);
   assert.ok(scrolled.scroll > 100, `un dedo no desplazó la página: ${scrolled.scroll}`);
   assert.equal(scrolled.view, start.view, 'un dedo no mueve el diagrama');
 
   await tab.evaluate('scrollTo(0, 0)');
+  await stillPage(tab);
+  assert.equal(await tab.evaluate('scrollY'), 0);
   await touchDrag(tab, [
     { from: { x: center.x - 30, y: center.y }, to: { x: center.x - 110, y: center.y } },
     { from: { x: center.x + 30, y: center.y }, to: { x: center.x + 110, y: center.y } },
