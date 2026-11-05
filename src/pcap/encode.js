@@ -5,9 +5,8 @@ const PCAP_MAGIC = 0xa1b2c3d4;
 const SNAPLEN = 65535;
 
 export function toCsv(packets, { origin }) {
-  const headers = ['table.number', 'table.time', 'panel.packet', 'table.source', 'table.destination',
+  const headers = ['table.number', 'table.time', 'csv.timestamp', 'table.source', 'table.destination',
     'table.protocol', 'table.length', 'table.detail'].map((key) => t(key));
-  headers[2] = t('csv.timestamp');
 
   const rows = packets.map((packet) => [
     packet.index,

@@ -597,7 +597,7 @@ function showPacketSelection(selection, last) {
   const conversation = { onConversation: showConversation, activeConversation: pair ? conversationKey(pair) : null };
 
   if (selection.length === 1 || (last && selection.length === 0)) {
-    renderPacketInspector(elements.panel, last ?? selection[0], conversation);
+    renderPacketInspector(elements.panel, last ?? selection[0], { ...conversation, origin: state.packets[0]?.timestamp });
   } else if (selection.length > 1) {
     renderCaptureSummary(elements.panel, state.capture, selection, { title: t('panel.selection'), ...conversation });
   } else {

@@ -1986,6 +1986,14 @@ button.pick-list__pick:hover { background: var(--raised); }
 /* El relleno pasa al botón para que toda la celda sea clicable. */
 .table--packets th:has(.sortable) { padding: 0; }
 
+/* Segundos y bytes en minúscula, aunque el renglón vaya en mayúsculas. */
+.panel-head__meta { text-transform: none; }
+
+/* En un teléfono el protocolo entra sin desplazarse; tiempo y bytes siguen en el panel del paquete. */
+@media (max-width: 40rem) {
+  .table--packets :is(th, td):is(:nth-child(2), :nth-child(6)) { display: none; }
+}
+
 .sortable {
   display: flex;
   align-items: center;

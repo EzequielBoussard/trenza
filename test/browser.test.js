@@ -171,6 +171,7 @@ test('una tabla o un bloque que se desplaza es una parada del tabulador con nomb
   await tab.evaluate("document.querySelectorAll('.packet-row')[3].click()");
   const bytes = await tab.evaluate("(() => { const box = document.querySelector('.panel pre.code-block'); return [box.tabIndex, box.getAttribute('role'), box.getAttribute('aria-label'), box.textContent.split('\\n')[0].length]; })()");
   assert.deepEqual(bytes, [0, 'region', 'Bytes', 39]);
+  assert.equal(await tab.evaluate("document.querySelector('.panel-head__kind').textContent"), 'Packet 4 · 0.005740 s · 342 bytes');
 
   // La rejilla de paquetes es una sola parada, que sigue al clic; a los encabezados se llega con las flechas.
   const grid = await tab.evaluate(`(() => {

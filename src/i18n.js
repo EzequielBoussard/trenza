@@ -189,6 +189,7 @@ const DICTIONARIES = {
     'panel.truncatedValue': '{bytes} bytes left unread',
     'panel.bytes': 'Bytes',
     'panel.packet': 'Packet {index}',
+    'panel.packetMeta': '{time} s · {length} bytes',
     'panel.selection': 'Selection',
 
     'table.interface': 'Interface',
@@ -569,6 +570,7 @@ const DICTIONARIES = {
     'panel.truncatedValue': 'quedaron {bytes} bytes sin leer',
     'panel.bytes': 'Bytes',
     'panel.packet': 'Paquete {index}',
+    'panel.packetMeta': '{time} s · {length} bytes',
     'panel.selection': 'Selección',
 
     'table.interface': 'Interfaz',

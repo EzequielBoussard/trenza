@@ -416,14 +416,15 @@ export class PacketTableView {
   }
 }
 
-export function renderPacketInspector(container, packet, { onConversation } = {}) {
+export function renderPacketInspector(container, packet, { onConversation, origin = 0 } = {}) {
   container.replaceChildren();
 
   const header = createElement('header', 'panel-head');
-  header.append(
-    createElement('p', 'panel-head__kind', t('panel.packet', { index: packet.index })),
-    createElement('h2', 'panel-head__title', packet.protocol),
-  );
+  const kind = createElement('p', 'panel-head__kind', t('panel.packet', { index: packet.index }));
+  // Tiempo y largo también acá: en pantallas angostas la tabla no muestra esas columnas.
+  const meta = t('panel.packetMeta', { time: formatTime(packet.timestamp, origin), length: packet.originalLength });
+  kind.append(createElement('span', 'panel-head__meta', ` · ${meta}`));
+  header.append(kind, createElement('h2', 'panel-head__title', packet.protocol));
   // Qué hace el protocolo, en una línea, si es uno de los comunes.
   const key = `protocol.${packet.protocol}`;
   if (t(key) !== key) header.append(createElement('p', 'panel-head__about', t(key)));
