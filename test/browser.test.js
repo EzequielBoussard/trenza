@@ -100,6 +100,17 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   await tab.close();
 });
 
+test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab();
+  await tab.open(`${site.url}/`);
+  await tab.chooseFile('[data-file-input]', saveFile('foto.pkt', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])));
+  await tab.waitFor("document.querySelector('[role=status]').dataset.tone === 'error'");
+  assert.equal(await tab.evaluate("document.documentElement.hasAttribute('data-loaded')"), false);
+  assert.match(await tab.evaluate("document.querySelector('[role=status]').textContent"), /^foto.pkt: .*Packet Tracer/);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
 test('una actividad muestra sus instrucciones limpias y la configuración de IOS', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await openFile(tab, 'actividad.pka', buildLegacyFile(activityXml(LAB, INSTRUCTIONS)));

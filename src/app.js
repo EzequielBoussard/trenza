@@ -674,7 +674,8 @@ async function open(name, bytes) {
       await showNetwork(bytes);
     }
   } catch (error) {
-    showFailure(error.message);
+    // El nombre va en el aviso: la portada ya no lo muestra en la cabecera.
+    showFailure(`${name}: ${error.message}`);
   }
   readGrips();
 }
@@ -688,16 +689,12 @@ function rescueFocus(trigger, target) {
   target.focus();
 }
 
+// Vuelve a la portada con el aviso: un visor vacío ofrecería exportar nada.
 function showFailure(message) {
-  state.kind = null;
-  delete document.body.dataset.view;
+  closeFile();
   state.status = { key: null, tone: 'error' };
   elements.status.textContent = message;
   elements.status.dataset.tone = 'error';
-  clearStage();
-  elements.stage.append(createElement('p', 'empty-note', message));
-  elements.panel.replaceChildren();
-  elements.rail.replaceChildren();
 }
 
 // Un archivo propio no tiene dirección: si quedara /demo, recargar abriría el ejemplo.
