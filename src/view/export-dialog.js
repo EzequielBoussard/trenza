@@ -223,7 +223,7 @@ export function wireExportDialog({ elements, state, setStatus }) {
     if (capture) updateScopeOptions(elements, state);
     refresh();
     // Sólo con dedos el foco entra por el formato: en el nombre levantaría el teclado y taparía el diálogo.
-    const first = TOUCH_ONLY.matches ? elements.exportForm.querySelector('input[name=format]:checked') : fields.name;
+    const first = (TOUCH_ONLY.matches && elements.exportForm.querySelector('input[name=format]:checked')) || fields.name;
     for (const field of elements.exportForm.querySelectorAll('[autofocus]')) field.autofocus = false;
     first.autofocus = true;
     elements.exportDialog.showModal();
