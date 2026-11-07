@@ -1308,11 +1308,11 @@ body[data-dragging] .dropveil { display: grid; }
 
 .device-chip .glyph { align-self: center; }
 
+/* Un nombre largo baja de renglón: cortado con puntos, dos equipos parecidos se confunden. */
 .device-chip__name {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .device-chip__meta {
@@ -1877,7 +1877,7 @@ button.key__row:hover { background: var(--raised); }
 .connections__peer--pick:hover { text-decoration-color: var(--orange); }
 
 @media (pointer: coarse) {
-  .connections__peer--pick { min-height: 2rem; }
+  .connections__peer--pick { min-width: 2.5rem; min-height: 2.5rem; text-align: left; }
 }
 
 .review {
@@ -2228,6 +2228,20 @@ button.pick-list__pick:hover { background: var(--raised); }
   .rail.is-searching .rail__expand { display: none; }
 }
 
+/* Acostado, el buscador y el botón comparten renglón: apilados dejaban el diagrama abajo del todo. */
+@media (max-width: 1180px) and (pointer: coarse) and (max-height: 30rem) {
+  .rail:has(.rail__expand) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .rail > * { grid-column: 1 / -1; }
+  .rail:not(.is-searching) > .rail__search { grid-column: 1; width: auto; margin-right: 0; }
+  .rail > .rail__expand { grid-column: 2; width: auto; margin: 0 1rem 0.5rem 0.75rem; padding-inline: 1rem; }
+  .rail__head { padding-top: 0.5rem; }
+  .rail:empty { height: 7rem; }
+}
+
 /* Marca a la izquierda y preferencias a la derecha; el archivo abierto, abajo. */
 @media (max-width: 60rem) {
   .masthead {
@@ -2270,6 +2284,19 @@ button.pick-list__pick:hover { background: var(--raised); }
 /* Por debajo de 400 px el formato no entra al lado de las preferencias. */
 @media (max-width: 25rem) {
   .masthead__kind { display: none; }
+}
+
+/* Con la pantalla baja, un teléfono acostado, la cabecera va en un renglón: en 2 se comía un
+   tercio del alto. */
+@media (min-width: 40.01rem) and (max-width: 60rem) and (max-height: 30rem) {
+  html[data-loaded] .masthead {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'brand file actions prefs';
+    gap: 0.75rem;
+    padding-block: 0.45rem;
+    padding-top: max(0.45rem, env(safe-area-inset-top));
+  }
+  html[data-loaded] .masthead__kind { display: none; }
 }
 
 @media (max-width: 62rem) {
