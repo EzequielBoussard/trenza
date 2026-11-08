@@ -29,7 +29,7 @@ const DICTIONARIES = {
     'theme.light': 'Light',
 
     'intro.title': 'Viewer for Packet Tracer files and network captures',
-    'intro.lead': 'Open a {pkt}, {pka} or {pkz} file to see the topology, interfaces and configuration of each device, or a {pcap} or {pcapng} file to go through the packets. The file is read in your browser and is not uploaded anywhere.',
+    'intro.lead': 'Open a {pkt}, {pka} or {pkz} file to see the topology, interfaces and configuration of each device, or a {pcap} or {pcapng} file to go through the packets.',
     'intro.choose': 'Choose a file',
     'intro.exampleNetwork': 'Example network',
     'intro.exampleCapture': 'Example capture',
@@ -45,7 +45,7 @@ const DICTIONARIES = {
     'about.privacyTerm': 'Privacy',
     'about.privacyBody': 'Decryption runs in the browser. There is no server that receives the file.',
     'about.limitsTerm': 'Read only',
-    'about.limitsBody': 'It does not edit or simulate. The diagram can be exported as PNG, JPG, SVG or PDF, and the capture as CSV or pcap.',
+    'about.limitsBody': 'It does not edit or simulate. The diagram can be exported as PNG, JPG, SVG or PDF, the device inventory as CSV, and the capture as CSV or pcap.',
     'about.madeBy': 'Made by',
     'about.disclaimer': 'Trenza is an independent project, not affiliated with or endorsed by Cisco. Cisco and Packet Tracer are trademarks of Cisco Systems, Inc.',
 
@@ -410,7 +410,7 @@ const DICTIONARIES = {
     'theme.light': 'Claro',
 
     'intro.title': 'Visor de archivos de Packet Tracer y capturas de red',
-    'intro.lead': 'Abrí un {pkt}, {pka} o {pkz} para ver la topología, las interfaces y la configuración de cada equipo, o un {pcap} o {pcapng} para recorrer los paquetes. El archivo se lee en el navegador y no se sube a ningún servidor.',
+    'intro.lead': 'Abrí un {pkt}, {pka} o {pkz} para ver la topología, las interfaces y la configuración de cada equipo, o un {pcap} o {pcapng} para recorrer los paquetes.',
     'intro.choose': 'Elegir un archivo',
     'intro.exampleNetwork': 'Red de ejemplo',
     'intro.exampleCapture': 'Captura de ejemplo',
@@ -426,7 +426,7 @@ const DICTIONARIES = {
     'about.privacyTerm': 'Privacidad',
     'about.privacyBody': 'El descifrado corre en el navegador. No hay un servidor que reciba el archivo.',
     'about.limitsTerm': 'Sólo lectura',
-    'about.limitsBody': 'No edita ni simula. El diagrama se exporta como PNG, JPG, SVG o PDF, y la captura como CSV o pcap.',
+    'about.limitsBody': 'No edita ni simula. El diagrama se exporta como PNG, JPG, SVG o PDF, el inventario de equipos como CSV y la captura como CSV o pcap.',
     'about.madeBy': 'Hecho por',
     'about.disclaimer': 'Trenza es un proyecto independiente, sin relación con Cisco ni respaldo de su parte. Cisco y Packet Tracer son marcas registradas de Cisco Systems, Inc.',
 
