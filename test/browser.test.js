@@ -361,7 +361,7 @@ test('el diálogo de exportar entra directo al nombre y entrega PNG, inventario 
     const bitmap = await createImageBitmap(await item.getType('image/png'));
     return [document.querySelector('[role=status]').textContent, bitmap.width, bitmap.height];
   })()`);
-  assert.deepEqual(copied, ['Image copied, 1920×1080 px: it can be pasted into any document.', 1920, 1080]);
+  assert.deepEqual(copied, ['Image copied (1920×1080 px).', 1920, 1080]);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });

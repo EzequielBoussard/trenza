@@ -80,3 +80,11 @@ test('los dos diccionarios tienen las mismas claves', () => {
   assert.ok(english.length > 200);
   assert.deepEqual(keys(source.slice(split)), english);
 });
+
+test('el aviso de navegador viejo pide las mismas versiones que el README', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const versions = (text) => [...text.matchAll(/(Safari|Chrome|Firefox) (\d+(?:\.\d+)?)/g)].slice(0, 3).map((m) => m.slice(1).join(' '));
+  const required = versions(readme.match(/^Safari .*$/m)[0]);
+  assert.deepEqual(versions(t('error.oldBrowser')), required);
+  assert.deepEqual(versions(withLanguage('es', () => t('error.oldBrowser'))), required);
+});
