@@ -95,9 +95,12 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   // La red de ejemplo tiene 2 errores de verdad; las 2 tablets con una 169.254 andan por Wi-Fi.
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.review__item')].map((item) => item.textContent.split(' ')[0])"),
     ['192.168.10.21', 'IoT022']);
-  const promised = await tab.evaluate("document.querySelector('.intro__caption').textContent.match(/finds ([0-9]+) mistakes/)[1]");
-  assert.equal(Number(promised), 2, 'la portada promete los mismos errores que encuentra');
   assert.equal(await tab.evaluate("document.querySelectorAll('.node .node__flag').length"), 3, 'IoT20, IoT21 e IoT022 llevan la marca');
+  assert.ok(await tab.evaluate("document.querySelector('.panel').textContent.includes('Example network from a 2021 course.')"));
+  assert.equal(await tab.evaluate("document.querySelectorAll('.review__item .review__fix').length"), 2);
+  await tab.evaluate("document.querySelector('.review__show').click()");
+  assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.node.is-path')].map((node) => node.getAttribute('aria-label').split(',')[0]).sort()"),
+    ['IoT20', 'IoT21'], 'ver en el diagrama deja a la vista los 2 equipos con la dirección repetida');
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });

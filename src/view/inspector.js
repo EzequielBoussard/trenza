@@ -480,6 +480,13 @@ function reviewList(findings, devicesById, picking, currentId) {
     t(`review.${finding.kind}`).split(/\{(\w+)\}/).forEach((piece, index) => {
       item.append(index % 2 === 0 ? piece : values[piece]());
     });
+    item.append(createElement('span', 'review__fix', t(`review.fix.${finding.kind}`)));
+    if (picking?.onShow) {
+      const show = createElement('button', 'button button--quiet button--small review__show', t('panel.reviewShow'));
+      show.type = 'button';
+      show.addEventListener('click', () => picking.onShow(finding.devices));
+      item.append(show);
+    }
     list.append(item);
   }
   if (findings.length > REVIEW_SHOWN) {
@@ -637,7 +644,9 @@ export function renderNetworkSummary(container, model, { fileName, variant, onDo
   if (review?.findings.length > 0) {
     const devicesById = new Map(model.devices.map((device) => [device.id, device]));
     const wrapper = createElement('div');
-    wrapper.append(createElement('p', 'panel-text', t('panel.reviewAbout')), reviewList(review.findings, devicesById, review));
+    wrapper.append(createElement('p', 'panel-text', t('panel.reviewAbout')));
+    if (review.example) wrapper.append(createElement('p', 'panel-text review__example', t('panel.reviewExample')));
+    wrapper.append(reviewList(review.findings, devicesById, review));
     container.append(section(t('panel.review'), wrapper));
   }
   if (compare) container.append(compareSection(model, compare));

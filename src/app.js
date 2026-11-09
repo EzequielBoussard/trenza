@@ -338,6 +338,12 @@ function choosePath(target) {
   state.topology?.showPath(steps ? steps.map((step) => step.id) : null);
 }
 
+// Los equipos de un aviso, con el resto apagado. Apiladas, el diagrama queda arriba del panel.
+function showFinding(ids) {
+  state.topology.showPath(ids);
+  elements.stage.scrollIntoView({ block: 'nearest' });
+}
+
 const flaggedIds = () => new Set(state.review.flatMap((finding) => finding.devices));
 
 function clearSelection() {
@@ -417,6 +423,8 @@ function showNetworkSummary() {
     hidden: (category) => category === 'infrastructure' && !state.showInfrastructure,
     review: {
       findings: state.review,
+      example: state.example,
+      onShow: showFinding,
       onPick: pickPeer,
       canPick: (peer) => peer.category !== 'infrastructure' || state.showInfrastructure,
     },
@@ -650,9 +658,10 @@ function showCapture(bytes) {
   setStatus('status.capture', values, 'ok');
 }
 
-async function open(name, bytes) {
+async function open(name, bytes, { example = false } = {}) {
   const trigger = document.activeElement;
   state.file = { name, bytes };
+  state.example = example;
   state.kind = null;
   state.model = null;
   state.comparison = null;
@@ -793,7 +802,7 @@ async function openExample(kind = 'network') {
   try {
     const response = await (early ?? fetch(path));
     if (!response.ok) throw new Error(t('error.httpStatus', { status: response.status }));
-    await open(path.split('/').pop(), new Uint8Array(await response.arrayBuffer()));
+    await open(path.split('/').pop(), new Uint8Array(await response.arrayBuffer()), { example: true });
   } catch (error) {
     showFailure(error.message);
   }

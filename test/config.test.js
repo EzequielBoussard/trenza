@@ -447,7 +447,7 @@ test('el mismo cable con el puerto nombrado distinto cambió de puerto, sin apar
   assert.deepEqual(result.linksMoved.map(({ before: old, after: now }) => `${old.fromPort} > ${now.toPort}`), ['FastEthernet > FastEthernet0']);
 });
 
-test('la revisión encuentra direcciones repetidas, puertas de enlace, puertos apagados y cables entre redes', () => {
+test('la revisión encuentra direcciones repetidas, puertas de enlace fuera de la red o que nadie tiene, puertos apagados y cables entre redes', () => {
   const pc = (id, address, gateway) => ({
     id, interfaces: [{ name: '', addresses: [{ address, mask: '255.255.255.0' }], gateway, enabled: true }], links: [],
   });
@@ -471,6 +471,7 @@ test('la revisión encuentra direcciones repetidas, puertas de enlace, puertos a
     { kind: 'subnets', devices: ['r1', 'r2'], ports: ['GigabitEthernet0/0', 'GigabitEthernet0/0'], addresses: ['10.0.0.1/30', '10.0.1.2/30'] },
     { kind: 'shutdown', devices: ['r1', 'r3'], port: 'GigabitEthernet0/1' },
     { kind: 'gateway', devices: ['pc3'], gateway: '192.168.10.1', network: '192.168.1.0/24' },
+    { kind: 'gatewayMissing', devices: ['pc1', 'pc2'], gateway: '192.168.1.1' },
     { kind: 'automatic', devices: ['pc4'], address: '169.254.7.8' },
   ]);
 
@@ -481,5 +482,7 @@ test('la revisión encuentra direcciones repetidas, puertas de enlace, puertos a
   assert.deepEqual(reviewNetwork([pc('a', '192.168.1.5', ''), pc('b', '192.168.1.6', '0.0.0.0')]), []);
   const tablet = pc('t', '192.168.1.9', '192.168.1.1');
   tablet.interfaces.push({ name: '', addresses: [{ address: '169.254.1.2', mask: '255.255.0.0' }], gateway: '192.168.1.1', enabled: true });
-  assert.deepEqual(reviewNetwork([tablet]), [], 'una 169.254 en una interfaz que no se usa no es un error');
+  const gateway = pc('gw', '192.168.1.1', '');
+  assert.deepEqual(reviewNetwork([tablet, gateway]), [], 'una 169.254 en una interfaz que no se usa no es un error');
+  assert.deepEqual(reviewNetwork([tablet]), [{ kind: 'gatewayMissing', devices: ['t'], gateway: '192.168.1.1' }]);
 });

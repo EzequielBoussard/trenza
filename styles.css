@@ -1887,7 +1887,10 @@ button.key__row:hover { background: var(--raised); }
   line-height: 1.45;
 }
 
-.review__item { margin-bottom: 0.4rem; overflow-wrap: anywhere; }
+.review__item { margin-bottom: 0.7rem; overflow-wrap: anywhere; }
+.review__example { margin-top: 0.5rem; }
+.review__fix { display: block; color: var(--text-muted); }
+.review__show { margin-top: 0.3rem; }
 .review__item::marker { color: var(--orange); }
 .review__more { list-style: none; color: var(--text-muted); }
 

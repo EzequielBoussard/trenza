@@ -2,7 +2,7 @@
 // prueba con node.
 import { networkOf, parseAddress } from './query.js';
 
-const KINDS = ['duplicate', 'subnets', 'shutdown', 'gateway', 'automatic'];
+const KINDS = ['duplicate', 'subnets', 'shutdown', 'gateway', 'gatewayMissing', 'automatic'];
 const AUTOMATIC = { width: 32, shift: 16n, prefix: 0xa9fen };
 
 const bare = (address) => String(address).trim().split(/[\s/]/)[0];
@@ -42,19 +42,29 @@ function duplicates(devices) {
     .map(({ address, ids }) => ({ kind: 'duplicate', devices: [...ids], address }));
 }
 
-// Sólo con máscara: sin ella no se sabe cuál es la red del equipo.
+// Sólo con máscara: sin ella no se sabe cuál es la red del equipo. Una puerta de enlace en la red
+// que ningún equipo tiene suele ser un número mal escrito; esas se juntan por dirección.
 function gateways(devices) {
   const findings = [];
+  const owned = new Set(devices.flatMap((device) => device.interfaces.flatMap((entry) => entry.addresses))
+    .map(({ address }) => parseAddress(address)).filter(Boolean).map(({ width, value }) => `${width}:${value}`));
+  const missing = new Map();
   for (const device of devices) {
     const gateway = device.interfaces.map((entry) => entry.gateway).find(Boolean);
     const parsed = gateway && parseAddress(gateway);
     if (!parsed || parsed.width !== 32 || parsed.value === 0n) continue;
     const networks = device.interfaces.flatMap(ipv4Of).map(({ network }) => network)
       .filter((network) => !isAutomatic(network));
-    if (networks.length === 0 || networks.some((network) => contains(network, gateway))) continue;
-    findings.push({ kind: 'gateway', devices: [device.id], gateway: bare(gateway), network: networks[0].cidr });
+    if (networks.length === 0) continue;
+    if (!networks.some((network) => contains(network, gateway))) {
+      findings.push({ kind: 'gateway', devices: [device.id], gateway: bare(gateway), network: networks[0].cidr });
+    } else if (!owned.has(`32:${parsed.value}`)) {
+      const key = bare(gateway);
+      if (!missing.has(key)) missing.set(key, { kind: 'gatewayMissing', devices: [], gateway: key });
+      missing.get(key).devices.push(device.id);
+    }
   }
-  return findings;
+  return [...findings, ...missing.values()];
 }
 
 // Cada cable se mira una vez, desde el equipo con el identificador menor.
