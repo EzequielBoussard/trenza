@@ -29,8 +29,8 @@ before(async () => {
 after(async () => {
   if (skip) return;
   await browser?.close();
-  site.close();
-  rmSync(folder, { recursive: true, force: true });
+  site?.close();
+  if (folder) rmSync(folder, { recursive: true, force: true });
 });
 
 function saveFile(name, bytes) {
@@ -42,7 +42,10 @@ function saveFile(name, bytes) {
 async function openFile(tab, name, bytes) {
   await tab.open(`${site.url}/`);
   await tab.chooseFile('[data-file-input]', saveFile(name, bytes));
-  await tab.waitFor("document.querySelector('svg.topology .node')");
+  // Si no abre, que la falla diga qué mostró la página.
+  await tab.waitFor("document.querySelector('svg.topology .node')").catch(async (error) => {
+    throw new Error(`${error.message}; ${await tab.evaluate("location.href + ' | ' + document.querySelector('[role=status]')?.textContent")}`);
+  });
 }
 
 const BANNER = `banner motd ${String.fromCharCode(3)}Solo personal autorizado. Toda conexión queda registrada y se revisa cada semana.${String.fromCharCode(3)}`;
@@ -96,7 +99,7 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.review__item')].map((item) => item.textContent.split(' ')[0])"),
     ['192.168.10.21', 'IoT022']);
   assert.equal(await tab.evaluate("document.querySelectorAll('.node .node__flag').length"), 3, 'IoT20, IoT21 e IoT022 llevan la marca');
-  assert.ok(await tab.evaluate("document.querySelector('.panel').textContent.includes('Example network from a 2021 course.')"));
+  assert.ok(await tab.evaluate("document.querySelector('.panel').textContent.includes('Example network from a 2021 course, unedited. The warnings')"));
   assert.equal(await tab.evaluate("document.querySelectorAll('.review__item .review__fix').length"), 2);
   await tab.evaluate("document.querySelector('.review__show').click()");
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.node.is-path')].map((node) => node.getAttribute('aria-label').split(',')[0]).sort()"),
@@ -531,17 +534,26 @@ test('el diálogo de exportar arranca con el formato y la medida de la última v
 });
 
 // Con un servidor propio, que la prueba apaga: el trabajador queda registrado sólo para ese origen.
-test('sin conexión el visor sale de la caché: la portada, la captura y /demo con su equipo', { skip, timeout: 60000 }, async () => {
+test('sin conexión el visor sale de la caché: la portada, la captura y /demo con su equipo', { skip, timeout: 60000 }, async (t) => {
   const own = await serve(fileURLToPath(new URL('..', import.meta.url)));
+  // Un servidor abierto deja a Node esperando aunque la prueba falle.
+  t.after(() => own.close());
   const tab = await browser.tab();
   await tab.open(`${own.url}/demo`);
   await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
-  await tab.evaluate('navigator.serviceWorker.ready.then(() => true)');
+  // Con tope: un trabajador que no se instala colgaría la prueba en vez de fallar.
+  await tab.waitFor('Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise((done) => setTimeout(done, 500, false))])').catch(async (error) => {
+    const state = await tab.evaluate("navigator.serviceWorker.getRegistration().then((r) => r ? ['installing', 'waiting', 'active'].map((k) => `${k}=${r[k]?.state}`).join(' ') : 'sin registro')");
+    throw new Error(`${error.message}; ${state}; ${tab.problems.join(' / ')}`);
+  });
   own.close();
 
   // Sólo se visitó /demo, así que la imagen de la portada no quedó guardada: sin recuadro roto.
   await tab.open(`${own.url}/`);
-  await tab.waitFor("document.querySelector('.intro__shot').hidden");
+  await tab.waitFor("document.querySelector('.intro__shot').hidden").catch(async (error) => {
+    const images = await tab.evaluate("[...document.querySelectorAll('.intro__image')].map((i) => `${i.complete} ${i.naturalWidth} ${i.currentSrc}`).join(' / ')");
+    throw new Error(`${error.message}; ${images}`);
+  });
   await tab.evaluate("document.querySelector('[data-example=capture]').click()");
   await tab.waitFor("document.querySelectorAll('.packet-row').length === 30");
 

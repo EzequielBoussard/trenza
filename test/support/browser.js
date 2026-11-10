@@ -196,10 +196,25 @@ export async function launch(executable) {
   const child = spawn(executable, args, { stdio: 'ignore' });
   const failed = {};
   child.on('error', (error) => { failed.error = error; });
-  const endpoint = await devToolsEndpoint(profile, failed);
-
-  const connection = new Connection(endpoint);
-  await connection.opened();
+  // El archivo del puerto puede leerse a medio escribir: se reintenta, y si no hay caso se cierra
+  // lo lanzado, que si no deja a Node esperando.
+  let connection;
+  try {
+    for (let attempt = 1; !connection; attempt++) {
+      const candidate = new Connection(await devToolsEndpoint(profile, failed));
+      try {
+        await candidate.opened();
+        connection = candidate;
+      } catch (error) {
+        if (attempt === 50) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+  } catch (error) {
+    child.kill();
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
+    throw error;
+  }
 
   return {
     // En inglés, que es lo que comparan las pruebas, aunque el sistema esté en otro idioma.
