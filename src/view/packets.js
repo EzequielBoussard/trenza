@@ -329,6 +329,8 @@ export class PacketTableView {
         createElement('td', 'table__mono', String(packet.originalLength)),
         cell('table__detail', packet.summary, this.needleFor()),
       );
+      // Cortado con puntos, el detalle entero se lee al apuntarlo.
+      row.lastElementChild.title = packet.summary;
       // Shift+clic selecciona texto por defecto.
       row.addEventListener('mousedown', (event) => {
         if (event.shiftKey) event.preventDefault();

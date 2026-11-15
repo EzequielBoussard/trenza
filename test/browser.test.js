@@ -167,6 +167,23 @@ test('plegar el panel de detalles agranda el diagrama, y "Show details" lo vuelv
   await tab.close();
 });
 
+test('la tabla de paquetes entra en una notebook sin desplazarse de costado', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab({ width: 1366, height: 700 });
+  await tab.open(`${site.url}/`);
+  await tab.evaluate("document.querySelector('[data-example=capture]').click()");
+  await tab.waitFor("document.querySelectorAll('.packet-row').length === 30");
+  const [scroll, client, cut, title] = await tab.evaluate(`(() => {
+    const box = document.querySelector('.packet-scroller');
+    const detail = document.querySelectorAll('.packet-row')[4].lastElementChild;
+    return [box.scrollWidth, box.clientWidth, detail.scrollWidth > detail.clientWidth, detail.title];
+  })()`);
+  assert.equal(scroll, client, 'la tabla es más ancha que su recuadro');
+  assert.ok(cut, 'el detalle largo se corta con puntos');
+  assert.match(title, /192\.0\.2\.23$/, 'cortado, el detalle entero queda en el título');
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
 test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await tab.open(`${site.url}/`);

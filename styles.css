@@ -1992,6 +1992,7 @@ button.pick-list__pick:hover { background: var(--raised); }
 }
 
 .table--packets {
+  min-width: 44rem;
   font-size: 0.76rem;
 }
 
@@ -2124,8 +2125,11 @@ button.pick-list__pick:hover { background: var(--raised); }
   }
 }
 
+/* El detalle toma el ancho que sobra y se corta con puntos: con su ancho entero la tabla no entraba
+   en una notebook y había que desplazarla de costado. El piso de la tabla le deja unas 20 letras. */
 .table__detail {
-  max-width: 32rem;
+  width: 100%;
+  max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-muted);
