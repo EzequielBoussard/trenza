@@ -269,6 +269,9 @@ const DICTIONARIES = {
     'zoom.in': 'Zoom in',
     'zoom.out': 'Zoom out',
     'zoom.fit': 'Fit the network',
+    'zoom.panel': 'Details panel',
+    'zoom.panelHide': 'Hide the details panel',
+    'zoom.panelShow': 'Show the details panel',
     'zoom.twoFingers': 'Use 2 fingers to move the diagram',
 
     'export.title': 'Export the diagram',
@@ -660,6 +663,9 @@ const DICTIONARIES = {
     'zoom.in': 'Acercar',
     'zoom.out': 'Alejar',
     'zoom.fit': 'Encuadrar la red',
+    'zoom.panel': 'Panel de detalles',
+    'zoom.panelHide': 'Ocultar el panel de detalles',
+    'zoom.panelShow': 'Mostrar el panel de detalles',
     'zoom.twoFingers': 'Usá 2 dedos para mover el diagrama',
 
     'export.title': 'Exportar el diagrama',

@@ -2067,32 +2067,45 @@ button.pick-list__pick:hover { background: var(--raised); }
 .packet-row.is-selected { background: var(--raised); color: var(--text-strong); }
 .packet-row.is-selected td:first-child { box-shadow: inset 3px 0 var(--orange); }
 
-.peek { display: none; }
+/* Con el panel fuera de la vista (apilado más abajo, o plegado), un botón al pie del diagrama lleva hasta él. */
+.peek {
+  display: none;
+  grid-area: stage;
+  align-self: end;
+  justify-self: center;
+  z-index: 3;
+  max-width: calc(100% - 2rem);
+  margin-bottom: 0.75rem;
+  padding: 0.55rem 1rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
+}
 
-/* Apiladas, el panel queda fuera de la pantalla: un botón al pie del diagrama lleva hasta él. */
 @media (max-width: 1180px) {
-  .peek:not([hidden]) {
-    display: block;
-    grid-area: stage;
-    align-self: end;
-    justify-self: center;
-    z-index: 3;
-    max-width: calc(100% - 2rem);
-    margin-bottom: 0.75rem;
-    padding: 0.55rem 1rem;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    font-size: 0.85rem;
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
+  .peek:not([hidden]) { display: block; }
+  .zoom__button--panel { display: none; }
+}
+
+/* El panel plegado: su columna y su separador se van, y el diagrama se reparte en ese ancho. */
+@media (min-width: 1180.02px) {
+  html[data-wide] body[data-view='network'] .workspace {
+    grid-template-columns: var(--rail-width) minmax(0, 1fr);
+    grid-template-areas: 'rail stage';
   }
+  html[data-wide] body[data-view='network'] :is(.panel, .grip--panel) { display: none; }
+  /* Por encima de la leyenda, que acá va al pie del diagrama. */
+  html[data-wide] body[data-view='network'] .peek:not([hidden]) { display: block; margin-bottom: 3.5rem; }
+  html[data-wide] .zoom { opacity: 1; }
 }
 
 @media (max-width: 1180px) and (pointer: coarse) {

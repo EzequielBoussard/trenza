@@ -319,9 +319,29 @@ function selectDevice(id) {
 
 // Apiladas, el panel queda debajo del diagrama, fuera de la pantalla: el botón lleva a su título.
 function goToPanel() {
+  if (!panelOpen()) setPanelOpen(true);
   const title = elements.panel.querySelector('.panel-head__title');
   title.tabIndex = -1;
   title.focus();
+}
+
+const WIDE_KEY = 'trenza.wide';
+const panelOpen = () => !('wide' in document.documentElement.dataset);
+
+// Plegado, el panel le deja su ancho al diagrama. Se recuerda de una visita a otra.
+function setPanelOpen(open) {
+  if (open) delete document.documentElement.dataset.wide;
+  else document.documentElement.dataset.wide = '';
+  try {
+    if (open) localStorage.removeItem(WIDE_KEY);
+    else localStorage.setItem(WIDE_KEY, '1');
+  } catch {
+    // Sin almacenamiento la elección dura lo que la pestaña.
+  }
+  state.topology?.paintPanel();
+  if (!open) return;
+  readGrips();
+  fitPanel();
 }
 
 // Desde las conexiones del panel: el botón pulsado desaparece con el panel viejo, así que el
@@ -510,6 +530,7 @@ function paintNetwork() {
     onSelect: selectDevice,
     onClear: clearSelection,
     legendHost: elements.stage,
+    panel: { open: panelOpen, toggle: () => setPanelOpen(!panelOpen()) },
   });
   state.topology.render(state.model, { showInfrastructure: state.showInfrastructure });
   state.topology.markFindings(flaggedIds());
@@ -1022,6 +1043,11 @@ function wireActions() {
 }
 
 async function start() {
+  try {
+    if (localStorage.getItem(WIDE_KEY)) document.documentElement.dataset.wide = '';
+  } catch {
+    // Sin almacenamiento el panel arranca a la vista.
+  }
   translateDocument();
   wireLanguage();
   wireTheme();

@@ -133,6 +133,40 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   await tab.close();
 });
 
+test('plegar el panel de detalles agranda el diagrama, y "Show details" lo vuelve a abrir', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab({ width: 1366, height: 700 });
+  await tab.open(`${site.url}/demo`);
+  await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
+  // Lo que mide en pantalla el nombre de un equipo.
+  const nameSize = `(() => {
+    const svg = document.querySelector('svg.topology');
+    const box = svg.getBoundingClientRect();
+    const scale = Math.min(box.width / svg.viewBox.baseVal.width, box.height / svg.viewBox.baseVal.height);
+    return parseFloat(getComputedStyle(svg.querySelector('.node text')).fontSize) * scale;
+  })()`;
+  const before = await tab.evaluate(nameSize);
+
+  await tab.evaluate("(() => { const button = document.querySelector('[data-control=panel]'); button.focus(); button.click(); })()");
+  await tab.waitFor(`${nameSize} > ${before * 1.3}`);
+  assert.deepEqual(await tab.evaluate(`(() => {
+    const button = document.querySelector('[data-control=panel]');
+    return [getComputedStyle(document.querySelector('.panel')).display, button.getAttribute('aria-expanded'), document.activeElement === button, localStorage.getItem('trenza.wide')];
+  })()`), ['none', 'false', true, '1'], 'el reparto nuevo rehace el botón: el foco tiene que seguir en él');
+
+  // Con el panel plegado, elegir un equipo ofrece sus detalles al pie del diagrama.
+  await tab.evaluate("[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('Router Principal')).click()");
+  await tab.waitFor("getComputedStyle(document.querySelector('[data-peek]')).display === 'block'");
+  await tab.evaluate("document.querySelector('[data-peek]').click()");
+  assert.deepEqual(await tab.evaluate(`(() => [
+    getComputedStyle(document.querySelector('.panel')).display,
+    document.querySelector('[data-control=panel]').getAttribute('aria-expanded'),
+    document.activeElement.textContent,
+    localStorage.getItem('trenza.wide'),
+  ])()`), ['block', 'true', 'Router Principal', null]);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
 test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await tab.open(`${site.url}/`);

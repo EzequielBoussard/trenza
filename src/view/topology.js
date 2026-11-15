@@ -155,10 +155,18 @@ function homeIcon() {
   return icon;
 }
 
-function control(label, title, action) {
+// Un recuadro con su columna derecha marcada: el panel de detalles, que se pliega.
+function panelIcon() {
+  const icon = element('svg', { viewBox: '0 0 24 24', class: 'zoom__icon', 'aria-hidden': 'true', focusable: 'false' });
+  icon.append(element('path', { d: 'M4 5.5h16v13H4zM14.5 5.5v13' }));
+  return icon;
+}
+
+function control(name, label, title, action) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'zoom__button';
+  button.dataset.control = name;
   button.append(label);
   button.title = title;
   button.setAttribute('aria-label', title);
@@ -167,11 +175,12 @@ function control(label, title, action) {
 }
 
 export class TopologyView {
-  constructor(container, { onSelect, onClear, legendHost }) {
+  constructor(container, { onSelect, onClear, legendHost, panel }) {
     this.container = container;
     this.legendHost = legendHost || container;
     this.onSelect = onSelect;
     this.onClear = onClear;
+    this.panel = panel;
     this.transform = { x: 0, y: 0, scale: 1 };
     this.target = { x: 0, y: 0, scale: 1 };
     this.gliding = 0;
@@ -213,6 +222,8 @@ export class TopologyView {
     if (!this.container.isConnected) return;
 
     const kept = keepView && this.frame ? { view: { ...this.target }, frame: this.frame } : null;
+    // Repartir rehace los controles: el foco vuelve al mismo botón.
+    const focused = this.container.contains(document.activeElement) ? document.activeElement.dataset.control : null;
     this.last = { model, showInfrastructure };
     const { devices: visible, links } = selectVisible(model, showInfrastructure);
 
@@ -388,6 +399,7 @@ export class TopologyView {
     this.hint.setAttribute('aria-hidden', 'true');
     this.hint.textContent = t('zoom.twoFingers');
     this.container.append(viewport, this.buildControls(), this.hint);
+    if (focused) this.container.querySelector(`[data-control="${focused}"]`)?.focus();
 
     this.svg = svg;
     this.viewport = viewport;
@@ -460,11 +472,27 @@ export class TopologyView {
     const group = document.createElement('div');
     group.className = 'zoom';
     group.append(
-      control('+', t('zoom.in'), () => this.zoomBy(1.25)),
-      control('−', t('zoom.out'), () => this.zoomBy(1 / 1.25)),
-      control(homeIcon(), t('zoom.fit'), () => this.fit()),
+      control('in', '+', t('zoom.in'), () => this.zoomBy(1.25)),
+      control('out', '−', t('zoom.out'), () => this.zoomBy(1 / 1.25)),
+      control('fit', homeIcon(), t('zoom.fit'), () => this.fit()),
     );
+    if (this.panel) {
+      const button = control('panel', panelIcon(), '', () => this.panel.toggle());
+      button.classList.add('zoom__button--panel');
+      button.setAttribute('aria-label', t('zoom.panel'));
+      group.append(button);
+      this.panelButton = button;
+      this.paintPanel();
+    }
     return group;
+  }
+
+  // El botón dice si el panel está a la vista; el panel también se abre desde afuera.
+  paintPanel() {
+    if (!this.panelButton) return;
+    const open = this.panel.open();
+    this.panelButton.title = t(open ? 'zoom.panelHide' : 'zoom.panelShow');
+    this.panelButton.setAttribute('aria-expanded', String(open));
   }
 
   // Cada entrada de la leyenda filtra los cables de su tipo.
@@ -840,10 +868,7 @@ export class TopologyView {
   // vieja dejaría franjas vacías: se reparte de nuevo.
   fit() {
     if (this.last && Math.abs(Math.log(this.panelAspect() / this.aspect)) > FIT_TOLERANCE) {
-      // Repartir rehace los controles: el foco vuelve a la casa nueva.
-      const focused = this.container.contains(document.activeElement);
       this.render(this.last.model, { showInfrastructure: this.last.showInfrastructure });
-      if (focused) this.container.querySelector('.zoom__button:last-child')?.focus();
     } else {
       this.resetView();
     }
