@@ -1878,6 +1878,13 @@ button.key__row:hover { background: var(--raised); }
 
 @media (pointer: coarse) {
   .connections__peer--pick { min-width: 2.5rem; min-height: 2.5rem; text-align: left; }
+  /* En una frase la medida mínima abría huecos entre las palabras: el relleno agranda el blanco sin mover el texto. */
+  .review .connections__peer--pick {
+    min-width: 0;
+    min-height: 0;
+    margin: -0.6rem -0.35rem;
+    padding: 0.6rem 0.35rem;
+  }
 }
 
 .review {

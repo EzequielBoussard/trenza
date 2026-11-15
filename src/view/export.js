@@ -135,7 +135,7 @@ export function cleanExportName(typed, fileName) {
 
 // Un renglón por dirección, en el orden de la lista: es lo que pide una tabla de direcciones.
 export function inventoryCsv(model, { showInfrastructure }) {
-  const headers = ['csv.device', 'csv.kind', 'panel.model', 'table.interface', 'table.address', 'table.mask',
+  const headers = ['csv.device', 'csv.kind', 'panel.model', 'table.interface', 'table.mac', 'table.address', 'table.mask',
     'panel.gateway', 'table.state', 'panel.location'].map((key) => t(key));
   const collator = new Intl.Collator(undefined, { numeric: true });
   const devices = [...selectVisible(model, showInfrastructure).devices].sort((a, b) =>
@@ -146,9 +146,10 @@ export function inventoryCsv(model, { showInfrastructure }) {
     const where = device.location.join(' › ');
     const ports = device.interfaces.flatMap((entry) =>
       (entry.addresses.length > 0 ? entry.addresses : [{ address: '', mask: '' }]).map((address) => [
-        entry.name || entry.mac, address.address, address.mask, entry.gateway || '', t(entry.enabled ? 'table.up' : 'table.down'),
+        entry.name || entry.kind || '', entry.mac || '', address.address, address.mask, entry.gateway || '',
+        t(entry.enabled ? 'table.up' : 'table.down'),
       ]));
-    return (ports.length > 0 ? ports : [['', '', '', '', '']]).map((port) => [...own, ...port, where]);
+    return (ports.length > 0 ? ports : [['', '', '', '', '', '']]).map((port) => [...own, ...port, where]);
   });
   return { blob: csvBlob([headers, ...rows]), devices: devices.length };
 }

@@ -58,6 +58,22 @@ function vlansFromEngine(engine) {
     .filter((vlan) => vlan.id);
 }
 
+// La clase de puerto, del TYPE del XML: eCopperFastEthernet, eSmartSerial, eHostWirelessN...
+function portKind(port) {
+  const type = childText(port, 'TYPE');
+  const ethernet = type.match(/(?:Gigabit|Fast)?Ethernet$/);
+  if (ethernet) return ethernet[0];
+  if (/Serial$/.test(type)) return 'Serial';
+  if (/Wireless\w*$/.test(type)) return 'Wi-Fi';
+  if (/Bluetooth$/.test(type)) return 'Bluetooth';
+  if (/Coaxial$/.test(type)) return 'Coaxial';
+  // El puerto celular viene sin tipo: lo dice el modelo de su módulo (PT-TABLETPC-NM-3G).
+  if (!type && /3G/.test(childText(port.parentNode, 'MODEL'))) return '3G/4G';
+  return '';
+}
+
+// El XML no guarda el nombre de cada puerto, y su orden no es el de la configuración: de un PORT
+// sale qué clase de puerto es, su MAC, su dirección y si está encendido.
 function interfacesFromPorts(engine) {
   // Hasta 5.x hay una sola puerta de enlace para todo el equipo.
   const deviceGateway = childText(engine, 'GATEWAY');
@@ -68,14 +84,29 @@ function interfacesFromPorts(engine) {
     if (!ip && !mac) continue;
     interfaces.push({
       name: '',
+      kind: portKind(port),
       addresses: ip ? [{ address: ip, mask: childText(port, 'SUBNET') }] : [],
       mac,
       gateway: childText(port, 'PORT_GATEWAY') || deviceGateway,
       description: '',
-      enabled: true,
+      enabled: childText(port, 'POWER') !== 'false',
     });
   }
   return interfaces;
+}
+
+// De la configuración se listan las interfaces con dirección o descripción y los puertos apagados.
+// Un Vlan1 sin dirección viene apagado de fábrica: no dice nada.
+const worthListing = (entry) => entry.addresses.length > 0 || Boolean(entry.description)
+  || (!entry.enabled && /ethernet|serial/i.test(entry.name) && !entry.name.includes('.'));
+
+function interfacesOf(engine, configured) {
+  const listed = configured.filter(worthListing);
+  const addressed = (entries) => entries.some((entry) => entry.addresses.length > 0);
+  if (addressed(listed)) return listed;
+  // Sin IOS vale lo que traiga cada PORT; con IOS, sólo si la dirección está nada más que ahí (DHCP).
+  const ports = interfacesFromPorts(engine);
+  return configured.length === 0 || addressed(ports) ? ports : listed;
 }
 
 // Todas, también las de puertos sin dirección, y sólo los dígitos: se buscan en cualquier formato.
@@ -130,7 +161,6 @@ function readDevice(deviceNode, index, places) {
 
   // Todas, también las que no tienen IP: un puerto de acceso dice a qué VLAN pertenece.
   const configured = readInterfaces(configLines);
-  const namedInterfaces = configured.filter((entry) => entry.addresses.length > 0 || entry.description);
   const workspace = childNamed(deviceNode, 'WORKSPACE');
   const logical = workspace ? childNamed(workspace, 'LOGICAL') : null;
 
@@ -143,7 +173,7 @@ function readDevice(deviceNode, index, places) {
     x: logical ? Number(childText(logical, 'X')) || 0 : 0,
     y: logical ? Number(childText(logical, 'Y')) || 0 : 0,
     location: workspace ? locationOf(childText(workspace, 'PHYSICAL'), places) : [],
-    interfaces: namedInterfaces.length > 0 ? namedInterfaces : interfacesFromPorts(engine),
+    interfaces: interfacesOf(engine, configured),
     macs: macsOf(engine),
     vlans: readVlans(configLines, configured, vlansFromEngine(engine)),
     routes: readRoutes(configLines),

@@ -48,6 +48,17 @@ async function openFile(tab, name, bytes) {
   });
 }
 
+// El texto de cada celda de una tabla del panel, con el renglón secundario entre paréntesis.
+const tableOf = (title) => `(() => {
+  const section = [...document.querySelectorAll('.panel section')].find((s) => s.querySelector('h3').textContent === '${title}');
+  if (!section) return null;
+  return [...section.querySelectorAll('tbody tr')].map((row) => [...row.cells].map((cell) => {
+    const sub = cell.querySelector('.table__sub')?.textContent ?? '';
+    const main = cell.textContent.slice(0, cell.textContent.length - sub.length);
+    return sub ? main + ' (' + sub + ')' : main;
+  }));
+})()`;
+
 const BANNER = `banner motd ${String.fromCharCode(3)}Solo personal autorizado. Toda conexión queda registrada y se revisa cada semana.${String.fromCharCode(3)}`;
 
 const LAB = networkXml([
@@ -104,6 +115,20 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   await tab.evaluate("document.querySelector('.review__show').click()");
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.node.is-path')].map((node) => node.getAttribute('aria-label').split(',')[0]).sort()"),
     ['IoT20', 'IoT21'], 'ver en el diagrama deja a la vista los 2 equipos con la dirección repetida');
+
+  // En el archivo real: una tablet dice qué es cada puerto, y un switch sin configurar no lista sus MAC.
+  const pick = async (name) => {
+    await tab.evaluate(`[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('${name}')).click()`);
+    await tab.waitFor(`document.querySelector('.panel-head__title')?.textContent === '${name}'`);
+  };
+  await pick('Pos Inalambrico');
+  assert.deepEqual((await tab.evaluate(tableOf('Interfaces'))).map(([port, , state]) => `${port.split(' ')[0]} ${state}`),
+    ['Wi-Fi Up', '3G/4G Up', 'Bluetooth Down']);
+  await pick('Switch 1 Camaras IP');
+  assert.equal(await tab.evaluate(tableOf('Interfaces')), null);
+  const cabled = await tab.evaluate("[...document.querySelectorAll('.connections__port')].map((port) => port.textContent)");
+  assert.equal(cabled.length, 22);
+  assert.deepEqual(cabled.slice(0, 3), ['FastEthernet0/1', 'FastEthernet0/2', 'FastEthernet0/3']);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
@@ -166,6 +191,63 @@ test('una actividad muestra sus instrucciones limpias y la configuración de IOS
   assert.match(router, /router-id 1\.1\.1\.1/);
   assert.match(router, /GigabitEthernet0\/0\/0 area 0/);
   assert.match(router, /vty 0 4 in/);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('la tabla de interfaces nombra cada puerto y los cables van por orden de puerto', { skip, timeout: 60000 }, async () => {
+  const fast = (mac, extra = {}) => ({ mac, type: 'eCopperFastEthernet', ...extra });
+  const network = networkXml([
+    deviceXml({
+      id: 'save-ref-id:1', name: 'S1', type: 'Switch', model: '2950-24', x: 300, y: 200,
+      config: [
+        'hostname S1', 'interface FastEthernet0/1', '!', 'interface FastEthernet0/2', ' shutdown', '!',
+        'interface FastEthernet0/10', '!', 'interface Vlan1', ' no ip address', ' shutdown', '!',
+      ],
+      ports: [fast('0001.0000.0001'), fast('0001.0000.0002'), fast('0001.0000.0003')],
+    }),
+    deviceXml({
+      id: 'save-ref-id:2', name: 'PC1', type: 'Pc', model: 'PC-PT', x: 150, y: 340,
+      ports: [fast('0001.6343.A2B1', { ip: '192.0.2.10', mask: '255.255.255.0' }), { mac: '000C.8560.58E7', type: 'eBluetooth', power: false }],
+    }),
+    deviceXml({
+      id: 'save-ref-id:3', name: 'PC2', type: 'Laptop', model: 'Laptop-PT', x: 450, y: 340,
+      ports: [{ mac: '0001.6343.A2B2', type: 'eHostWirelessN', ip: '192.0.2.11', mask: '255.255.255.0' }, { mac: '0001.6343.A2B3' }],
+    }),
+  ], [
+    linkXml('save-ref-id:1', 'FastEthernet0/10', 'save-ref-id:2', 'FastEthernet0'),
+    linkXml('save-ref-id:1', 'FastEthernet0/2', 'save-ref-id:3', 'FastEthernet0'),
+  ]);
+  const tab = await browser.tab();
+  await openFile(tab, 'puertos.pkt', buildLegacyFile(network));
+  const pick = async (name) => {
+    await tab.evaluate(`[...document.querySelectorAll('.rail button')].find((b) => b.textContent.startsWith('${name}')).click()`);
+    await tab.waitFor(`document.querySelector('.panel-head__title')?.textContent === '${name}'`);
+  };
+
+  // Un puerto apagado con un cable se avisa aunque no tenga dirección.
+  const findings = await tab.evaluate("[...document.querySelectorAll('.review__item')].map((item) => item.textContent)");
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /^S1 has FastEthernet0\/2 shut down, but a cable connects it to PC2\./);
+
+  // Del switch, sólo lo que dice algo: ni las MAC de sus puertos ni el Vlan1 apagado de fábrica.
+  await pick('S1');
+  assert.deepEqual(await tab.evaluate(tableOf('Interfaces')), [['FastEthernet0/2', '-', 'Down']]);
+  assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.connections__port')].map((port) => port.textContent)"),
+    ['FastEthernet0/2', 'FastEthernet0/10']);
+
+  await pick('PC1');
+  assert.deepEqual(await tab.evaluate(tableOf('Interfaces')), [
+    ['FastEthernet (0001.6343.A2B1)', '192.0.2.10 (255.255.255.0)', 'Up'],
+    ['Bluetooth (000C.8560.58E7)', '-', 'Down'],
+  ]);
+
+  // Sin tipo en el archivo, la MAC sigue siendo el nombre del renglón.
+  await pick('PC2');
+  assert.deepEqual(await tab.evaluate(tableOf('Interfaces')), [
+    ['Wi-Fi (0001.6343.A2B2)', '192.0.2.11 (255.255.255.0)', 'Up'],
+    ['0001.6343.A2B3', '-', 'Up'],
+  ]);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
@@ -355,7 +437,8 @@ test('el diálogo de exportar entra directo al nombre y entrega PNG, inventario 
   const rows = readFileSync(file.path, 'utf8').replace(/^\uFEFF/, '').trim().split('\r\n');
   assert.equal(file.name, 'red.csv');
   assert.equal(rows.length, 4);
-  assert.match(rows[1], /^"R1","Router","ISR4331","GigabitEthernet0\/0\/0","192\.0\.2\.1","255\.255\.255\.0"/);
+  assert.match(rows[1], /^"R1","Router","ISR4331","GigabitEthernet0\/0\/0","","192\.0\.2\.1","255\.255\.255\.0"/);
+  assert.match(rows[3], /^"PC1","User device","PC-PT","","0001\.6343\.A2B1","192\.0\.2\.10"/);
 
   await tab.evaluate(`(() => {
     document.querySelector('[data-export]').click();
@@ -539,13 +622,17 @@ test('sin conexión el visor sale de la caché: la portada, la captura y /demo c
   // Un servidor abierto deja a Node esperando aunque la prueba falle.
   t.after(() => own.close());
   const tab = await browser.tab();
-  await tab.open(`${own.url}/demo`);
-  await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
-  // Con tope: un trabajador que no se instala colgaría la prueba en vez de fallar.
-  await tab.waitFor('Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise((done) => setTimeout(done, 500, false))])').catch(async (error) => {
-    const state = await tab.evaluate("navigator.serviceWorker.getRegistration().then((r) => r ? ['installing', 'waiting', 'active'].map((k) => `${k}=${r[k]?.state}`).join(' ') : 'sin registro')");
-    throw new Error(`${error.message}; ${state}; ${tab.problems.join(' / ')}`);
-  });
+  // Sin ventana el registro falla de vez en cuando: la visita siguiente lo vuelve a intentar, como
+  // pasa de verdad. Con tope, que un trabajador que no se instala colgaría la prueba.
+  const working = 'Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise((done) => setTimeout(done, 500, false))])';
+  let ready = false;
+  for (let visit = 0; visit < 3 && !ready; visit++) {
+    await tab.open(`${own.url}/demo`);
+    await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
+    ready = await tab.waitFor(working, 5000).catch(() => false);
+  }
+  const state = await tab.evaluate("navigator.serviceWorker.getRegistration().then((r) => r ? ['installing', 'waiting', 'active'].map((k) => `${k}=${r[k]?.state}`).join(' ') : 'sin registro')");
+  assert.ok(ready, `el trabajador no quedó listo: ${state}; ${tab.problems.join(' / ')}`);
   own.close();
 
   // Sólo se visitó /demo, así que la imagen de la portada no quedó guardada: sin recuadro roto.

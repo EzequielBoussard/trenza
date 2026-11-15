@@ -94,10 +94,13 @@ function interfaceTable(interfaces) {
   const body = createElement('tbody');
   for (const entry of interfaces) {
     const addresses = entry.addresses.length > 0 ? entry.addresses : [{ address: '-' }];
+    // Sin nombre en el archivo vale la clase de puerto, y la MAC va debajo como dato secundario.
+    const label = entry.name || entry.kind || entry.mac || '-';
     for (const address of addresses) {
       const row = createElement('tr');
       const name = createElement('td', 'table__mono');
-      name.append(...withPortBreaks(entry.name || entry.mac || '-'));
+      name.append(...withPortBreaks(label));
+      if (entry.mac && entry.mac !== label && address === addresses[0]) name.append(createElement('span', 'table__sub', entry.mac));
       if (entry.description) name.title = entry.description;
 
       row.append(
@@ -275,7 +278,9 @@ function pathSection(device, devicesById, picking) {
 function connectionList(device, devicesById, picking) {
   const meters = new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 });
   const list = createElement('ul', 'connections');
-  for (const connection of device.links) {
+  // Por puerto y con los números como números: Fa0/2 va antes que Fa0/10.
+  const byPort = new Intl.Collator(undefined, { numeric: true });
+  for (const connection of [...device.links].sort((first, second) => byPort.compare(first.port, second.port))) {
     const item = createElement('li', 'connections__item');
     item.append(
       createElement('span', 'connections__port', connection.port || t('panel.unnamedPort')),

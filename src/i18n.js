@@ -202,6 +202,7 @@ const DICTIONARIES = {
     'panel.selection': 'Selection',
 
     'table.interface': 'Interface',
+    'table.mac': 'MAC',
     'table.address': 'Address',
     'table.mask': 'Mask',
     'table.state': 'State',
@@ -592,6 +593,7 @@ const DICTIONARIES = {
     'panel.selection': 'Selección',
 
     'table.interface': 'Interfaz',
+    'table.mac': 'MAC',
     'table.address': 'Dirección',
     'table.mask': 'Máscara',
     'table.state': 'Estado',

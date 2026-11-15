@@ -130,7 +130,10 @@ test('el inventario tiene un renglón por dirección, en el orden de la lista', 
   const device = (id, name, category, interfaces) => ({ id, name, category, model: 'M', location: ['Sede', 'Rack'], interfaces, links: [] });
   const model = {
     devices: [
-      device('2', 'PC10', 'endpoint', [{ name: 'FastEthernet0', mac: '', gateway: '10.0.0.1', enabled: true, addresses: [{ address: '10.0.0.10', mask: '255.255.255.0' }] }]),
+      device('2', 'PC10', 'endpoint', [
+        { name: '', kind: 'FastEthernet', mac: '0001.6343.A2B1', gateway: '10.0.0.1', enabled: true, addresses: [{ address: '10.0.0.10', mask: '255.255.255.0' }] },
+        { name: '', kind: '', mac: '000C.8560.58E7', gateway: '10.0.0.1', enabled: false, addresses: [] },
+      ]),
       device('3', 'PC9', 'endpoint', []),
       device('1', 'R1', 'router', [
         { name: 'Gig0/0', mac: '', gateway: '', enabled: true, addresses: [{ address: '10.0.0.1', mask: '255.255.255.0' }, { address: '2001:db8::1', mask: '' }] },
@@ -145,15 +148,18 @@ test('el inventario tiene un renglón por dirección, en el orden de la lista', 
 
   assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf], 'sin BOM, Excel rompe los acentos');
   assert.equal(devices, 3);
-  assert.equal(lines[0], '"Device","Type","Model","Interface","Address","Mask","Gateway","State","Location"');
-  assert.deepEqual(lines.slice(1).map((line) => line.split('","').slice(0, 5).join('|').replace(/^"/, '')), [
-    'R1|Router|M|Gig0/0|10.0.0.1',
-    'R1|Router|M|Gig0/0|2001:db8::1',
-    'R1|Router|M|Gig0/1|',
-    'PC9|User device|M||',
-    'PC10|User device|M|FastEthernet0|10.0.0.10',
+  assert.equal(lines[0], '"Device","Type","Model","Interface","MAC","Address","Mask","Gateway","State","Location"');
+  // La interfaz dice el nombre o la clase de puerto; la MAC tiene su columna y no va en su lugar.
+  assert.deepEqual(lines.slice(1).map((line) => line.split('","').slice(0, 6).join('|').replace(/^"/, '')), [
+    'R1|Router|M|Gig0/0||10.0.0.1',
+    'R1|Router|M|Gig0/0||2001:db8::1',
+    'R1|Router|M|Gig0/1||',
+    'PC9|User device|M|||',
+    'PC10|User device|M|FastEthernet|0001.6343.A2B1|10.0.0.10',
+    'PC10|User device|M||000C.8560.58E7|',
   ]);
   assert.match(lines[5], /"10\.0\.0\.1","Up","Sede › Rack"$/);
+  assert.match(lines[6], /"Down","Sede › Rack"$/);
 });
 
 test('el camino entre 2 equipos va por la menor cantidad de cables y dice por qué puerto pasa', () => {
