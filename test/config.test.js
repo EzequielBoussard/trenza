@@ -448,19 +448,28 @@ test('el mismo cable con el puerto nombrado distinto cambió de puerto, sin apar
 });
 
 test('la revisión encuentra direcciones repetidas, puertas de enlace fuera de la red o que nadie tiene, puertos apagados y cables entre redes', () => {
-  const pc = (id, address, gateway) => ({
-    id, interfaces: [{ name: '', addresses: [{ address, mask: '255.255.255.0' }], gateway, enabled: true }], links: [],
+  const pc = (id, address, gateway, plug) => ({
+    id,
+    category: 'endpoint',
+    interfaces: [{ name: '', addresses: [{ address, mask: '255.255.255.0' }], gateway, enabled: true }],
+    links: plug ? [{ port: 'FastEthernet0', peerId: plug, peerPort: `Fa-${id}` }] : [],
+  });
+  const hub = (id, peers, category = 'switch') => ({
+    id, category, interfaces: [], links: peers.map((peer) => ({ port: `Fa-${peer}`, peerId: peer, peerPort: 'FastEthernet0' })),
   });
   const router = (id, ports, links) => ({
     id,
+    category: 'router',
+    runningConfig: ['hostname R'],
     interfaces: ports.map(([name, address, mask, enabled = true]) => ({ name, addresses: address ? [{ address, mask }] : [], enabled })),
     links: links.map(([port, peerId, peerPort]) => ({ port, peerId, peerPort })),
   });
   const devices = [
-    pc('pc1', '192.168.1.10', '192.168.1.1'),
-    pc('pc2', '192.168.1.10', '192.168.1.1'),
-    pc('pc3', '192.168.1.30', '192.168.10.1'),
-    pc('pc4', '169.254.7.8', '192.168.1.1'),
+    pc('pc1', '192.168.1.10', '192.168.1.1', 's1'),
+    pc('pc2', '192.168.1.10', '192.168.1.1', 's1'),
+    pc('pc3', '192.168.1.30', '192.168.10.1', 's1'),
+    pc('pc4', '169.254.7.8', '192.168.1.1', 's1'),
+    hub('s1', ['pc1', 'pc2', 'pc3', 'pc4']),
     router('r1', [['GigabitEthernet0/0', '10.0.0.1', '255.255.255.252'], ['GigabitEthernet0/1', '', '', false]],
       [['GigabitEthernet0/0', 'r2', 'GigabitEthernet0/0'], ['GigabitEthernet0/1', 'r3', 'GigabitEthernet0/0']]),
     router('r2', [['GigabitEthernet0/0', '10.0.1.2', '255.255.255.252']], [['GigabitEthernet0/0', 'r1', 'GigabitEthernet0/0']]),
@@ -480,9 +489,67 @@ test('la revisión encuentra direcciones repetidas, puertas de enlace fuera de l
     : device));
   assert.ok(!reviewNetwork(fixed).some((finding) => finding.kind === 'subnets'), 'la misma red en las 2 puntas no se marca');
   assert.deepEqual(reviewNetwork([pc('a', '192.168.1.5', ''), pc('b', '192.168.1.6', '0.0.0.0')]), []);
-  const tablet = pc('t', '192.168.1.9', '192.168.1.1');
+  const tablet = pc('t', '192.168.1.9', '192.168.1.1', 's9');
   tablet.interfaces.push({ name: '', addresses: [{ address: '169.254.1.2', mask: '255.255.0.0' }], gateway: '192.168.1.1', enabled: true });
-  const gateway = pc('gw', '192.168.1.1', '');
-  assert.deepEqual(reviewNetwork([tablet, gateway]), [], 'una 169.254 en una interfaz que no se usa no es un error');
-  assert.deepEqual(reviewNetwork([tablet]), [{ kind: 'gatewayMissing', devices: ['t'], gateway: '192.168.1.1' }]);
+  const gateway = pc('gw', '192.168.1.1', '', 's9');
+  assert.deepEqual(reviewNetwork([tablet, gateway, hub('s9', ['t', 'gw'])]), [], 'una 169.254 en una interfaz que no se usa no es un error');
+  assert.deepEqual(reviewNetwork([tablet, hub('s9', ['t'])]), [{ kind: 'gatewayMissing', devices: ['t'], gateway: '192.168.1.1' }]);
+});
+
+test('una dirección repetida avisa sólo si los 2 equipos comparten segmento', () => {
+  const pc = (id, plug) => ({
+    id,
+    category: 'endpoint',
+    interfaces: [{ name: '', addresses: [{ address: '192.168.1.10', mask: '255.255.255.0' }], gateway: '', enabled: true }],
+    links: plug ? [{ port: 'FastEthernet0', peerId: plug, peerPort: `Fa-${id}` }] : [],
+  });
+  const sw = (id, peers) => ({
+    id, category: 'switch', interfaces: [], links: peers.map(([peer, port]) => ({ port: `Fa-${peer}`, peerId: peer, peerPort: port })),
+  });
+  const kinds = (devices) => reviewNetwork(devices).map((finding) => `${finding.kind}:${finding.devices.join()}`);
+
+  // En 2 redes del mismo archivo que no se tocan, y sin ningún cable.
+  assert.deepEqual(kinds([pc('a', 's1'), sw('s1', [['a', 'FastEthernet0']]), pc('b', 's2'), sw('s2', [['b', 'FastEthernet0']])]), []);
+  assert.deepEqual(kinds([pc('a'), pc('b')]), []);
+
+  // A cada lado de un router: los switches se ven, pero por interfaces distintas.
+  const router = {
+    id: 'r',
+    category: 'router',
+    runningConfig: ['hostname R'],
+    interfaces: [
+      { name: 'GigabitEthernet0/0', addresses: [{ address: '192.168.1.1', mask: '255.255.255.0' }], enabled: true },
+      { name: 'GigabitEthernet0/1', addresses: [{ address: '192.168.2.1', mask: '255.255.255.0' }], enabled: true },
+    ],
+    links: [{ port: 'GigabitEthernet0/0', peerId: 's1', peerPort: 'Fa-r' }, { port: 'GigabitEthernet0/1', peerId: 's2', peerPort: 'Fa-r' }],
+  };
+  const sides = [
+    pc('a', 's1'), sw('s1', [['a', 'FastEthernet0'], ['r', 'GigabitEthernet0/0']]),
+    pc('b', 's2'), sw('s2', [['b', 'FastEthernet0'], ['r', 'GigabitEthernet0/1']]), router,
+  ];
+  assert.deepEqual(kinds(sides), []);
+
+  // Los mismos 2 equipos, con sus switches unidos por un cable.
+  const joined = sides.filter((device) => device !== router).map((device) => ({ ...device }));
+  joined[1] = sw('s1', [['a', 'FastEthernet0'], ['s2', 'Fa-s1']]);
+  joined[3] = sw('s2', [['b', 'FastEthernet0'], ['s1', 'Fa-s2']]);
+  assert.deepEqual(kinds(joined), ['duplicate:a,b']);
+});
+
+test('con un router hogareño en la red no se avisa que a la puerta de enlace no la tiene nadie', () => {
+  const pc = (plug) => ({
+    id: 'pc',
+    category: 'endpoint',
+    interfaces: [{ name: '', addresses: [{ address: '192.168.0.10', mask: '255.255.255.0' }], gateway: '192.168.0.1', enabled: true }],
+    links: plug ? [{ port: 'FastEthernet0', peerId: plug, peerPort: 'Ethernet1' }] : [],
+  });
+  const box = (category, runningConfig = []) => ({
+    id: 'box', category, runningConfig, interfaces: [], links: [{ port: 'Ethernet1', peerId: 'pc', peerPort: 'FastEthernet0' }],
+  });
+  const kinds = (devices) => reviewNetwork(devices).map((finding) => finding.kind);
+
+  assert.deepEqual(kinds([pc('box'), box('switch')]), ['gatewayMissing']);
+  assert.deepEqual(kinds([pc('box'), box('wireless')]), [], 'el router hogareño guarda su dirección donde no se lee');
+  assert.deepEqual(kinds([pc('box'), box('security', ['hostname ASA'])]), ['gatewayMissing'], 'con IOS la dirección se leería');
+  assert.deepEqual(kinds([pc()]), [], 'sin cable puede estar por Wi-Fi: no se sabe');
 });

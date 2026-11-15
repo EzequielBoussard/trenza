@@ -3,18 +3,18 @@ import { readAccessLists, readInterfaces, readRoutes, readRoutingProtocols, read
 
 const DEVICE_CATEGORIES = [
   { match: /router/i, category: 'router' },
-  { match: /switch|bridge/i, category: 'switch' },
-  { match: /access\s*point|wireless|wrt|wrs|repeater/i, category: 'wireless' },
+  { match: /switch|bridge|\bhub/i, category: 'switch' },
+  { match: /access\s*point|wireless|wrt|wrs|repeater|home\s*gateway/i, category: 'wireless' },
   { match: /server/i, category: 'server' },
   { match: /laptop|tablet|pda|smartphone|phone/i, category: 'endpoint' },
   { match: /\bpc\b|desktop|printer|tv|thin\s*client/i, category: 'endpoint' },
-  { match: /cloud|wan|dsl|cable\s*modem|modem/i, category: 'cloud' },
-  { match: /firewall|asa/i, category: 'security' },
-  { match: /\bmcu|\bsbc|\biot|sensor|actuator|smart/i, category: 'iot' },
+  { match: /cloud|wan|dsl|cable\s*modem|modem|cell\s*tower/i, category: 'cloud' },
+  { match: /firewall|asa|security\s*appliance/i, category: 'security' },
+  { match: /\bmcu|\bsbc|\biot|\bplc\b|\bhmi\b|sensor|actuator|smart/i, category: 'iot' },
 ];
 
 // Con \b, para que "TabletPC" no caiga en infraestructura por "table".
-const INFRASTRUCTURE = /power distribution|coaxial splitter|\b(rack|shelf|table)\b/i;
+const INFRASTRUCTURE = /power distribution|coaxial\s*splitter|\b(rack|shelf|table)\b/i;
 
 function childText(parent, tagName) {
   for (const child of parent.children) {
