@@ -756,7 +756,17 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 }
 
 .statusbar[data-tone='ok'] { color: var(--green); }
-.statusbar[data-tone='error'] { color: var(--orange); }
+/* Un error no puede pasar por un dato más de la barra: va en letra de lectura sobre una franja. */
+.statusbar[data-tone='error'] {
+  padding-block: 0.65rem;
+  border-bottom-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 16%, var(--ground));
+  box-shadow: inset 4px 0 var(--orange);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-strong);
+}
 
 .statusbar[data-tone='warn'] { color: var(--brown); }
 

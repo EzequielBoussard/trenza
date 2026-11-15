@@ -140,6 +140,13 @@ test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout:
   await tab.waitFor("document.querySelector('[role=status]').dataset.tone === 'error'");
   assert.equal(await tab.evaluate("document.documentElement.hasAttribute('data-loaded')"), false);
   assert.match(await tab.evaluate("document.querySelector('[role=status]').textContent"), /^foto.pkt: .*Packet Tracer/);
+  // El error se tiene que ver: letra de lectura y una franja de otro color que el fondo.
+  const [size, band, ground] = await tab.evaluate(`(() => {
+    const style = getComputedStyle(document.querySelector('[role=status]'));
+    return [parseFloat(style.fontSize), style.backgroundColor, getComputedStyle(document.body).backgroundColor];
+  })()`);
+  assert.ok(size >= 14, `el aviso mide ${size} px`);
+  assert.notEqual(band, ground);
   assert.deepEqual(tab.problems, []);
   await tab.close();
 });
