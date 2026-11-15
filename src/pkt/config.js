@@ -137,9 +137,13 @@ export function readVlans(configLines, interfaces, declared = []) {
     }
   }
 
-  return [...vlans.values()]
+  const shown = [...vlans.values()]
     .filter((vlan) => !DEFAULT_VLANS.has(vlan.id) || named.has(vlan.id))
     .sort((a, b) => Number(a.id) - Number(b.id));
+  // Un tronco en un switch sin más VLAN que las de fábrica lleva la 1: sin ella no se vería que es tronco.
+  const trunks = interfaces.filter((entry) => entry.trunkAll).map((entry) => entry.name);
+  if (shown.length === 0 && trunks.length > 0) return [{ ...define('1'), trunks }];
+  return shown;
 }
 
 // Sólo rutas estáticas: las aprendidas no están en la configuración.
@@ -152,7 +156,11 @@ export function readRoutes(configLines) {
     const ipv4 = line.match(/^ip route\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\S+)/i);
     if (ipv4) routes.push({ destination: ipv4[1], mask: ipv4[2], via: ipv4[3] });
 
-    const ipv6 = line.match(/^ipv6 route\s+(\S+\/\d+)\s+(\S+)/i);
+    // Un ASA nombra primero la interfaz: "route outside 0.0.0.0 0.0.0.0 203.0.113.1".
+    const asa = line.match(/^route\s+\S+\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s+(\S+)/i);
+    if (asa) routes.push({ destination: asa[1], mask: asa[2], via: asa[3] });
+
+    const ipv6 = line.match(/^ipv6 route\s+(?:[a-z]\S*\s+)?(\S+\/\d+)\s+(\S+)/i);
     if (ipv6) routes.push({ destination: ipv6[1], mask: '', via: ipv6[2] });
   }
 

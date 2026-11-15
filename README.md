@@ -86,7 +86,7 @@ Se despliega en Cloudflare Pages sin comando de compilación. `_headers` define 
 
 Safari 16.4, Chrome 86 y Firefox 113 en adelante. En Safari y Firefox el límite lo pone `DecompressionStream`, que es lo que descomprime el `.pkt`; en Chrome, `replaceChildren`. Para abrir un `.pkz` hace falta Chrome 103, por `deflate-raw`.
 
-Está probado con archivos reales de Packet Tracer 5.0, 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en menos de un segundo, una de 4000 en 3 y una de 16000 en 12, sin etiquetas encimadas; de lejos los nombres se dibujan recién cuando se pueden leer, y el zoom llega hasta leerlos. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
+Está probado con archivos reales de Packet Tracer 5.0, 5.3.3, 7.2.1, 7.2.2, 7.3.0, 7.3.1, 8.1.0, 8.2.1 y 9.0.1, de entre 2 y 71 equipos, en `.pkt`, `.pka` y `.pkz`. Además abre sin errores otras 299 redes de las versiones 5.2 a 9.0, y en sus 598 equipos con IOS las rutas, listas de acceso, protocolos, puertos de acceso y troncos leídos coinciden con la configuración. Con redes más grandes, armadas copiando la de ejemplo, una de 1000 equipos abre en menos de un segundo, una de 4000 en 3 y una de 16000 en 12, sin etiquetas encimadas; de lejos los nombres se dibujan recién cuando se pueden leer, y el zoom llega hasta leerlos. Las VLAN, OSPF y las listas de acceso se prueban además con configuraciones de IOS escritas a mano.
 
 ## Contribuir
 

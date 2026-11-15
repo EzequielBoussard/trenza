@@ -553,3 +553,23 @@ test('con un router hogareño en la red no se avisa que a la puerta de enlace no
   assert.deepEqual(kinds([pc('box'), box('security', ['hostname ASA'])]), ['gatewayMissing'], 'con IOS la dirección se leería');
   assert.deepEqual(kinds([pc()]), [], 'sin cable puede estar por Wi-Fi: no se sabe');
 });
+
+test('un ASA nombra la interfaz antes del destino de la ruta, y un prefijo IPv6 que empieza con letra no es una interfaz', () => {
+  assert.deepEqual(readRoutes([
+    'route outside 0.0.0.0 0.0.0.0 203.0.113.1 1',
+    'ipv6 route outside ::/0 2001:db8::225',
+    'ipv6 route fd00::/8 2001:db8::1',
+  ]), [
+    { destination: '0.0.0.0', mask: '0.0.0.0', via: '203.0.113.1' },
+    { destination: '::/0', mask: '', via: '2001:db8::225' },
+    { destination: 'fd00::/8', mask: '', via: '2001:db8::1' },
+  ]);
+});
+
+test('un tronco en un switch sin VLAN propias se ve en la VLAN 1', () => {
+  const config = ['interface FastEthernet0/1', ' switchport mode trunk', '!', 'interface FastEthernet0/2', '!'];
+  const vlans = readVlans(config, readInterfaces(config), [{ id: '1', name: 'default' }]);
+  assert.deepEqual(vlans.map((vlan) => [vlan.id, vlan.name, vlan.trunks]), [['1', 'default', ['FastEthernet0/1']]]);
+  const plain = ['interface FastEthernet0/1', '!'];
+  assert.deepEqual(readVlans(plain, readInterfaces(plain), [{ id: '1', name: 'default' }]), []);
+});
