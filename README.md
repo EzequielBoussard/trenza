@@ -96,6 +96,6 @@ Si un archivo no abre o se ve mal, abrí un issue con la versión de Packet Trac
 
 El código es MIT (ver `LICENSE`).
 
-La tipografía de `fonts/` es IBM Plex, bajo la SIL Open Font License 1.1 (`fonts/LICENSE.txt`). La red de `showcase/` es un trabajo propio de un curso de redes. La captura de ejemplo es sintética: la arma `scripts/captura-ejemplo.mjs` con direcciones reservadas para documentación, así que no sale de ninguna red real.
+La tipografía de `fonts/` es IBM Plex, bajo la SIL Open Font License 1.1 (`fonts/LICENSE.txt`). La red de `showcase/` es un trabajo de un curso de redes, hecho con un compañero. La captura de ejemplo es sintética: la arma `scripts/captura-ejemplo.mjs` con direcciones reservadas para documentación, así que no sale de ninguna red real.
 
 Trenza es un proyecto independiente, sin relación con Cisco ni respaldo de su parte. Cisco y Packet Tracer son marcas registradas de Cisco Systems, Inc. El proyecto no incluye software, iconos ni contenido de Cisco: los símbolos del diagrama son propios.
