@@ -184,6 +184,26 @@ test('la tabla de paquetes entra en una notebook sin desplazarse de costado', { 
   await tab.close();
 });
 
+test('los equipos sin cables van a una bandeja aparte, sin que una etiqueta de la red la pise', { skip, timeout: 60000 }, async () => {
+  const pc = (n, x, y) => deviceXml({ id: `save-ref-id:${n}`, name: `PC${n}`, type: 'Pc', model: 'PC-PT', x, y, ports: [{ ip: `192.0.2.${n}`, mask: '255.255.255.0' }] });
+  const network = networkXml([
+    deviceXml({ id: 'save-ref-id:9', name: 'S1', type: 'Switch', model: '2960-24TT', x: 300, y: 100 }),
+    pc(1, 250, 1100), pc(2, 350, 1100),
+    deviceXml({ id: 'save-ref-id:7', name: 'R7', type: 'Router', model: '2911', x: 300, y: 3400 }),
+  ], [linkXml('save-ref-id:9', 'Fa0/1', 'save-ref-id:1', 'FastEthernet0'), linkXml('save-ref-id:9', 'Fa0/2', 'save-ref-id:2', 'FastEthernet0')]);
+  const tab = await browser.tab({ width: 1366, height: 700 });
+  await openFile(tab, 'bandeja.pkt', buildLegacyFile(network));
+  // Las etiquetas de la red terminan arriba de la línea de la bandeja.
+  const below = await tab.evaluate(`(() => {
+    const rule = document.querySelector('.tray__rule').getBoundingClientRect().top;
+    return [...document.querySelectorAll('.node:not([data-id="save-ref-id:7"]) text')]
+      .filter((text) => text.getBoundingClientRect().bottom > rule).map((text) => text.textContent);
+  })()`);
+  assert.deepEqual(below, []);
+  assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
 test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await tab.open(`${site.url}/`);

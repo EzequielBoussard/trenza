@@ -451,11 +451,13 @@ export class TopologyView {
       const tray = trayPlan(stray, trayWidth);
       const trayTop = height - VIEW_INSETS.bottom - tray.height;
 
+      // Sobre la bandeja va la etiqueta del equipo de más abajo, igual que en el exporte.
+      const above = stray.length > 0 ? VIEW_INSETS.bottom : 0;
       const positions = projectIntoRect(placed, {
         x: side,
         y: VIEW_INSETS.top,
         width: trayWidth,
-        height: trayTop - VIEW_INSETS.top,
+        height: trayTop - VIEW_INSETS.top - above,
       }, { stretch: VIEW_STRETCH });
       for (const [id, point] of trayPositions(stray, tray, { x: side, y: trayTop, width: trayWidth })) {
         positions.set(id, point);
