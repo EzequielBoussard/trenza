@@ -1178,6 +1178,13 @@ html:not([data-js]) .intro {
 
 .intro__footer p { margin: 0 0 0.3rem; }
 
+/* El crédito se lee como las notas; el aviso legal queda más chico. */
+.intro__footer p:first-child {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
 .link {
   color: var(--orange);
   text-underline-offset: 2px;
