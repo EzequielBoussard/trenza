@@ -54,7 +54,9 @@ const tableOf = (title) => `(() => {
   if (!section) return null;
   return [...section.querySelectorAll('tbody tr')].map((row) => [...row.cells].map((cell) => {
     const sub = cell.querySelector('.table__sub')?.textContent ?? '';
-    const main = cell.textContent.slice(0, cell.textContent.length - sub.length);
+    const copy = cell.cloneNode(true);
+    for (const node of copy.querySelectorAll('.table__sub, .visually-hidden')) node.remove();
+    const main = copy.textContent;
     return sub ? main + ' (' + sub + ')' : main;
   }));
 })()`;
@@ -207,6 +209,11 @@ test('los equipos sin cables van a una bandeja aparte, sin que una etiqueta de l
 test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab();
   await tab.open(`${site.url}/`);
+  // Oculta pero presente: si la región apareciera junto con el aviso, el lector no lo diría.
+  assert.deepEqual(await tab.evaluate(`(() => {
+    const status = getComputedStyle(document.querySelector('[role=status]'));
+    return [status.display === 'none', status.visibility, document.querySelector('[role=status]').getBoundingClientRect().height <= 1];
+  })()`), [false, 'visible', true]);
   await tab.chooseFile('[data-file-input]', saveFile('foto.pkt', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])));
   await tab.waitFor("document.querySelector('[role=status]').dataset.tone === 'error'");
   assert.equal(await tab.evaluate("document.documentElement.hasAttribute('data-loaded')"), false);
@@ -259,7 +266,7 @@ test('una actividad muestra sus instrucciones limpias y la configuración de IOS
   await tab.waitFor("document.querySelector('.panel-head__title')?.textContent === 'S1'");
   const vlans = await tab.evaluate(`[...document.querySelectorAll('.panel section')].find((s) => s.querySelector('h3').textContent === 'VLANs').querySelector('table').innerText`);
   assert.match(vlans, /voice ports/i);
-  assert.match(vlans, /40\s+Voz\s+-\s+Fa0\/1/);
+  assert.match(vlans, /40\s+,?\s*Voz\s+-\s+Fa0\/1/);
   assert.match(vlans, /Gi0\/1 \(native\)/);
   assert.match(await tab.evaluate("document.querySelector('.panel pre.code-block').textContent"), /banner motd \^CSolo personal/);
 
@@ -315,6 +322,8 @@ test('la tabla de interfaces nombra cada puerto y los cables van por orden de pu
     ['FastEthernet0/2', 'FastEthernet0/10']);
 
   await pick('PC1');
+  // Lo que lee un lector de pantalla: los 2 renglones de la celda, separados.
+  assert.equal(await tab.evaluate("document.querySelector('.panel tbody td').textContent"), 'FastEthernet,\u00a00001.6343.A2B1');
   assert.deepEqual(await tab.evaluate(tableOf('Interfaces')), [
     ['FastEthernet (0001.6343.A2B1)', '192.0.2.10 (255.255.255.0)', 'Up'],
     ['Bluetooth (000C.8560.58E7)', '-', 'Down'],

@@ -47,6 +47,14 @@ function withPortBreaks(text) {
     .flatMap((part, index) => (index === 0 ? [part] : [document.createElement('wbr'), part]));
 }
 
+// El renglón de abajo de una celda: sin la coma oculta el lector pega los 2 ("192.168.1.15255.255.255.0").
+// Va un espacio duro porque uno común se pierde al armar el texto de la celda.
+function subLine(text) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(createElement('span', 'visually-hidden', ',\u00a0'), createElement('span', 'table__sub', text));
+  return fragment;
+}
+
 function dataTable(headings, rows) {
   const table = createElement('table', 'table');
   const headRow = createElement('tr');
@@ -64,7 +72,7 @@ function dataTable(headings, rows) {
       const cell = createElement('td', className || null);
       if (wrap) cell.append(...withPortBreaks(text));
       else cell.textContent = text;
-      if (sub) cell.append(createElement('span', 'table__sub', sub));
+      if (sub) cell.append(subLine(sub));
       row.append(cell);
     }
     body.append(row);
@@ -78,7 +86,7 @@ function dataTable(headings, rows) {
 // el panel, y para quien sólo quiere saber la dirección es un dato secundario.
 function addressCell({ address, mask }) {
   const cell = createElement('td', 'table__mono', address);
-  if (mask) cell.append(createElement('span', 'table__sub', mask));
+  if (mask) cell.append(subLine(mask));
   return cell;
 }
 
@@ -100,7 +108,7 @@ function interfaceTable(interfaces) {
       const row = createElement('tr');
       const name = createElement('td', 'table__mono');
       name.append(...withPortBreaks(label));
-      if (entry.mac && entry.mac !== label && address === addresses[0]) name.append(createElement('span', 'table__sub', entry.mac));
+      if (entry.mac && entry.mac !== label && address === addresses[0]) name.append(subLine(entry.mac));
       if (entry.description) name.title = entry.description;
 
       row.append(
