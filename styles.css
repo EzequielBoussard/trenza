@@ -787,8 +787,18 @@ body[data-view='capture'] .masthead__format[data-format='capture'] {
 html:not([data-loaded]) .masthead__file,
 html:not([data-loaded]) .masthead__actions { display: none; }
 
-/* En la portada la barra de estado sólo aparece si hay algo que avisar. */
-html:not([data-loaded]) .statusbar:not([data-tone='error']):not([data-tone='warn']) { display: none; }
+/* En la portada la barra de estado sólo se ve si hay algo que avisar. Oculta sigue en el árbol de
+   accesibilidad: si apareciera junto con el aviso, el lector de pantalla no lo anunciaría. */
+html:not([data-loaded]) .statusbar:not([data-tone='error']):not([data-tone='warn']) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 html:not([data-loaded]) .rail,
 html:not([data-loaded]) .grip,
