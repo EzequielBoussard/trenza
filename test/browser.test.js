@@ -117,6 +117,7 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   await tab.evaluate("document.querySelector('.review__show').click()");
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.node.is-path')].map((node) => node.getAttribute('aria-label').split(',')[0]).sort()"),
     ['IoT20', 'IoT21'], 'ver en el diagrama deja a la vista los 2 equipos con la dirección repetida');
+  await tab.waitFor("document.querySelector('.rail [role=status]').textContent === 'On the diagram: IoT20 and IoT21'");
 
   // En el archivo real: una tablet dice qué es cada puerto, y un switch sin configurar no lista sus MAC.
   const pick = async (name) => {

@@ -1,9 +1,5 @@
-// Genera showcase/captura-ejemplo.pcap: una notebook entra a la red por DHCP, resuelve
-// example.com, baja la página por HTTP, le hace ping al router y pregunta la hora por NTP.
-// Todas las direcciones son de documentación (RFC 5737, RFC 3849 y RFC 7042), así que la
-// captura no sale de ninguna red real.
-//
-//   node scripts/captura-ejemplo.mjs
+// Genera showcase/captura-ejemplo.pcap (node scripts/captura-ejemplo.mjs): una notebook pide DHCP,
+// DNS, HTTP, ping y NTP, todo con direcciones de documentación (RFC 5737, 3849 y 7042).
 import { writeFileSync } from 'node:fs';
 
 const LAPTOP = { mac: '00:00:5e:00:53:17', ip: '192.0.2.23' };

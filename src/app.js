@@ -1,4 +1,4 @@
-import { countOf, getLanguage, setLanguage, t, translateDocument } from './i18n.js';
+import { countOf, getLanguage, getLocale, setLanguage, t, translateDocument } from './i18n.js';
 import { decodePacketTracerFile } from './pkt/decode.js';
 import { compareNetworks } from './pkt/compare.js';
 import { buildNetworkModel } from './pkt/model.js';
@@ -362,6 +362,8 @@ function choosePath(target) {
 function showFinding(ids) {
   state.topology.showPath(ids);
   elements.stage.scrollIntoView({ block: 'nearest' });
+  const names = new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format(ids.map((id) => state.devicesById.get(id).name));
+  state.announcer.say(t('panel.reviewShown', { names }));
 }
 
 const flaggedIds = () => new Set(state.review.flatMap((finding) => finding.devices));
