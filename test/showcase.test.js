@@ -53,6 +53,11 @@ test('el hash del guion en línea coincide con el de la política de seguridad',
   assert.ok(headers.includes(`'sha256-${hash}'`));
 });
 
+test('Pages no repite los modulepreload en una cabecera Link', () => {
+  const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8');
+  assert.match(headers, /^\/\*\n(?: {2}.+\n)* {2}! Link$/m);
+});
+
 test('el ejemplo que pide la cabecera en /demo es el mismo que abre el visor', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');

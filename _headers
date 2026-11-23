@@ -1,9 +1,11 @@
+# Pages copia los modulepreload a una cabecera Link, y con ella Chrome pide cada módulo 2 veces.
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-iD+8Toa8jvMZw+p0fq0C6qr7+oZdb2i/zGhxPQzbiNs='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: geolocation=(), camera=(), microphone=()
+  ! Link
 
 # Los nombres de archivo no llevan hash: hay que revalidar para ver cada despliegue.
 /
