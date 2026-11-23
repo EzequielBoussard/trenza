@@ -1065,6 +1065,8 @@ async function start() {
 
   go(`${DEMO_PATH.test(location.pathname) ? '/demo' : '/'}${location.search}${location.hash}`);
 
+  // Con /demo o ?src= las letras del diagrama bajan junto con el archivo y no después.
+  if (document.documentElement.dataset.loaded) labelFontsReady();
   let source = null;
   try {
     source = await readSourceFromLocation();

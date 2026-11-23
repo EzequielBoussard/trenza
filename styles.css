@@ -1162,12 +1162,21 @@ html:not([data-js]) .intro {
 
 .intro__notes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem 2rem;
   margin-block: 0;
   padding-top: 1.75rem;
   border-top: 1px solid var(--line);
   font-size: 0.85rem;
+}
+
+/* Las 4 notas van de a 1, 2 o 4: con 3 columnas la última quedaba sola. */
+@media (min-width: 34rem) {
+  .intro__notes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 68rem) {
+  .intro__notes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .intro__term {

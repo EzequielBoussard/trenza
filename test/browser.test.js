@@ -136,6 +136,21 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   await tab.close();
 });
 
+test('en /demo las letras del diagrama se piden sin esperar al archivo', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab();
+  // El .pkt llega 1 s tarde, como en una red lenta.
+  tab.connection.handlers.push(({ method, params, sessionId }) => {
+    if (method !== 'Fetch.requestPaused' || sessionId !== tab.sessionId) return;
+    setTimeout(() => tab.send('Fetch.continueRequest', { requestId: params.requestId }), 1000);
+  });
+  await tab.send('Fetch.enable', { patterns: [{ urlPattern: '*red-supermercado.pkt' }] });
+  await tab.open(`${site.url}/demo`);
+  await tab.waitFor("document.querySelectorAll('svg.topology .node').length === 71");
+  const [font, file] = await tab.evaluate("['condensed-500', 'red-supermercado.pkt'].map((name) => performance.getEntriesByType('resource').find((entry) => entry.name.includes(name)).toJSON())");
+  assert.ok(font.startTime < file.responseEnd, `la tipografía se pidió a ${Math.round(font.startTime)} ms y el archivo llegó a ${Math.round(file.responseEnd)}`);
+  await tab.close();
+});
+
 test('plegar el panel de detalles agranda el diagrama, y "Show details" lo vuelve a abrir', { skip, timeout: 60000 }, async () => {
   const tab = await browser.tab({ width: 1366, height: 700 });
   await tab.open(`${site.url}/demo`);
@@ -227,6 +242,20 @@ test('un archivo que no abre vuelve a la portada con el aviso', { skip, timeout:
   assert.ok(size >= 14, `el aviso mide ${size} px`);
   assert.notEqual(band, ground);
   assert.deepEqual(tab.problems, []);
+  await tab.close();
+});
+
+test('las 4 notas de la portada van en filas parejas a cualquier ancho', { skip, timeout: 60000 }, async () => {
+  const tab = await browser.tab();
+  await tab.open(`${site.url}/`);
+  for (const width of [360, 600, 900, 1000, 1100, 1440]) {
+    await tab.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    const rows = await tab.evaluate(`(() => {
+      const tops = [...document.querySelectorAll('.intro__notes > *')].map((note) => Math.round(note.getBoundingClientRect().top));
+      return [...new Set(tops)].map((top) => tops.filter((other) => other === top).length);
+    })()`);
+    assert.ok(rows.every((count) => count === rows[0]), `a ${width} px las filas tienen ${rows.join(' y ')} notas`);
+  }
   await tab.close();
 });
 
