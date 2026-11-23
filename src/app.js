@@ -78,6 +78,8 @@ const state = {
   packets: [],
   devicesById: new Map(),
   selectedDeviceId: null,
+  // Los equipos de un aviso que "Ver en el diagrama" dejó a la vista.
+  finding: null,
   packetSelection: [],
   showInfrastructure: false,
   // El tipo elegido en la guía del resumen; se traduce si cambia el idioma.
@@ -360,6 +362,7 @@ function choosePath(target) {
 
 // Los equipos de un aviso, con el resto apagado. Apiladas, el diagrama queda arriba del panel.
 function showFinding(ids) {
+  state.finding = ids;
   state.topology.showPath(ids);
   elements.stage.scrollIntoView({ block: 'nearest' });
   const names = new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format(ids.map((id) => state.devicesById.get(id).name));
@@ -371,6 +374,7 @@ const flaggedIds = () => new Set(state.review.flatMap((finding) => finding.devic
 function clearSelection() {
   if (state.kind !== 'network') return;
   choosePath(null);
+  state.finding = null;
   state.selectedDeviceId = null;
   state.topology.clearSelection();
   markChips(null);
@@ -1029,8 +1033,18 @@ function wireActions() {
     // Soltar el equipo no mueve el foco, así que el lector no diría nada sin el aviso.
     if (event.key === 'Escape' && !elements.exportDialog.open) {
       const released = state.kind === 'network' && state.devicesById.get(state.selectedDeviceId);
+      const marked = state.kind === 'network' && state.finding;
+      const from = document.activeElement;
+      const inPanel = elements.panel.contains(from);
+      const shown = [...elements.panel.querySelectorAll('.review__show')].indexOf(from);
       clearSelection();
       if (released) state.announcer?.say(t('rail.released', { name: released.name }));
+      else if (marked) state.announcer?.say(t('panel.reviewCleared'));
+      // El panel se rehace entero: el foco vuelve al mismo botón o, si ya no está, al título.
+      if (inPanel && !from.isConnected) {
+        const same = elements.panel.querySelectorAll('.review__show')[shown];
+        if (same) same.focus(); else goToPanel();
+      }
     }
 
     // "/" lleva al buscador de la columna, salvo mientras se escribe en otro campo.

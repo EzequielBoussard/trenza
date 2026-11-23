@@ -118,6 +118,11 @@ test('la red de ejemplo abre en /demo sin errores ni bloqueos de la política', 
   assert.deepEqual(await tab.evaluate("[...document.querySelectorAll('.node.is-path')].map((node) => node.getAttribute('aria-label').split(',')[0]).sort()"),
     ['IoT20', 'IoT21'], 'ver en el diagrama deja a la vista los 2 equipos con la dirección repetida');
   await tab.waitFor("document.querySelector('.rail [role=status]').textContent === 'On the diagram: IoT20 and IoT21'");
+  // Escape borra la marca, lo dice y deja el foco en el mismo botón aunque el panel se rehaga.
+  await tab.evaluate("(() => { const show = document.querySelector('.review__show'); show.focus(); show.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()");
+  await tab.waitFor("document.querySelector('.rail [role=status]').textContent === 'The diagram shows every device again'");
+  assert.equal(await tab.evaluate("document.querySelectorAll('.node.is-path').length"), 0);
+  assert.equal(await tab.evaluate("document.activeElement === document.querySelector('.review__show')"), true);
 
   // En el archivo real: una tablet dice qué es cada puerto, y un switch sin configurar no lista sus MAC.
   const pick = async (name) => {
